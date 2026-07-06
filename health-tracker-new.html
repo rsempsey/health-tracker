@@ -1,0 +1,3890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Health Tracker</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f4f6f8; font-family: system-ui, sans-serif; }
+    input, select, textarea, button { font-family: inherit; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+(function (global, factory) {
+  if (typeof define === "function" && define.amd) {
+    define(["exports"], factory);
+  } else if (typeof exports !== "undefined") {
+    factory(exports);
+  } else {
+    var mod = {
+      exports: {}
+    };
+    factory(mod.exports);
+    global.healthTracker = mod.exports;
+  }
+})(typeof globalThis !== "undefined" ? globalThis : typeof self !== "undefined" ? self : this, function (_exports) {
+  "use strict";
+
+  Object.defineProperty(_exports, "__esModule", {
+    value: true
+  });
+  _exports.default = App;
+  function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
+  function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+  function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
+  function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
+  function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
+  function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
+  function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
+  function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
+  function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+  function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */ var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i.return) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
+  function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
+  function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+  function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+  function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+  function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+  function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+  function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+  function asyncGeneratorStep(n, t, e, r, o, a, c) { try { var i = n[a](c), u = i.value; } catch (n) { return void e(n); } i.done ? t(u) : Promise.resolve(u).then(r, o); }
+  function _asyncToGenerator(n) { return function () { var t = this, e = arguments; return new Promise(function (r, o) { var a = n.apply(t, e); function _next(n) { asyncGeneratorStep(a, r, o, _next, _throw, "next", n); } function _throw(n) { asyncGeneratorStep(a, r, o, _next, _throw, "throw", n); } _next(void 0); }); }; }
+  // ── FIRESTORE REST CONFIG ─────────────────────────────────────────────────────
+  var FS_PROJECT = "health-tracker-fedf5";
+  var FS_KEY = "AIzaSyAOOAw1TVluE2At2rRXbxxmmU6iDBhUO-c";
+  var FS_COL = "health-tracker";
+  var FS_USER = "bob";
+  var FS_BASE = "https://firestore.googleapis.com/v1/projects/" + FS_PROJECT + "/databases/(default)/documents/" + FS_COL + "/";
+  function fsGet(_x) {
+    return _fsGet.apply(this, arguments);
+  }
+  function _fsGet() {
+    _fsGet = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee3(key) {
+      var res, json, raw, _t3;
+      return _regenerator().w(function (_context3) {
+        while (1) switch (_context3.p = _context3.n) {
+          case 0:
+            _context3.p = 0;
+            _context3.n = 1;
+            return fetch(FS_BASE + FS_USER + "-" + key + "?key=" + FS_KEY);
+          case 1:
+            res = _context3.v;
+            if (!(res.status === 404)) {
+              _context3.n = 2;
+              break;
+            }
+            return _context3.a(2, null);
+          case 2:
+            if (res.ok) {
+              _context3.n = 3;
+              break;
+            }
+            throw new Error("GET " + res.status);
+          case 3:
+            _context3.n = 4;
+            return res.json();
+          case 4:
+            json = _context3.v;
+            raw = json.fields && json.fields.value && json.fields.value.stringValue;
+            return _context3.a(2, raw ? JSON.parse(raw) : null);
+          case 5:
+            _context3.p = 5;
+            _t3 = _context3.v;
+            throw _t3;
+          case 6:
+            return _context3.a(2);
+        }
+      }, _callee3, null, [[0, 5]]);
+    }));
+    return _fsGet.apply(this, arguments);
+  }
+  function fsSet(_x2, _x3) {
+    return _fsSet.apply(this, arguments);
+  } // ── REFERENCE RANGES ──────────────────────────────────────────────────────────
+  function _fsSet() {
+    _fsSet = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee4(key, data) {
+      var url, body, res, txt, _t4;
+      return _regenerator().w(function (_context4) {
+        while (1) switch (_context4.p = _context4.n) {
+          case 0:
+            _context4.p = 0;
+            url = FS_BASE + FS_USER + "-" + key + "?key=" + FS_KEY;
+            body = {
+              fields: {
+                value: {
+                  stringValue: JSON.stringify(data)
+                }
+              }
+            };
+            _context4.n = 1;
+            return fetch(url, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify(body)
+            });
+          case 1:
+            res = _context4.v;
+            if (res.ok) {
+              _context4.n = 3;
+              break;
+            }
+            _context4.n = 2;
+            return res.text();
+          case 2:
+            txt = _context4.v;
+            throw new Error("SET " + res.status + ": " + txt.slice(0, 100));
+          case 3:
+            _context4.n = 5;
+            break;
+          case 4:
+            _context4.p = 4;
+            _t4 = _context4.v;
+            throw _t4;
+          case 5:
+            return _context4.a(2);
+        }
+      }, _callee4, null, [[0, 4]]);
+    }));
+    return _fsSet.apply(this, arguments);
+  }
+  var LAB_REFS = {
+    "Glucose": {
+      low: 70,
+      high: 99,
+      unit: "mg/dL"
+    },
+    "HbA1c": {
+      low: null,
+      high: 5.6,
+      unit: "%"
+    },
+    "eAG": {
+      low: null,
+      high: 114,
+      unit: "mg/dL"
+    },
+    "Total Chol": {
+      low: null,
+      high: 200,
+      unit: "mg/dL"
+    },
+    "LDL": {
+      low: null,
+      high: 100,
+      unit: "mg/dL"
+    },
+    "HDL": {
+      low: 40,
+      high: null,
+      unit: "mg/dL"
+    },
+    "Triglycerides": {
+      low: null,
+      high: 150,
+      unit: "mg/dL"
+    },
+    "Non-HDL Chol": {
+      low: null,
+      high: 130,
+      unit: "mg/dL"
+    },
+    "ALT": {
+      low: null,
+      high: 56,
+      unit: "U/L"
+    },
+    "AST": {
+      low: null,
+      high: 40,
+      unit: "U/L"
+    },
+    "Alk Phos": {
+      low: 44,
+      high: 147,
+      unit: "U/L"
+    },
+    "T Bili": {
+      low: null,
+      high: 1.2,
+      unit: "mg/dL"
+    },
+    "Albumin": {
+      low: 3.5,
+      high: 5.0,
+      unit: "g/dL"
+    },
+    "Total Protein": {
+      low: 6.0,
+      high: 8.3,
+      unit: "g/dL"
+    },
+    "Sodium": {
+      low: 135,
+      high: 145,
+      unit: "mEq/L"
+    },
+    "Potassium": {
+      low: 3.5,
+      high: 5.0,
+      unit: "mEq/L"
+    },
+    "Chloride": {
+      low: 96,
+      high: 106,
+      unit: "mEq/L"
+    },
+    "CO2": {
+      low: 22,
+      high: 29,
+      unit: "mEq/L"
+    },
+    "BUN": {
+      low: 7,
+      high: 20,
+      unit: "mg/dL"
+    },
+    "Creatinine": {
+      low: 0.6,
+      high: 1.2,
+      unit: "mg/dL"
+    },
+    "Calcium": {
+      low: 8.5,
+      high: 10.5,
+      unit: "mg/dL"
+    },
+    "WBC": {
+      low: 4.5,
+      high: 11.0,
+      unit: "K/µL"
+    },
+    "Hemoglobin": {
+      low: 13.5,
+      high: 17.5,
+      unit: "g/dL"
+    },
+    "Hematocrit": {
+      low: 41,
+      high: 53,
+      unit: "%"
+    },
+    "Platelets": {
+      low: 150,
+      high: 400,
+      unit: "K/µL"
+    },
+    "TSH": {
+      low: 0.4,
+      high: 4.0,
+      unit: "mIU/L"
+    },
+    "PSA": {
+      low: null,
+      high: 4.0,
+      unit: "ng/mL"
+    },
+    "Magnesium": {
+      low: 1.7,
+      high: 2.3,
+      unit: "mg/dL"
+    },
+    "Cardiac Risk": {
+      low: null,
+      high: 5.0,
+      unit: ""
+    }
+  };
+  function labStatus(name, value) {
+    var ref = LAB_REFS[name];
+    if (!ref || value == null || isNaN(value)) return "normal";
+    if (ref.high !== null && value > ref.high) return "high";
+    if (ref.low !== null && value < ref.low) return "low";
+    return "normal";
+  }
+  function statusColor(s) {
+    if (s === "high") return "#ef4444";
+    if (s === "low") return "#3b82f6";
+    return "#22c55e";
+  }
+
+  // ── SEED DATA ─────────────────────────────────────────────────────────────────
+  var SEED_BP = [{
+    id: 1,
+    date: "2025-03-26",
+    time: "",
+    systolic: 144,
+    diastolic: 92,
+    heartRate: 87,
+    medication: "",
+    notes: "Penn State Hershey — office visit"
+  }, {
+    id: 2,
+    date: "2026-07-04",
+    time: "13:26",
+    systolic: 125,
+    diastolic: 81,
+    heartRate: 91,
+    medication: "Amlodipine Besylate 5mg @ ~11:00 AM",
+    notes: "First home reading — resting"
+  }];
+  var SEED_WEIGHT = [{
+    id: 1,
+    date: "2025-03-26",
+    weight: 306.44,
+    notes: "Penn State Hershey office"
+  }, {
+    id: 2,
+    date: "2026-07-01",
+    weight: 310,
+    notes: "ER visit"
+  }];
+  var SEED_LABS = [{
+    id: 1,
+    date: "2024-03-06",
+    lab: "Penn State Hershey",
+    values: {
+      "Sodium": 137,
+      "Potassium": 4.3,
+      "Chloride": 103,
+      "CO2": 25.7,
+      "BUN": 17,
+      "Creatinine": 0.74,
+      "Glucose": 122,
+      "Calcium": 9.8,
+      "WBC": 9.36,
+      "Hemoglobin": 16.5,
+      "Hematocrit": 49.2,
+      "Platelets": 176,
+      "ALT": 73,
+      "T Bili": 0.5,
+      "Alk Phos": 84,
+      "AST": 37,
+      "Albumin": 4.5,
+      "Total Protein": 7.1,
+      "Total Chol": 133,
+      "LDL": 72,
+      "HDL": 45,
+      "Cardiac Risk": 2.96,
+      "Triglycerides": 79
+    }
+  }, {
+    id: 2,
+    date: "2024-09-09",
+    lab: "Penn State Hershey",
+    values: {
+      "Sodium": 137,
+      "Potassium": 4.3,
+      "Chloride": 102,
+      "CO2": 27.1,
+      "BUN": 13,
+      "Creatinine": 0.77,
+      "Glucose": 109,
+      "Calcium": 9.1,
+      "WBC": 9.68,
+      "Hemoglobin": 16.8,
+      "Hematocrit": 48.7,
+      "Platelets": 172,
+      "ALT": 66,
+      "T Bili": 0.8,
+      "Alk Phos": 79,
+      "AST": 38,
+      "Albumin": 4.4,
+      "Total Protein": 7.5,
+      "Total Chol": 145,
+      "LDL": 88,
+      "HDL": 43,
+      "Cardiac Risk": 3.37,
+      "Triglycerides": 69,
+      "HbA1c": 6.1,
+      "eAG": 128,
+      "PSA": 0.73
+    }
+  }, {
+    id: 3,
+    date: "2026-07-01",
+    lab: "ER — Penn State Hershey",
+    values: {
+      "Sodium": 134,
+      "Potassium": 3.7,
+      "Chloride": 103,
+      "CO2": 22,
+      "Glucose": 153,
+      "BUN": 12,
+      "Creatinine": 0.79,
+      "Albumin": "4.7 / 4.4",
+      "Total Protein": "7.9 / 7.4",
+      "T Bili": "0.6 / 1.0",
+      "Alk Phos": "76 / 74",
+      "AST": "40 / 38",
+      "ALT": "68 / 65",
+      "Calcium": 9.4,
+      "WBC": 9.86,
+      "Hemoglobin": 17.2,
+      "Hematocrit": 51,
+      "Platelets": 177,
+      "Magnesium": 2.0,
+      "TSH": 2.514,
+      "Total Chol": 140,
+      "Triglycerides": 56,
+      "HDL": 32,
+      "LDL": 94,
+      "Non-HDL Chol": 108,
+      "HbA1c": 6.8,
+      "eAG": 148
+    }
+  }];
+  var SEED_GOALS = {
+    weight: 250,
+    systolic: 120,
+    diastolic: 80,
+    HbA1c: 5.6,
+    HDL: 50,
+    LDL: 80
+  };
+  var SEED_MEDS = [{
+    id: 1,
+    name: "Amlodipine Besylate",
+    dose: "5mg",
+    frequency: "Daily",
+    startDate: "2026-07-04",
+    notes: "For blood pressure",
+    active: true
+  }];
+  var HEIGHT_IN = 71;
+  var LAB_PANELS = {
+    "Metabolic": ["Glucose", "Sodium", "Potassium", "Chloride", "CO2", "BUN", "Creatinine", "Calcium", "Albumin", "Total Protein"],
+    "Liver": ["ALT", "AST", "Alk Phos", "T Bili"],
+    "Lipids": ["Total Chol", "LDL", "HDL", "Triglycerides", "Non-HDL Chol", "Cardiac Risk"],
+    "Blood / CBC": ["WBC", "Hemoglobin", "Hematocrit", "Platelets"],
+    "Diabetes": ["HbA1c", "eAG"],
+    "Other": ["TSH", "PSA", "Magnesium"]
+  };
+  var BLANK_VALS = function BLANK_VALS() {
+    var v = {};
+    Object.values(LAB_PANELS).flat().forEach(function (m) {
+      v[m] = "";
+    });
+    return v;
+  };
+
+  // ── STORAGE HOOK ──────────────────────────────────────────────────────────────
+  function usePersistedState(key, seed) {
+    var CACHE_KEY = 'ht2026:' + key;
+
+    // Instant render from localStorage cache
+    var _useState = useState(function () {
+        try {
+          var raw = localStorage.getItem(CACHE_KEY);
+          if (raw) return JSON.parse(raw);
+        } catch (_unused) {}
+        return null;
+      }),
+      _useState2 = _slicedToArray(_useState, 2),
+      data = _useState2[0],
+      setData = _useState2[1];
+    var _useState3 = useState(false),
+      _useState4 = _slicedToArray(_useState3, 2),
+      loaded = _useState4[0],
+      setLoaded = _useState4[1];
+    useEffect(function () {
+      function load() {
+        return _load.apply(this, arguments);
+      }
+      function _load() {
+        _load = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
+          var val, _t;
+          return _regenerator().w(function (_context) {
+            while (1) switch (_context.p = _context.n) {
+              case 0:
+                _context.p = 0;
+                _context.n = 1;
+                return fsGet(key);
+              case 1:
+                val = _context.v;
+                if (!(val !== null)) {
+                  _context.n = 2;
+                  break;
+                }
+                setData(val);
+                try {
+                  localStorage.setItem(CACHE_KEY, JSON.stringify(val));
+                } catch (_unused2) {}
+                _context.n = 4;
+                break;
+              case 2:
+                _context.n = 3;
+                return fsSet(key, seed);
+              case 3:
+                setData(seed);
+                try {
+                  localStorage.setItem(CACHE_KEY, JSON.stringify(seed));
+                } catch (_unused3) {}
+              case 4:
+                _context.n = 6;
+                break;
+              case 5:
+                _context.p = 5;
+                _t = _context.v;
+                console.error("Firestore load error", key, _t);
+                // Fall back to cache or seed
+                setData(function (d) {
+                  return d !== null ? d : seed;
+                });
+              case 6:
+                setLoaded(true);
+              case 7:
+                return _context.a(2);
+            }
+          }, _callee, null, [[0, 5]]);
+        }));
+        return _load.apply(this, arguments);
+      }
+      load();
+    }, [key]);
+    function update(_x4) {
+      return _update.apply(this, arguments);
+    }
+    function _update() {
+      _update = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee2(d) {
+        var _t2;
+        return _regenerator().w(function (_context2) {
+          while (1) switch (_context2.p = _context2.n) {
+            case 0:
+              setData(d);
+              try {
+                localStorage.setItem(CACHE_KEY, JSON.stringify(d));
+              } catch (_unused4) {}
+              _context2.p = 1;
+              _context2.n = 2;
+              return fsSet(key, d);
+            case 2:
+              _context2.n = 4;
+              break;
+            case 3:
+              _context2.p = 3;
+              _t2 = _context2.v;
+              console.error("Firestore write error", key, _t2);
+            case 4:
+              return _context2.a(2);
+          }
+        }, _callee2, null, [[1, 3]]);
+      }));
+      return _update.apply(this, arguments);
+    }
+    return [data, update, loaded];
+  }
+
+  // ── HELPERS ───────────────────────────────────────────────────────────────────
+  function bmi(lbs) {
+    return (lbs / (HEIGHT_IN * HEIGHT_IN) * 703).toFixed(1);
+  }
+  function bmiCat(b) {
+    if (b < 18.5) return {
+      label: "Underweight",
+      color: "#3b82f6"
+    };
+    if (b < 25) return {
+      label: "Normal",
+      color: "#22c55e"
+    };
+    if (b < 30) return {
+      label: "Overweight",
+      color: "#eab308"
+    };
+    return {
+      label: "Obese",
+      color: "#ef4444"
+    };
+  }
+  function bpCat(s, d) {
+    if (s < 120 && d < 80) return {
+      label: "Normal",
+      color: "#22c55e"
+    };
+    if (s < 130 && d < 80) return {
+      label: "Elevated",
+      color: "#eab308"
+    };
+    if (s < 140 || d < 90) return {
+      label: "High Stage 1",
+      color: "#f97316"
+    };
+    return {
+      label: "High Stage 2",
+      color: "#ef4444"
+    };
+  }
+  function fmtDate(d) {
+    if (!d) return "—";
+    var _d$split = d.split("-"),
+      _d$split2 = _slicedToArray(_d$split, 3),
+      y = _d$split2[0],
+      m = _d$split2[1],
+      day = _d$split2[2];
+    return "".concat(["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][+m - 1], " ").concat(+day, ", ").concat(y);
+  }
+  function firstNum(v) {
+    return parseFloat(String(v).split("/")[0]);
+  }
+  function today() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  // ── STYLE TOKENS ──────────────────────────────────────────────────────────────
+  var C = {
+    bg: "#f4f6f8",
+    card: "#fff",
+    border: "#e5e7eb",
+    text: "#111827",
+    muted: "#6b7280",
+    faint: "#9ca3af",
+    accent: "#2563eb"
+  };
+  var inputSt = {
+    width: "100%",
+    padding: "8px 10px",
+    border: "1px solid ".concat(C.border),
+    borderRadius: 8,
+    fontSize: 14,
+    background: "#fafafa",
+    color: C.text,
+    boxSizing: "border-box"
+  };
+  var labelSt = {
+    fontSize: 12,
+    color: C.muted,
+    fontWeight: 600,
+    marginBottom: 3,
+    display: "block"
+  };
+  var taSt = _objectSpread(_objectSpread({}, inputSt), {}, {
+    resize: "vertical",
+    minHeight: 80,
+    fontFamily: "inherit",
+    lineHeight: 1.5
+  });
+  function Badge(_ref) {
+    var label = _ref.label,
+      color = _ref.color,
+      small = _ref.small;
+    return /*#__PURE__*/React.createElement("span", {
+      style: {
+        background: color + "18",
+        color: color,
+        border: "1px solid ".concat(color, "40"),
+        borderRadius: 5,
+        padding: small ? "1px 7px" : "2px 9px",
+        fontSize: small ? 11 : 12,
+        fontWeight: 600,
+        whiteSpace: "nowrap"
+      }
+    }, label);
+  }
+  function Card(_ref2) {
+    var children = _ref2.children,
+      style = _ref2.style;
+    return /*#__PURE__*/React.createElement("div", {
+      style: _objectSpread({
+        background: C.card,
+        border: "1px solid ".concat(C.border),
+        borderRadius: 12,
+        padding: "16px 18px"
+      }, style)
+    }, children);
+  }
+  function SectionTitle(_ref3) {
+    var children = _ref3.children;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: C.faint,
+        letterSpacing: 0.8,
+        marginBottom: 10
+      }
+    }, children);
+  }
+  function DelBtn(_ref4) {
+    var onClick = _ref4.onClick;
+    return /*#__PURE__*/React.createElement("button", {
+      onClick: onClick,
+      style: {
+        background: "none",
+        border: "none",
+        color: "#d1d5db",
+        cursor: "pointer",
+        fontSize: 18,
+        padding: 2,
+        lineHeight: 1
+      },
+      title: "Delete"
+    }, "\xD7");
+  }
+  function AddBtn(_ref5) {
+    var onClick = _ref5.onClick,
+      label = _ref5.label;
+    return /*#__PURE__*/React.createElement("button", {
+      onClick: onClick,
+      style: {
+        width: "100%",
+        padding: "11px",
+        background: C.accent,
+        color: "#fff",
+        border: "none",
+        borderRadius: 9,
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: "pointer",
+        marginBottom: 14
+      }
+    }, label);
+  }
+  function SaveBtn(_ref6) {
+    var onClick = _ref6.onClick,
+      _ref6$label = _ref6.label,
+      label = _ref6$label === void 0 ? "Save" : _ref6$label;
+    return /*#__PURE__*/React.createElement("button", {
+      onClick: onClick,
+      style: {
+        width: "100%",
+        padding: "10px",
+        background: C.text,
+        color: "#fff",
+        border: "none",
+        borderRadius: 8,
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    }, label);
+  }
+  function Spinner() {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        padding: "60px 0",
+        color: C.faint,
+        fontSize: 14
+      }
+    }, "Loading\u2026");
+  }
+
+  // ── MINI LINE CHART ───────────────────────────────────────────────────────────
+  function MiniChart(_ref7) {
+    var points = _ref7.points,
+      _ref7$color = _ref7.color,
+      color = _ref7$color === void 0 ? "#2563eb" : _ref7$color,
+      goal = _ref7.goal,
+      unit = _ref7.unit,
+      _ref7$bad = _ref7.bad,
+      bad = _ref7$bad === void 0 ? "high" : _ref7$bad;
+    var W = 280,
+      H = 70,
+      pad = 8;
+    if (!points || points.length < 2) return null;
+    var vals = points.map(function (p) {
+      return p.y;
+    });
+    var allVals = goal != null ? [].concat(_toConsumableArray(vals), [goal]) : vals;
+    var mn = Math.min.apply(Math, _toConsumableArray(allVals)),
+      mx = Math.max.apply(Math, _toConsumableArray(allVals));
+    var rng = mx - mn || 1;
+    var xs = points.map(function (_, i) {
+      return pad + i * (W - 2 * pad) / (points.length - 1);
+    });
+    var ys = points.map(function (p) {
+      return H - pad - (p.y - mn) / rng * (H - 2 * pad);
+    });
+    var path = "M" + xs.map(function (x, i) {
+      return "".concat(x, ",").concat(ys[i]);
+    }).join(" L");
+    var goalY = goal != null ? H - pad - (goal - mn) / rng * (H - 2 * pad) : null;
+    var last = points[points.length - 1];
+    var prev = points[points.length - 2];
+    var delta = last.y - prev.y;
+    var goodDir = bad === "high" ? delta < 0 : delta > 0;
+    var arrow = delta === 0 ? "→" : delta > 0 ? "↑" : "↓";
+    var arrowColor = delta === 0 ? C.faint : goodDir ? "#22c55e" : "#ef4444";
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("svg", {
+      width: W,
+      height: H,
+      style: {
+        display: "block",
+        overflow: "visible"
+      }
+    }, goalY != null && /*#__PURE__*/React.createElement("line", {
+      x1: pad,
+      y1: goalY,
+      x2: W - pad,
+      y2: goalY,
+      stroke: "#22c55e",
+      strokeWidth: 1,
+      strokeDasharray: "4,3",
+      opacity: 0.7
+    }), /*#__PURE__*/React.createElement("path", {
+      d: path,
+      fill: "none",
+      stroke: color,
+      strokeWidth: 2,
+      strokeLinejoin: "round",
+      strokeLinecap: "round"
+    }), points.map(function (p, i) {
+      return /*#__PURE__*/React.createElement("circle", {
+        key: i,
+        cx: xs[i],
+        cy: ys[i],
+        r: 3,
+        fill: color
+      });
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginTop: 4
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.faint
+      }
+    }, fmtDate(points[0].date), " \u2192 ", fmtDate(last.date)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: arrowColor
+      }
+    }, arrow, " ", Math.abs(delta).toFixed(1), " ", unit)));
+  }
+
+  // ── GOAL PROGRESS BAR ─────────────────────────────────────────────────────────
+  function GoalBar(_ref8) {
+    var label = _ref8.label,
+      current = _ref8.current,
+      goal = _ref8.goal,
+      unit = _ref8.unit,
+      _ref8$bad = _ref8.bad,
+      bad = _ref8$bad === void 0 ? "high" : _ref8$bad;
+    if (current == null || goal == null) return null;
+    var met = bad === "high" ? current <= goal : current >= goal;
+    var pct = bad === "high" ? Math.max(0, Math.min(100, 100 - (current - goal) / Math.max(goal, 1) * 50)) : Math.max(0, Math.min(100, current / goal * 100));
+    var barColor = met ? "#22c55e" : current === goal ? "#22c55e" : "#f97316";
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "baseline",
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 600,
+        color: C.text
+      }
+    }, label), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: C.muted
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        color: met ? "#22c55e" : C.text
+      }
+    }, current), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.faint
+      }
+    }, " / goal ", goal, " ", unit), met && /*#__PURE__*/React.createElement("span", {
+      style: {
+        marginLeft: 6,
+        color: "#22c55e",
+        fontWeight: 700
+      }
+    }, "\u2713"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        background: C.border,
+        borderRadius: 4,
+        height: 6,
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: "".concat(pct, "%"),
+        background: barColor,
+        height: "100%",
+        borderRadius: 4,
+        transition: "width 0.4s"
+      }
+    })));
+  }
+
+  // ── VITALS TAB ────────────────────────────────────────────────────────────────
+  function VitalsTab(_ref9) {
+    var readings = _ref9.bp,
+      setReadings = _ref9.setBp,
+      goals = _ref9.goals;
+    var _useState5 = useState(false),
+      _useState6 = _slicedToArray(_useState5, 2),
+      open = _useState6[0],
+      setOpen = _useState6[1];
+    var _useState7 = useState({
+        date: "",
+        time: "",
+        systolic: "",
+        diastolic: "",
+        heartRate: "",
+        medication: "",
+        notes: ""
+      }),
+      _useState8 = _slicedToArray(_useState7, 2),
+      f = _useState8[0],
+      setF = _useState8[1];
+    var sorted = _toConsumableArray(readings).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    });
+    var latest = sorted[0];
+    var prev = sorted[1];
+    function save() {
+      if (!f.systolic || !f.diastolic || !f.heartRate || !f.date) return;
+      setReadings([].concat(_toConsumableArray(readings), [_objectSpread(_objectSpread({
+        id: Date.now()
+      }, f), {}, {
+        systolic: +f.systolic,
+        diastolic: +f.diastolic,
+        heartRate: +f.heartRate
+      })]));
+      setF({
+        date: "",
+        time: "",
+        systolic: "",
+        diastolic: "",
+        heartRate: "",
+        medication: "",
+        notes: ""
+      });
+      setOpen(false);
+    }
+    var chartPts = _toConsumableArray(readings).sort(function (a, b) {
+      return a.date.localeCompare(b.date);
+    }).map(function (r) {
+      return {
+        date: r.date,
+        y: r.systolic
+      };
+    });
+    var bp = latest ? bpCat(latest.systolic, latest.diastolic) : null;
+    return /*#__PURE__*/React.createElement("div", null, latest && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST \xB7 ", fmtDate(latest.date)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 24,
+        alignItems: "flex-end",
+        flexWrap: "wrap",
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 34,
+        fontWeight: 800,
+        color: C.text,
+        letterSpacing: -1
+      }
+    }, latest.systolic, "/", latest.diastolic), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: C.faint,
+        marginLeft: 6
+      }
+    }, "mmHg"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 5
+      }
+    }, /*#__PURE__*/React.createElement(Badge, {
+      label: bp.label,
+      color: bp.color
+    }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 26,
+        fontWeight: 700,
+        color: C.text
+      }
+    }, latest.heartRate), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: C.faint,
+        marginLeft: 4
+      }
+    }, "bpm"), prev && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.faint,
+        marginTop: 2
+      }
+    }, "prev ", prev.systolic, "/", prev.diastolic, " \xB7 ", prev.heartRate, " bpm"))), chartPts.length >= 2 && /*#__PURE__*/React.createElement(MiniChart, {
+      points: chartPts,
+      color: bp.color,
+      goal: goals === null || goals === void 0 ? void 0 : goals.systolic,
+      unit: "mmHg"
+    })), goals && (latest || prev) && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "GOALS"), /*#__PURE__*/React.createElement(GoalBar, {
+      label: "Systolic BP",
+      current: latest === null || latest === void 0 ? void 0 : latest.systolic,
+      goal: goals.systolic,
+      unit: "mmHg"
+    }), /*#__PURE__*/React.createElement(GoalBar, {
+      label: "Diastolic BP",
+      current: latest === null || latest === void 0 ? void 0 : latest.diastolic,
+      goal: goals.diastolic,
+      unit: "mmHg"
+    })), /*#__PURE__*/React.createElement(AddBtn, {
+      onClick: function onClick() {
+        return setOpen(!open);
+      },
+      label: open ? "Cancel" : "+ Log Reading"
+    }), open && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 10,
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Date"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "date",
+      value: f.date,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          date: e.target.value
+        }));
+      }
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Time"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "time",
+      value: f.time,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          time: e.target.value
+        }));
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr 1fr",
+        gap: 10,
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Systolic"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "number",
+      placeholder: "120",
+      value: f.systolic,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          systolic: e.target.value
+        }));
+      }
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Diastolic"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "number",
+      placeholder: "80",
+      value: f.diastolic,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          diastolic: e.target.value
+        }));
+      }
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "HR (bpm)"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "number",
+      placeholder: "72",
+      value: f.heartRate,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          heartRate: e.target.value
+        }));
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Medication"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "text",
+      placeholder: "e.g. Amlodipine 5mg @ 8 AM",
+      value: f.medication,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          medication: e.target.value
+        }));
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Notes"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "text",
+      placeholder: "e.g. resting, after walk",
+      value: f.notes,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          notes: e.target.value
+        }));
+      }
+    })), /*#__PURE__*/React.createElement(SaveBtn, {
+      onClick: save
+    })), /*#__PURE__*/React.createElement(SectionTitle, null, "ALL READINGS"), sorted.map(function (r) {
+      var bp = bpCat(r.systolic, r.diastolic);
+      return /*#__PURE__*/React.createElement(Card, {
+        key: r.id,
+        style: {
+          marginBottom: 10
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start"
+        }
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 12,
+          color: C.faint,
+          marginBottom: 4
+        }
+      }, fmtDate(r.date), r.time && r.time !== "—" ? " \xB7 ".concat(r.time) : ""), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "baseline",
+          gap: 8,
+          flexWrap: "wrap"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 22,
+          fontWeight: 700,
+          color: C.text
+        }
+      }, r.systolic, "/", r.diastolic, " ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: C.faint,
+          fontWeight: 400
+        }
+      }, "mmHg")), /*#__PURE__*/React.createElement(Badge, {
+        label: bp.label,
+        color: bp.color,
+        small: true
+      })), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 15,
+          color: C.muted,
+          marginTop: 2
+        }
+      }, r.heartRate, " bpm"), r.medication && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: C.faint,
+          marginTop: 5
+        }
+      }, "\uD83D\uDC8A ", r.medication), r.notes && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: C.faint,
+          marginTop: 2
+        }
+      }, "\uD83D\uDCDD ", r.notes)), /*#__PURE__*/React.createElement(DelBtn, {
+        onClick: function onClick() {
+          return setReadings(readings.filter(function (x) {
+            return x.id !== r.id;
+          }));
+        }
+      })));
+    }));
+  }
+
+  // ── WEIGHT TAB ────────────────────────────────────────────────────────────────
+  function WeightTab(_ref0) {
+    var entries = _ref0.weight,
+      setEntries = _ref0.setWeight,
+      goals = _ref0.goals;
+    var _useState9 = useState(false),
+      _useState0 = _slicedToArray(_useState9, 2),
+      open = _useState0[0],
+      setOpen = _useState0[1];
+    var _useState1 = useState({
+        date: "",
+        weight: "",
+        notes: ""
+      }),
+      _useState10 = _slicedToArray(_useState1, 2),
+      f = _useState10[0],
+      setF = _useState10[1];
+    var sorted = _toConsumableArray(entries).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    });
+    var latest = sorted[0];
+    var first = sorted[sorted.length - 1];
+    var change = latest && first && latest.id !== first.id ? (latest.weight - first.weight).toFixed(1) : null;
+    function save() {
+      if (!f.weight || !f.date) return;
+      setEntries([].concat(_toConsumableArray(entries), [{
+        id: Date.now(),
+        date: f.date,
+        weight: +f.weight,
+        notes: f.notes
+      }]));
+      setF({
+        date: "",
+        weight: "",
+        notes: ""
+      });
+      setOpen(false);
+    }
+    var chartPts = _toConsumableArray(entries).sort(function (a, b) {
+      return a.date.localeCompare(b.date);
+    }).map(function (e) {
+      return {
+        date: e.date,
+        y: e.weight
+      };
+    });
+    return /*#__PURE__*/React.createElement("div", null, latest && function () {
+      var b = parseFloat(bmi(latest.weight));
+      var cat = bmiCat(b);
+      return /*#__PURE__*/React.createElement(Card, {
+        style: {
+          marginBottom: 14
+        }
+      }, /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST \xB7 ", fmtDate(latest.date)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 28,
+          alignItems: "flex-end",
+          flexWrap: "wrap",
+          marginBottom: 12
+        }
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 36,
+          fontWeight: 800,
+          color: C.text,
+          letterSpacing: -1
+        }
+      }, latest.weight), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 14,
+          color: C.faint,
+          marginLeft: 5
+        }
+      }, "lb"), change !== null && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 13,
+          color: +change > 0 ? "#ef4444" : "#22c55e",
+          marginTop: 2,
+          fontWeight: 600
+        }
+      }, +change > 0 ? "+" : "", change, " lb since ", fmtDate(first.date))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 26,
+          fontWeight: 700,
+          color: C.text
+        }
+      }, b), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 13,
+          color: C.faint,
+          marginLeft: 4
+        }
+      }, "BMI"), /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: 4
+        }
+      }, /*#__PURE__*/React.createElement(Badge, {
+        label: cat.label,
+        color: cat.color
+      })))), chartPts.length >= 2 && /*#__PURE__*/React.createElement(MiniChart, {
+        points: chartPts,
+        color: "#8b5cf6",
+        goal: goals === null || goals === void 0 ? void 0 : goals.weight,
+        unit: "lb"
+      }));
+    }(), goals && latest && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "GOALS"), /*#__PURE__*/React.createElement(GoalBar, {
+      label: "Weight",
+      current: latest.weight,
+      goal: goals.weight,
+      unit: "lb"
+    })), /*#__PURE__*/React.createElement(AddBtn, {
+      onClick: function onClick() {
+        return setOpen(!open);
+      },
+      label: open ? "Cancel" : "+ Log Weight"
+    }), open && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 10,
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Date"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "date",
+      value: f.date,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          date: e.target.value
+        }));
+      }
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Weight (lb)"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "number",
+      step: "0.1",
+      placeholder: "300",
+      value: f.weight,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          weight: e.target.value
+        }));
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Notes"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "text",
+      placeholder: "e.g. morning, before breakfast",
+      value: f.notes,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          notes: e.target.value
+        }));
+      }
+    })), /*#__PURE__*/React.createElement(SaveBtn, {
+      onClick: save
+    })), /*#__PURE__*/React.createElement(SectionTitle, null, "ALL ENTRIES"), sorted.map(function (e) {
+      var b = parseFloat(bmi(e.weight));
+      var cat = bmiCat(b);
+      return /*#__PURE__*/React.createElement(Card, {
+        key: e.id,
+        style: {
+          marginBottom: 10
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start"
+        }
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 12,
+          color: C.faint,
+          marginBottom: 4
+        }
+      }, fmtDate(e.date)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "baseline",
+          gap: 10,
+          flexWrap: "wrap"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 22,
+          fontWeight: 700,
+          color: C.text
+        }
+      }, e.weight, " ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: C.faint,
+          fontWeight: 400
+        }
+      }, "lb")), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 14,
+          color: C.muted
+        }
+      }, b, " BMI"), /*#__PURE__*/React.createElement(Badge, {
+        label: cat.label,
+        color: cat.color,
+        small: true
+      })), e.notes && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: C.faint,
+          marginTop: 4
+        }
+      }, "\uD83D\uDCDD ", e.notes)), /*#__PURE__*/React.createElement(DelBtn, {
+        onClick: function onClick() {
+          return setEntries(entries.filter(function (x) {
+            return x.id !== e.id;
+          }));
+        }
+      })));
+    }));
+  }
+
+  // ── LABS TAB ──────────────────────────────────────────────────────────────────
+  function LabsTab(_ref1) {
+    var _sorted$;
+    var labs = _ref1.labs,
+      setLabs = _ref1.setLabs,
+      goals = _ref1.goals;
+    var _useState11 = useState(null),
+      _useState12 = _slicedToArray(_useState11, 2),
+      selected = _useState12[0],
+      setSelected = _useState12[1];
+    var _useState13 = useState("panel"),
+      _useState14 = _slicedToArray(_useState13, 2),
+      view = _useState14[0],
+      setView = _useState14[1];
+    var _useState15 = useState("HbA1c"),
+      _useState16 = _slicedToArray(_useState15, 2),
+      trendMarker = _useState16[0],
+      setTrendMarker = _useState16[1];
+    var _useState17 = useState(false),
+      _useState18 = _slicedToArray(_useState17, 2),
+      open = _useState18[0],
+      setOpen = _useState18[1];
+    var _useState19 = useState(""),
+      _useState20 = _slicedToArray(_useState19, 2),
+      fDate = _useState20[0],
+      setFDate = _useState20[1];
+    var _useState21 = useState(""),
+      _useState22 = _slicedToArray(_useState21, 2),
+      fLab = _useState22[0],
+      setFLab = _useState22[1];
+    var _useState23 = useState(BLANK_VALS()),
+      _useState24 = _slicedToArray(_useState23, 2),
+      fVals = _useState24[0],
+      setFVals = _useState24[1];
+    var sorted = _toConsumableArray(labs).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    });
+    var activeId = selected !== null && selected !== void 0 ? selected : (_sorted$ = sorted[0]) === null || _sorted$ === void 0 ? void 0 : _sorted$.id;
+    var current = labs.find(function (l) {
+      return l.id === activeId;
+    }) || sorted[0];
+    var allMarkers = _toConsumableArray(new Set(labs.flatMap(function (l) {
+      return Object.keys(l.values);
+    }))).sort();
+    var trendData = labs.filter(function (l) {
+      return l.values[trendMarker] != null;
+    }).map(function (l) {
+      return {
+        date: l.date,
+        y: firstNum(l.values[trendMarker])
+      };
+    }).sort(function (a, b) {
+      return a.date.localeCompare(b.date);
+    });
+    var ref = LAB_REFS[trendMarker];
+    function flagCount(lab) {
+      return Object.entries(lab.values).filter(function (_ref10) {
+        var _ref11 = _slicedToArray(_ref10, 2),
+          k = _ref11[0],
+          v = _ref11[1];
+        return labStatus(k, firstNum(v)) !== "normal";
+      }).length;
+    }
+    function savePanel() {
+      if (!fDate) return;
+      var values = {};
+      Object.entries(fVals).forEach(function (_ref12) {
+        var _ref13 = _slicedToArray(_ref12, 2),
+          k = _ref13[0],
+          v = _ref13[1];
+        if (v !== "") values[k] = isNaN(+v) ? v : +v;
+      });
+      if (!Object.keys(values).length) return;
+      var nl = {
+        id: Date.now(),
+        date: fDate,
+        lab: fLab || "Lab",
+        values: values
+      };
+      var next = [].concat(_toConsumableArray(labs), [nl]);
+      setLabs(next);
+      setSelected(nl.id);
+      setFDate("");
+      setFLab("");
+      setFVals(BLANK_VALS());
+      setOpen(false);
+      setView("panel");
+    }
+    function delLab(id) {
+      var next = labs.filter(function (l) {
+        return l.id !== id;
+      });
+      setLabs(next);
+      if (activeId === id) setSelected(null);
+    }
+    var goalMarkers = ["HbA1c", "HDL", "LDL"];
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8,
+        marginBottom: 14,
+        flexWrap: "wrap"
+      }
+    }, sorted.map(function (l) {
+      var flags = flagCount(l);
+      var active = l.id === activeId;
+      return /*#__PURE__*/React.createElement("button", {
+        key: l.id,
+        onClick: function onClick() {
+          setSelected(l.id);
+          setView("panel");
+        },
+        style: {
+          padding: "8px 12px",
+          borderRadius: 8,
+          border: "1px solid ".concat(active ? C.accent : C.border),
+          background: active ? C.accent : "#fff",
+          color: active ? "#fff" : C.text,
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          gap: 6
+        }
+      }, fmtDate(l.date), flags > 0 && /*#__PURE__*/React.createElement("span", {
+        style: {
+          background: active ? "rgba(255,255,255,0.3)" : "#fee2e2",
+          color: active ? "#fff" : "#ef4444",
+          borderRadius: 10,
+          padding: "1px 6px",
+          fontSize: 11
+        }
+      }, flags));
+    })), /*#__PURE__*/React.createElement(AddBtn, {
+      onClick: function onClick() {
+        return setOpen(!open);
+      },
+      label: open ? "Cancel" : "+ Add Lab Results"
+    }), open && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        color: C.text,
+        fontSize: 15,
+        marginBottom: 14
+      }
+    }, "New Lab Results"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 10,
+        marginBottom: 16
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Date"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "date",
+      value: fDate,
+      onChange: function onChange(e) {
+        return setFDate(e.target.value);
+      }
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Lab / Location"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "text",
+      placeholder: "e.g. Penn State Hershey",
+      value: fLab,
+      onChange: function onChange(e) {
+        return setFLab(e.target.value);
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.faint,
+        marginBottom: 12
+      }
+    }, "Enter only the values from your results \u2014 leave the rest blank."), Object.entries(LAB_PANELS).map(function (_ref14) {
+      var _ref15 = _slicedToArray(_ref14, 2),
+        panel = _ref15[0],
+        markers = _ref15[1];
+      return /*#__PURE__*/React.createElement("div", {
+        key: panel,
+        style: {
+          marginBottom: 16
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          fontWeight: 700,
+          color: C.faint,
+          letterSpacing: 0.8,
+          marginBottom: 8,
+          paddingBottom: 4,
+          borderBottom: "1px solid ".concat(C.border)
+        }
+      }, panel.toUpperCase()), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 8
+        }
+      }, markers.map(function (m) {
+        var r = LAB_REFS[m];
+        return /*#__PURE__*/React.createElement("div", {
+          key: m
+        }, /*#__PURE__*/React.createElement("label", {
+          style: _objectSpread(_objectSpread({}, labelSt), {}, {
+            marginBottom: 2
+          })
+        }, m, r && /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontWeight: 400,
+            color: C.faint,
+            marginLeft: 4
+          }
+        }, r.unit)), /*#__PURE__*/React.createElement("input", {
+          style: _objectSpread(_objectSpread({}, inputSt), {}, {
+            padding: "6px 8px"
+          }),
+          type: "text",
+          placeholder: r ? r.low != null && r.high != null ? "".concat(r.low, "\u2013").concat(r.high) : r.high != null ? "<".concat(r.high) : ">".concat(r.low) : "",
+          value: fVals[m],
+          onChange: function onChange(e) {
+            return setFVals(function (v) {
+              return _objectSpread(_objectSpread({}, v), {}, _defineProperty({}, m, e.target.value));
+            });
+          }
+        }));
+      })));
+    }), /*#__PURE__*/React.createElement(SaveBtn, {
+      onClick: savePanel
+    })), !open && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6,
+        marginBottom: 14
+      }
+    }, ["panel", "trend"].map(function (v) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: v,
+        onClick: function onClick() {
+          return setView(v);
+        },
+        style: {
+          padding: "6px 14px",
+          borderRadius: 7,
+          border: "1px solid ".concat(C.border),
+          background: view === v ? C.text : "#fff",
+          color: view === v ? "#fff" : C.muted,
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: "pointer"
+        }
+      }, v === "panel" ? "Panel View" : "Trend");
+    })), view === "panel" && current && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.faint
+      }
+    }, current.lab), /*#__PURE__*/React.createElement(DelBtn, {
+      onClick: function onClick() {
+        return delLab(current.id);
+      }
+    })), goals && goalMarkers.some(function (m) {
+      return current.values[m] != null;
+    }) && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "GOALS"), goalMarkers.map(function (m) {
+      if (current.values[m] == null || goals[m] == null) return null;
+      var ref = LAB_REFS[m];
+      return /*#__PURE__*/React.createElement(GoalBar, {
+        key: m,
+        label: m,
+        current: firstNum(current.values[m]),
+        goal: goals[m],
+        unit: (ref === null || ref === void 0 ? void 0 : ref.unit) || "",
+        bad: m === "HDL" ? "low" : "high"
+      });
+    })), Object.entries(LAB_PANELS).map(function (_ref16) {
+      var _ref17 = _slicedToArray(_ref16, 2),
+        panel = _ref17[0],
+        markers = _ref17[1];
+      var rows = markers.filter(function (m) {
+        return current.values[m] != null;
+      });
+      if (!rows.length) return null;
+      return /*#__PURE__*/React.createElement(Card, {
+        key: panel,
+        style: {
+          marginBottom: 12
+        }
+      }, /*#__PURE__*/React.createElement(SectionTitle, null, panel.toUpperCase()), rows.map(function (m) {
+        var raw = String(current.values[m]);
+        var status = labStatus(m, firstNum(raw));
+        var r = LAB_REFS[m];
+        return /*#__PURE__*/React.createElement("div", {
+          key: m,
+          style: {
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "6px 0",
+            borderBottom: "1px solid ".concat(C.border)
+          }
+        }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 14,
+            color: C.text,
+            fontWeight: 500
+          }
+        }, m), r && /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 11,
+            color: C.faint,
+            marginLeft: 6
+          }
+        }, r.low != null && r.high != null ? "".concat(r.low, "\u2013").concat(r.high) : r.high != null ? "<".concat(r.high) : ">".concat(r.low), " ", r.unit)), /*#__PURE__*/React.createElement("div", {
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 8
+          }
+        }, /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 15,
+            fontWeight: 700,
+            color: status === "normal" ? C.text : statusColor(status)
+          }
+        }, raw), r && /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 11,
+            color: C.faint
+          }
+        }, r.unit), status !== "normal" && /*#__PURE__*/React.createElement(Badge, {
+          label: status.toUpperCase(),
+          color: statusColor(status),
+          small: true
+        })));
+      }));
+    })), view === "trend" && /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Marker"), /*#__PURE__*/React.createElement("select", {
+      value: trendMarker,
+      onChange: function onChange(e) {
+        return setTrendMarker(e.target.value);
+      },
+      style: _objectSpread(_objectSpread({}, inputSt), {}, {
+        width: "auto",
+        cursor: "pointer"
+      })
+    }, allMarkers.map(function (m) {
+      return /*#__PURE__*/React.createElement("option", {
+        key: m,
+        value: m
+      }, m);
+    }))), trendData.length >= 2 && /*#__PURE__*/React.createElement(MiniChart, {
+      points: trendData,
+      color: C.accent,
+      goal: goals === null || goals === void 0 ? void 0 : goals[trendMarker],
+      unit: (ref === null || ref === void 0 ? void 0 : ref.unit) || "",
+      bad: trendMarker === "HDL" ? "low" : "high"
+    }), trendData.length < 2 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: C.faint,
+        fontSize: 13,
+        marginBottom: 12
+      }
+    }, "Need at least two tests to show a trend."), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 12
+      }
+    }, trendData.map(function (pt, i) {
+      var status = labStatus(trendMarker, pt.y);
+      var prevPt = trendData[i - 1];
+      var delta = prevPt ? pt.y - prevPt.y : null;
+      return /*#__PURE__*/React.createElement("div", {
+        key: pt.date,
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "7px 0",
+          borderBottom: "1px solid ".concat(C.border)
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 13,
+          color: C.muted
+        }
+      }, fmtDate(pt.date)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 10
+        }
+      }, delta !== null && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: delta > 0 ? "#ef4444" : delta < 0 ? "#22c55e" : C.faint,
+          fontWeight: 600
+        }
+      }, delta > 0 ? "+" : "", delta.toFixed(2)), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 17,
+          fontWeight: 700,
+          color: status === "normal" ? C.text : statusColor(status)
+        }
+      }, pt.y), ref && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: C.faint
+        }
+      }, ref.unit), status !== "normal" && /*#__PURE__*/React.createElement(Badge, {
+        label: status.toUpperCase(),
+        color: statusColor(status),
+        small: true
+      })));
+    })))));
+  }
+
+  // ── GOALS TAB ─────────────────────────────────────────────────────────────────
+  function GoalsTab(_ref18) {
+    var goals = _ref18.goals,
+      setGoals = _ref18.setGoals;
+    var _useState25 = useState(false),
+      _useState26 = _slicedToArray(_useState25, 2),
+      editing = _useState26[0],
+      setEditing = _useState26[1];
+    var _useState27 = useState(null),
+      _useState28 = _slicedToArray(_useState27, 2),
+      draft = _useState28[0],
+      setDraft = _useState28[1];
+    var goalDefs = [{
+      key: "weight",
+      label: "Weight",
+      unit: "lb",
+      bad: "high"
+    }, {
+      key: "systolic",
+      label: "Systolic BP",
+      unit: "mmHg",
+      bad: "high"
+    }, {
+      key: "diastolic",
+      label: "Diastolic BP",
+      unit: "mmHg",
+      bad: "high"
+    }, {
+      key: "HbA1c",
+      label: "HbA1c",
+      unit: "%",
+      bad: "high"
+    }, {
+      key: "HDL",
+      label: "HDL Cholesterol",
+      unit: "mg/dL",
+      bad: "low"
+    }, {
+      key: "LDL",
+      label: "LDL Cholesterol",
+      unit: "mg/dL",
+      bad: "high"
+    }];
+    function startEdit() {
+      setDraft(_objectSpread({}, goals));
+      setEditing(true);
+    }
+    function saveEdit() {
+      setGoals(draft);
+      setEditing(false);
+    }
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, {
+      style: {
+        marginBottom: 0
+      }
+    }, "YOUR TARGETS"), !editing ? /*#__PURE__*/React.createElement("button", {
+      onClick: startEdit,
+      style: {
+        fontSize: 13,
+        color: C.accent,
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        fontWeight: 600,
+        padding: 0
+      }
+    }, "Edit") : /*#__PURE__*/React.createElement("button", {
+      onClick: saveEdit,
+      style: {
+        fontSize: 13,
+        color: "#22c55e",
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        fontWeight: 600,
+        padding: 0
+      }
+    }, "Save")), editing ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 10
+      }
+    }, goalDefs.map(function (g) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: g.key
+      }, /*#__PURE__*/React.createElement("label", {
+        style: labelSt
+      }, g.label, " ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontWeight: 400,
+          color: C.faint
+        }
+      }, "(", g.unit, ")")), /*#__PURE__*/React.createElement("input", {
+        style: _objectSpread(_objectSpread({}, inputSt), {}, {
+          padding: "7px 9px"
+        }),
+        type: "number",
+        step: "0.1",
+        value: draft[g.key] || "",
+        onChange: function onChange(e) {
+          return setDraft(function (d) {
+            return _objectSpread(_objectSpread({}, d), {}, _defineProperty({}, g.key, +e.target.value));
+          });
+        }
+      }));
+    })) : /*#__PURE__*/React.createElement("div", null, goalDefs.map(function (g) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: g.key,
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          padding: "7px 0",
+          borderBottom: "1px solid ".concat(C.border)
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 14,
+          color: C.text
+        }
+      }, g.label), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 14,
+          fontWeight: 700,
+          color: C.text
+        }
+      }, goals[g.key], " ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontWeight: 400,
+          color: C.faint,
+          fontSize: 12
+        }
+      }, g.unit)));
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.faint,
+        textAlign: "center",
+        padding: "0 16px"
+      }
+    }, "Goals appear as progress bars and chart reference lines throughout the tracker."));
+  }
+
+  // ── JOURNAL TAB ───────────────────────────────────────────────────────────────
+  function JournalTab(_ref19) {
+    var entries = _ref19.journal,
+      setEntries = _ref19.setJournal;
+    var _useState29 = useState(false),
+      _useState30 = _slicedToArray(_useState29, 2),
+      open = _useState30[0],
+      setOpen = _useState30[1];
+    var _useState31 = useState(today()),
+      _useState32 = _slicedToArray(_useState31, 2),
+      fDate = _useState32[0],
+      setFDate = _useState32[1];
+    var _useState33 = useState(""),
+      _useState34 = _slicedToArray(_useState33, 2),
+      fText = _useState34[0],
+      setFText = _useState34[1];
+    var _useState35 = useState([]),
+      _useState36 = _slicedToArray(_useState35, 2),
+      fTags = _useState36[0],
+      setFTags = _useState36[1];
+    var tagOpts = ["Exercise", "Diet", "Medication", "Stress", "Sleep", "Symptom", "Doctor visit", "Other"];
+    var sorted = _toConsumableArray(entries).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    });
+    function save() {
+      if (!fText.trim() || !fDate) return;
+      setEntries([].concat(_toConsumableArray(entries), [{
+        id: Date.now(),
+        date: fDate,
+        text: fText.trim(),
+        tags: fTags
+      }]));
+      setFDate(today());
+      setFText("");
+      setFTags([]);
+      setOpen(false);
+    }
+    function toggleTag(t) {
+      setFTags(function (ts) {
+        return ts.includes(t) ? ts.filter(function (x) {
+          return x !== t;
+        }) : [].concat(_toConsumableArray(ts), [t]);
+      });
+    }
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(AddBtn, {
+      onClick: function onClick() {
+        return setOpen(!open);
+      },
+      label: open ? "Cancel" : "+ New Entry"
+    }), open && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Date"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "date",
+      value: fDate,
+      onChange: function onChange(e) {
+        return setFDate(e.target.value);
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Tags"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6
+      }
+    }, tagOpts.map(function (t) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: t,
+        onClick: function onClick() {
+          return toggleTag(t);
+        },
+        style: {
+          padding: "4px 10px",
+          borderRadius: 20,
+          border: "1px solid ".concat(fTags.includes(t) ? C.accent : C.border),
+          background: fTags.includes(t) ? C.accent + "18" : "#fff",
+          color: fTags.includes(t) ? C.accent : C.muted,
+          fontSize: 12,
+          cursor: "pointer",
+          fontWeight: 500
+        }
+      }, t);
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Note"), /*#__PURE__*/React.createElement("textarea", {
+      style: taSt,
+      placeholder: "What happened today? Changes to diet, exercise, how you're feeling, symptoms, anything worth remembering\u2026",
+      value: fText,
+      onChange: function onChange(e) {
+        return setFText(e.target.value);
+      }
+    })), /*#__PURE__*/React.createElement(SaveBtn, {
+      onClick: save
+    })), sorted.length === 0 && !open && /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        color: C.faint,
+        fontSize: 14,
+        padding: "40px 0"
+      }
+    }, "No entries yet. Use the journal to connect the dots between lifestyle and your numbers."), sorted.map(function (e) {
+      return /*#__PURE__*/React.createElement(Card, {
+        key: e.id,
+        style: {
+          marginBottom: 10
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: 6
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 12,
+          color: C.faint
+        }
+      }, fmtDate(e.date)), /*#__PURE__*/React.createElement(DelBtn, {
+        onClick: function onClick() {
+          return setEntries(entries.filter(function (x) {
+            return x.id !== e.id;
+          }));
+        }
+      })), e.tags && e.tags.length > 0 && /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 4,
+          marginBottom: 8
+        }
+      }, e.tags.map(function (t) {
+        return /*#__PURE__*/React.createElement("span", {
+          key: t,
+          style: {
+            fontSize: 11,
+            background: C.accent + "12",
+            color: C.accent,
+            border: "1px solid ".concat(C.accent, "30"),
+            borderRadius: 4,
+            padding: "1px 7px"
+          }
+        }, t);
+      })), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 14,
+          color: C.text,
+          lineHeight: 1.55,
+          whiteSpace: "pre-wrap"
+        }
+      }, e.text));
+    }));
+  }
+
+  // ── MEDICATIONS TAB ───────────────────────────────────────────────────────────
+  function MedsTab(_ref20) {
+    var meds = _ref20.meds,
+      setMeds = _ref20.setMeds,
+      medLogs = _ref20.medLogs,
+      setMedLogs = _ref20.setMedLogs;
+    var _useState37 = useState(false),
+      _useState38 = _slicedToArray(_useState37, 2),
+      open = _useState38[0],
+      setOpen = _useState38[1];
+    var _useState39 = useState(false),
+      _useState40 = _slicedToArray(_useState39, 2),
+      logOpen = _useState40[0],
+      setLogOpen = _useState40[1];
+    var _useState41 = useState({
+        name: "",
+        dose: "",
+        frequency: "Daily",
+        startDate: today(),
+        notes: "",
+        active: true
+      }),
+      _useState42 = _slicedToArray(_useState41, 2),
+      f = _useState42[0],
+      setF = _useState42[1];
+
+    // default log form to now
+    function nowTime() {
+      return new Date().toTimeString().slice(0, 5);
+    }
+    var _useState43 = useState({
+        medId: "",
+        date: today(),
+        time: nowTime(),
+        notes: ""
+      }),
+      _useState44 = _slicedToArray(_useState43, 2),
+      lf = _useState44[0],
+      setLf = _useState44[1];
+    var active = meds.filter(function (m) {
+      return m.active;
+    });
+    var inactive = meds.filter(function (m) {
+      return !m.active;
+    });
+    function saveMed() {
+      if (!f.name) return;
+      setMeds([].concat(_toConsumableArray(meds), [_objectSpread({
+        id: Date.now()
+      }, f)]));
+      setF({
+        name: "",
+        dose: "",
+        frequency: "Daily",
+        startDate: today(),
+        notes: "",
+        active: true
+      });
+      setOpen(false);
+    }
+    function saveLog() {
+      if (!lf.medId || !lf.date) return;
+      var med = meds.find(function (m) {
+        return m.id === +lf.medId;
+      });
+      if (!med) return;
+      setMedLogs([].concat(_toConsumableArray(medLogs), [{
+        id: Date.now(),
+        medId: +lf.medId,
+        medName: med.name,
+        dose: med.dose,
+        date: lf.date,
+        time: lf.time,
+        notes: lf.notes
+      }]));
+      setLf({
+        medId: lf.medId,
+        date: today(),
+        time: nowTime(),
+        notes: ""
+      });
+      setLogOpen(false);
+    }
+    function toggle(id) {
+      setMeds(meds.map(function (m) {
+        return m.id === id ? _objectSpread(_objectSpread({}, m), {}, {
+          active: !m.active
+        }) : m;
+      }));
+    }
+
+    // group logs by date, most recent first
+    var logsByDate = _toConsumableArray(medLogs).sort(function (a, b) {
+      return b.date.localeCompare(a.date) || b.time.localeCompare(a.time);
+    });
+    var recentLogs = logsByDate.slice(0, 20);
+    function MedCard(_ref21) {
+      var m = _ref21.m;
+      return /*#__PURE__*/React.createElement(Card, {
+        style: {
+          marginBottom: 10,
+          opacity: m.active ? 1 : 0.6
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          flex: 1
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 3,
+          flexWrap: "wrap"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 15,
+          fontWeight: 700,
+          color: C.text
+        }
+      }, "\uD83D\uDC8A ", m.name), m.dose && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 13,
+          color: C.muted
+        }
+      }, m.dose), /*#__PURE__*/React.createElement(Badge, {
+        label: m.active ? "Active" : "Inactive",
+        color: m.active ? "#22c55e" : "#9ca3af",
+        small: true
+      })), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 12,
+          color: C.faint
+        }
+      }, m.frequency, " \xB7 Started ", fmtDate(m.startDate)), m.notes && /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 12,
+          color: C.faint,
+          marginTop: 3
+        }
+      }, "\uD83D\uDCDD ", m.notes), function () {
+        var lastLog = logsByDate.find(function (l) {
+          return l.medId === m.id;
+        });
+        if (!lastLog) return /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontSize: 11,
+            color: "#f97316",
+            marginTop: 4
+          }
+        }, "No doses logged yet");
+        return /*#__PURE__*/React.createElement("div", {
+          style: {
+            fontSize: 11,
+            color: "#22c55e",
+            marginTop: 4
+          }
+        }, "Last taken: ", fmtDate(lastLog.date), lastLog.time ? " @ " + lastLog.time : "");
+      }()), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 4,
+          alignItems: "center"
+        }
+      }, /*#__PURE__*/React.createElement("button", {
+        onClick: function onClick() {
+          return toggle(m.id);
+        },
+        style: {
+          fontSize: 12,
+          color: C.accent,
+          background: "none",
+          border: "1px solid ".concat(C.border),
+          borderRadius: 6,
+          cursor: "pointer",
+          padding: "3px 8px",
+          fontWeight: 600
+        }
+      }, m.active ? "Stop" : "Resume"), /*#__PURE__*/React.createElement(DelBtn, {
+        onClick: function onClick() {
+          return setMeds(meds.filter(function (x) {
+            return x.id !== m.id;
+          }));
+        }
+      }))));
+    }
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "LOG A DOSE"), active.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: C.faint
+      }
+    }, "Add a medication below before logging doses.") : logOpen ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Medication"), /*#__PURE__*/React.createElement("select", {
+      style: inputSt,
+      value: lf.medId,
+      onChange: function onChange(e) {
+        return setLf(_objectSpread(_objectSpread({}, lf), {}, {
+          medId: e.target.value
+        }));
+      }
+    }, /*#__PURE__*/React.createElement("option", {
+      value: ""
+    }, "Select\u2026"), active.map(function (m) {
+      return /*#__PURE__*/React.createElement("option", {
+        key: m.id,
+        value: m.id
+      }, m.name, m.dose ? " " + m.dose : "");
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 10,
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Date"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "date",
+      value: lf.date,
+      onChange: function onChange(e) {
+        return setLf(_objectSpread(_objectSpread({}, lf), {}, {
+          date: e.target.value
+        }));
+      }
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Time"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "time",
+      value: lf.time,
+      onChange: function onChange(e) {
+        return setLf(_objectSpread(_objectSpread({}, lf), {}, {
+          time: e.target.value
+        }));
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Notes (optional)"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "text",
+      placeholder: "e.g. taken with food",
+      value: lf.notes,
+      onChange: function onChange(e) {
+        return setLf(_objectSpread(_objectSpread({}, lf), {}, {
+          notes: e.target.value
+        }));
+      }
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 8
+      }
+    }, /*#__PURE__*/React.createElement(SaveBtn, {
+      onClick: saveLog
+    }), /*#__PURE__*/React.createElement("button", {
+      onClick: function onClick() {
+        return setLogOpen(false);
+      },
+      style: {
+        flex: 1,
+        padding: "10px",
+        background: "none",
+        border: "1px solid ".concat(C.border),
+        borderRadius: 8,
+        fontSize: 14,
+        cursor: "pointer",
+        color: C.muted
+      }
+    }, "Cancel"))) : /*#__PURE__*/React.createElement("button", {
+      onClick: function onClick() {
+        setLf({
+          medId: active.length === 1 ? String(active[0].id) : "",
+          date: today(),
+          time: nowTime(),
+          notes: ""
+        });
+        setLogOpen(true);
+      },
+      style: {
+        width: "100%",
+        padding: "11px",
+        background: "#22c55e",
+        color: "#fff",
+        border: "none",
+        borderRadius: 9,
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    }, "+ Log Dose Taken")), recentLogs.length > 0 && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "RECENT DOSES"), recentLogs.map(function (l) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: l.id,
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "7px 0",
+          borderBottom: "1px solid ".concat(C.border)
+        }
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 14,
+          fontWeight: 600,
+          color: C.text
+        }
+      }, "\uD83D\uDC8A ", l.medName, l.dose ? " " + l.dose : ""), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: C.faint
+        }
+      }, fmtDate(l.date), l.time ? " @ " + l.time : "", l.notes ? " · " + l.notes : "")), /*#__PURE__*/React.createElement(DelBtn, {
+        onClick: function onClick() {
+          return setMedLogs(medLogs.filter(function (x) {
+            return x.id !== l.id;
+          }));
+        }
+      }));
+    })), /*#__PURE__*/React.createElement(AddBtn, {
+      onClick: function onClick() {
+        return setOpen(!open);
+      },
+      label: open ? "Cancel" : "+ Add Medication"
+    }), open && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 10,
+        marginBottom: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        gridColumn: "1/-1"
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Medication Name"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "text",
+      placeholder: "e.g. Amlodipine Besylate",
+      value: f.name,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          name: e.target.value
+        }));
+      }
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Dose"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "text",
+      placeholder: "e.g. 5mg",
+      value: f.dose,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          dose: e.target.value
+        }));
+      }
+    })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Frequency"), /*#__PURE__*/React.createElement("select", {
+      style: inputSt,
+      value: f.frequency,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          frequency: e.target.value
+        }));
+      }
+    }, ["Daily", "Twice daily", "As needed", "Weekly", "Other"].map(function (o) {
+      return /*#__PURE__*/React.createElement("option", {
+        key: o
+      }, o);
+    }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Start Date"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "date",
+      value: f.startDate,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          startDate: e.target.value
+        }));
+      }
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, "Notes"), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "text",
+      placeholder: "e.g. Take with food, for blood pressure",
+      value: f.notes,
+      onChange: function onChange(e) {
+        return setF(_objectSpread(_objectSpread({}, f), {}, {
+          notes: e.target.value
+        }));
+      }
+    })), /*#__PURE__*/React.createElement(SaveBtn, {
+      onClick: saveMed
+    })), active.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SectionTitle, null, "ACTIVE MEDICATIONS"), active.map(function (m) {
+      return /*#__PURE__*/React.createElement(MedCard, {
+        key: m.id,
+        m: m
+      });
+    })), inactive.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SectionTitle, {
+      style: {
+        marginTop: 8
+      }
+    }, "INACTIVE"), inactive.map(function (m) {
+      return /*#__PURE__*/React.createElement(MedCard, {
+        key: m.id,
+        m: m
+      });
+    })), meds.length === 0 && !open && /*#__PURE__*/React.createElement("div", {
+      style: {
+        textAlign: "center",
+        color: C.faint,
+        fontSize: 14,
+        padding: "40px 0"
+      }
+    }, "No medications added yet."));
+  }
+
+  // ── PDF SUMMARY COMPONENT ────────────────────────────────────────────────────
+  function PDFSummary(_ref22) {
+    var bp = _ref22.bp,
+      weight = _ref22.weight,
+      labs = _ref22.labs,
+      goals = _ref22.goals,
+      journal = _ref22.journal,
+      meds = _ref22.meds;
+    var latestBP = _toConsumableArray(bp).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    })[0];
+    var latestW = _toConsumableArray(weight).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    })[0];
+    var latestLab = _toConsumableArray(labs).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    })[0];
+    var activeMeds = meds.filter(function (m) {
+      return m.active;
+    });
+    var watch = ['HbA1c', 'HDL', 'ALT', 'Glucose', 'Sodium', 'LDL', 'Triglycerides'];
+    var todayStr = new Date().toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    var S = {
+      wrap: {
+        fontFamily: 'system-ui,sans-serif',
+        fontSize: 13,
+        color: '#111827',
+        background: '#fff',
+        padding: '24px 18px'
+      },
+      h1: {
+        fontSize: 22,
+        fontWeight: 800,
+        margin: '0 0 4px'
+      },
+      sub: {
+        color: '#6b7280',
+        fontSize: 12,
+        marginBottom: 16
+      },
+      h2: {
+        fontSize: 14,
+        fontWeight: 700,
+        margin: '24px 0 8px',
+        paddingBottom: 4,
+        borderBottom: '2px solid #e5e7eb',
+        color: '#1d4ed8'
+      },
+      h3: {
+        fontSize: 12,
+        fontWeight: 700,
+        margin: '10px 0 4px',
+        color: '#374151'
+      },
+      hero: {
+        display: 'flex',
+        gap: 12,
+        flexWrap: 'wrap',
+        marginBottom: 16
+      },
+      stat: {
+        background: '#f9fafb',
+        border: '1px solid #e5e7eb',
+        borderRadius: 8,
+        padding: '10px 14px',
+        minWidth: 120
+      },
+      statLbl: {
+        fontSize: 10,
+        color: '#6b7280',
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+        marginBottom: 2
+      },
+      statVal: {
+        fontSize: 22,
+        fontWeight: 800,
+        letterSpacing: -0.5
+      },
+      statSub: {
+        fontSize: 10,
+        color: '#9ca3af',
+        marginTop: 2
+      },
+      table: {
+        width: '100%',
+        borderCollapse: 'collapse',
+        marginBottom: 8,
+        fontSize: 12
+      },
+      th: {
+        textAlign: 'left',
+        fontSize: 10,
+        fontWeight: 700,
+        color: '#6b7280',
+        textTransform: 'uppercase',
+        padding: '4px 6px',
+        borderBottom: '2px solid #e5e7eb'
+      },
+      td: {
+        padding: '5px 6px',
+        borderBottom: '1px solid #f3f4f6',
+        fontSize: 12
+      },
+      hi: {
+        color: '#dc2626',
+        fontWeight: 700
+      },
+      lo: {
+        color: '#2563eb',
+        fontWeight: 700
+      },
+      note: {
+        marginTop: 24,
+        fontSize: 10,
+        color: '#9ca3af'
+      }
+    };
+    function Stat(_ref23) {
+      var label = _ref23.label,
+        value = _ref23.value,
+        sub = _ref23.sub,
+        hi = _ref23.hi;
+      return /*#__PURE__*/React.createElement("div", {
+        style: S.stat
+      }, /*#__PURE__*/React.createElement("div", {
+        style: S.statLbl
+      }, label), /*#__PURE__*/React.createElement("div", {
+        style: _objectSpread(_objectSpread({}, S.statVal), {}, {
+          color: hi ? '#dc2626' : '#111827'
+        })
+      }, value), sub && /*#__PURE__*/React.createElement("div", {
+        style: S.statSub
+      }, sub));
+    }
+    function refRange(m) {
+      var r = LAB_REFS[m];
+      if (!r) return '';
+      if (r.low != null && r.high != null) return r.low + '–' + r.high;
+      if (r.high != null) return '<' + r.high;
+      return '>' + r.low;
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      style: S.wrap
+    }, /*#__PURE__*/React.createElement("div", {
+      style: S.h1
+    }, "Health Summary"), /*#__PURE__*/React.createElement("div", {
+      style: S.sub
+    }, "Bob Sempsey \xB7 Generated ", todayStr), /*#__PURE__*/React.createElement("div", {
+      style: S.hero
+    }, latestBP && /*#__PURE__*/React.createElement(Stat, {
+      label: "Blood Pressure",
+      value: latestBP.systolic + '/' + latestBP.diastolic,
+      sub: fmtDate(latestBP.date) + ' · ' + bpCat(latestBP.systolic, latestBP.diastolic).label
+    }), latestW && /*#__PURE__*/React.createElement(Stat, {
+      label: "Weight",
+      value: latestW.weight + ' lb',
+      sub: fmtDate(latestW.date) + ' · BMI ' + bmi(latestW.weight)
+    }), latestLab && latestLab.values['HbA1c'] != null && /*#__PURE__*/React.createElement(Stat, {
+      label: "HbA1c",
+      value: firstNum(latestLab.values['HbA1c']) + '%',
+      sub: fmtDate(latestLab.date),
+      hi: true
+    }), latestLab && latestLab.values['HDL'] != null && /*#__PURE__*/React.createElement(Stat, {
+      label: "HDL",
+      value: firstNum(latestLab.values['HDL']) + ' mg/dL',
+      sub: fmtDate(latestLab.date),
+      hi: true
+    })), /*#__PURE__*/React.createElement("div", {
+      style: S.h2
+    }, "Blood Pressure History"), /*#__PURE__*/React.createElement("table", {
+      style: S.table
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['Date', 'BP', 'HR', 'Category', 'Medication'].map(function (h) {
+      return /*#__PURE__*/React.createElement("th", {
+        key: h,
+        style: S.th
+      }, h);
+    }))), /*#__PURE__*/React.createElement("tbody", null, _toConsumableArray(bp).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    }).map(function (r) {
+      return /*#__PURE__*/React.createElement("tr", {
+        key: r.id
+      }, /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, fmtDate(r.date)), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, r.systolic, "/", r.diastolic), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, r.heartRate), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, bpCat(r.systolic, r.diastolic).label), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, r.medication || ''));
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: S.h2
+    }, "Weight History"), /*#__PURE__*/React.createElement("table", {
+      style: S.table
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['Date', 'Weight', 'BMI', 'Category', 'Notes'].map(function (h) {
+      return /*#__PURE__*/React.createElement("th", {
+        key: h,
+        style: S.th
+      }, h);
+    }))), /*#__PURE__*/React.createElement("tbody", null, _toConsumableArray(weight).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    }).map(function (e) {
+      return /*#__PURE__*/React.createElement("tr", {
+        key: e.id
+      }, /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, fmtDate(e.date)), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, e.weight, " lb"), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, bmi(e.weight)), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, bmiCat(parseFloat(bmi(e.weight))).label), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, e.notes || ''));
+    }))), /*#__PURE__*/React.createElement("div", {
+      style: S.h2
+    }, "Lab Results \u2014 Key Markers"), _toConsumableArray(labs).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    }).map(function (lab) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: lab.id
+      }, /*#__PURE__*/React.createElement("div", {
+        style: S.h3
+      }, fmtDate(lab.date), " \u2014 ", lab.lab), /*#__PURE__*/React.createElement("table", {
+        style: S.table
+      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['Marker', 'Value', 'Unit', 'Range'].map(function (h) {
+        return /*#__PURE__*/React.createElement("th", {
+          key: h,
+          style: S.th
+        }, h);
+      }))), /*#__PURE__*/React.createElement("tbody", null, watch.filter(function (m) {
+        return lab.values[m] != null;
+      }).map(function (m) {
+        var status = labStatus(m, firstNum(lab.values[m]));
+        var ref = LAB_REFS[m];
+        return /*#__PURE__*/React.createElement("tr", {
+          key: m
+        }, /*#__PURE__*/React.createElement("td", {
+          style: S.td
+        }, m), /*#__PURE__*/React.createElement("td", {
+          style: _objectSpread(_objectSpread({}, S.td), status === 'high' ? S.hi : status === 'low' ? S.lo : {})
+        }, String(lab.values[m])), /*#__PURE__*/React.createElement("td", {
+          style: S.td
+        }, ref && ref.unit || ''), /*#__PURE__*/React.createElement("td", {
+          style: S.td
+        }, refRange(m)));
+      }))));
+    }), activeMeds.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: S.h2
+    }, "Active Medications"), /*#__PURE__*/React.createElement("table", {
+      style: S.table
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['Medication', 'Dose', 'Frequency', 'Since'].map(function (h) {
+      return /*#__PURE__*/React.createElement("th", {
+        key: h,
+        style: S.th
+      }, h);
+    }))), /*#__PURE__*/React.createElement("tbody", null, activeMeds.map(function (m) {
+      return /*#__PURE__*/React.createElement("tr", {
+        key: m.id
+      }, /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, m.name), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, m.dose || ''), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, m.frequency), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, fmtDate(m.startDate)));
+    })))), function () {
+      var rows = [];
+      if (goals.weight && latestW) rows.push({
+        label: 'Weight',
+        target: goals.weight + ' lb',
+        current: latestW.weight + ' lb',
+        met: latestW.weight <= goals.weight
+      });
+      if (goals.systolic && latestBP) rows.push({
+        label: 'Systolic BP',
+        target: goals.systolic + ' mmHg',
+        current: latestBP.systolic + ' mmHg',
+        met: latestBP.systolic <= goals.systolic
+      });
+      if (goals.HbA1c && latestLab && latestLab.values['HbA1c'] != null) rows.push({
+        label: 'HbA1c',
+        target: goals.HbA1c + '%',
+        current: firstNum(latestLab.values['HbA1c']) + '%',
+        met: firstNum(latestLab.values['HbA1c']) <= goals.HbA1c
+      });
+      if (goals.HDL && latestLab && latestLab.values['HDL'] != null) rows.push({
+        label: 'HDL',
+        target: goals.HDL + ' mg/dL',
+        current: firstNum(latestLab.values['HDL']) + ' mg/dL',
+        met: firstNum(latestLab.values['HDL']) >= goals.HDL
+      });
+      if (!rows.length) return null;
+      return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+        style: S.h2
+      }, "Goals"), /*#__PURE__*/React.createElement("table", {
+        style: S.table
+      }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['Goal', 'Target', 'Current', 'Status'].map(function (h) {
+        return /*#__PURE__*/React.createElement("th", {
+          key: h,
+          style: S.th
+        }, h);
+      }))), /*#__PURE__*/React.createElement("tbody", null, rows.map(function (r) {
+        return /*#__PURE__*/React.createElement("tr", {
+          key: r.label
+        }, /*#__PURE__*/React.createElement("td", {
+          style: S.td
+        }, r.label), /*#__PURE__*/React.createElement("td", {
+          style: S.td
+        }, r.target), /*#__PURE__*/React.createElement("td", {
+          style: S.td
+        }, r.current), /*#__PURE__*/React.createElement("td", {
+          style: _objectSpread(_objectSpread({}, S.td), {}, {
+            color: r.met ? '#22c55e' : '#6b7280',
+            fontWeight: r.met ? 700 : 400
+          })
+        }, r.met ? '✓ Met' : 'In progress'));
+      }))));
+    }(), journal.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: S.h2
+    }, "Journal (recent)"), /*#__PURE__*/React.createElement("table", {
+      style: S.table
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['Date', 'Tags', 'Note'].map(function (h) {
+      return /*#__PURE__*/React.createElement("th", {
+        key: h,
+        style: S.th
+      }, h);
+    }))), /*#__PURE__*/React.createElement("tbody", null, _toConsumableArray(journal).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    }).slice(0, 15).map(function (e) {
+      return /*#__PURE__*/React.createElement("tr", {
+        key: e.id
+      }, /*#__PURE__*/React.createElement("td", {
+        style: _objectSpread(_objectSpread({}, S.td), {}, {
+          whiteSpace: 'nowrap'
+        })
+      }, fmtDate(e.date)), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, (e.tags || []).join(', ')), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, e.text));
+    })))), /*#__PURE__*/React.createElement("div", {
+      style: S.note
+    }, "For personal reference only. Consult your healthcare provider for medical advice."));
+  }
+
+  // ── EXPORT TAB ────────────────────────────────────────────────────────────────
+  function ExportTab(_ref24) {
+    var bp = _ref24.bp,
+      weight = _ref24.weight,
+      labs = _ref24.labs,
+      goals = _ref24.goals,
+      journal = _ref24.journal,
+      meds = _ref24.meds;
+    var _useState45 = useState(null),
+      _useState46 = _slicedToArray(_useState45, 2),
+      view = _useState46[0],
+      setView = _useState46[1]; // null | {type:'csv',name,content} | {type:'pdf',html}
+
+    // ── CSV ──────────────────────────────────────────────────────────────────────
+    function makeCSV(rows) {
+      return rows.map(function (r) {
+        return r.map(function (cell) {
+          var s = String(cell !== null && cell !== void 0 ? cell : '');
+          return s.includes(',') || s.includes('\n') || s.includes('"') ? '"' + s.replace(/"/g, '""') + '"' : s;
+        }).join(',');
+      }).join('\n');
+    }
+    var csvSets = [{
+      label: 'Blood Pressure & Heart Rate',
+      count: bp.length,
+      build: function build() {
+        var rows = [['Date', 'Time', 'Systolic', 'Diastolic', 'Heart Rate', 'Category', 'Medication', 'Notes']];
+        _toConsumableArray(bp).sort(function (a, b) {
+          return a.date.localeCompare(b.date);
+        }).forEach(function (r) {
+          return rows.push([r.date, r.time || '', r.systolic, r.diastolic, r.heartRate, bpCat(r.systolic, r.diastolic).label, r.medication || '', r.notes || '']);
+        });
+        return makeCSV(rows);
+      }
+    }, {
+      label: 'Weight',
+      count: weight.length,
+      build: function build() {
+        var rows = [['Date', 'Weight (lb)', 'BMI', 'Notes']];
+        _toConsumableArray(weight).sort(function (a, b) {
+          return a.date.localeCompare(b.date);
+        }).forEach(function (e) {
+          return rows.push([e.date, e.weight, bmi(e.weight), e.notes || '']);
+        });
+        return makeCSV(rows);
+      }
+    }, {
+      label: 'Lab Results',
+      count: labs.length,
+      build: function build() {
+        var markers = _toConsumableArray(new Set(labs.flatMap(function (l) {
+          return Object.keys(l.values);
+        }))).sort();
+        var rows = [['Date', 'Lab'].concat(_toConsumableArray(markers))];
+        _toConsumableArray(labs).sort(function (a, b) {
+          return a.date.localeCompare(b.date);
+        }).forEach(function (l) {
+          return rows.push([l.date, l.lab].concat(_toConsumableArray(markers.map(function (m) {
+            return l.values[m] != null ? String(l.values[m]) : '';
+          }))));
+        });
+        return makeCSV(rows);
+      }
+    }, {
+      label: 'Journal',
+      count: journal.length,
+      build: function build() {
+        var rows = [['Date', 'Tags', 'Note']];
+        _toConsumableArray(journal).sort(function (a, b) {
+          return a.date.localeCompare(b.date);
+        }).forEach(function (e) {
+          return rows.push([e.date, (e.tags || []).join('; '), e.text]);
+        });
+        return makeCSV(rows);
+      }
+    }, {
+      label: 'Medications',
+      count: meds.length,
+      build: function build() {
+        var rows = [['Name', 'Dose', 'Frequency', 'Start Date', 'Status', 'Notes']];
+        meds.forEach(function (m) {
+          return rows.push([m.name, m.dose || '', m.frequency, m.startDate, m.active ? 'Active' : 'Inactive', m.notes || '']);
+        });
+        return makeCSV(rows);
+      }
+    }];
+
+    // ── UI ────────────────────────────────────────────────────────────────────────
+    var btnSt = {
+      width: '100%',
+      padding: '12px',
+      borderRadius: 9,
+      border: '1px solid ' + C.border,
+      background: '#fff',
+      color: C.text,
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: 'pointer',
+      textAlign: 'left',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10
+    };
+    function buildTextSummary() {
+      var latestBP = _toConsumableArray(bp).sort(function (a, b) {
+        return b.date.localeCompare(a.date);
+      })[0];
+      var latestW = _toConsumableArray(weight).sort(function (a, b) {
+        return b.date.localeCompare(a.date);
+      })[0];
+      var latestLab = _toConsumableArray(labs).sort(function (a, b) {
+        return b.date.localeCompare(a.date);
+      })[0];
+      var watch = ['HbA1c', 'HDL', 'ALT', 'Glucose', 'Sodium', 'LDL', 'Triglycerides'];
+      var lines = [];
+      var hr = function hr(s) {
+        return lines.push(s, '─'.repeat(40));
+      };
+      lines.push('HEALTH SUMMARY — BOB SEMPSEY');
+      lines.push('Generated ' + new Date().toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      }));
+      lines.push('');
+      if (latestBP) {
+        lines.push('BLOOD PRESSURE: ' + latestBP.systolic + '/' + latestBP.diastolic + ' mmHg (' + bpCat(latestBP.systolic, latestBP.diastolic).label + ')');
+        lines.push('  As of: ' + fmtDate(latestBP.date));
+      }
+      if (latestW) {
+        lines.push('WEIGHT: ' + latestW.weight + ' lb  |  BMI: ' + bmi(latestW.weight));
+        lines.push('  As of: ' + fmtDate(latestW.date));
+      }
+      lines.push('');
+      hr('BP HISTORY');
+      _toConsumableArray(bp).sort(function (a, b) {
+        return b.date.localeCompare(a.date);
+      }).forEach(function (r) {
+        lines.push(fmtDate(r.date) + '  ' + r.systolic + '/' + r.diastolic + ' mmHg  ' + r.heartRate + ' bpm  ' + bpCat(r.systolic, r.diastolic).label);
+        if (r.medication) lines.push('  Medication: ' + r.medication);
+      });
+      lines.push('');
+      hr('WEIGHT HISTORY');
+      _toConsumableArray(weight).sort(function (a, b) {
+        return b.date.localeCompare(a.date);
+      }).forEach(function (e) {
+        lines.push(fmtDate(e.date) + '  ' + e.weight + ' lb  BMI ' + bmi(e.weight) + '  ' + bmiCat(parseFloat(bmi(e.weight))).label);
+      });
+      lines.push('');
+      hr('LAB RESULTS — KEY MARKERS');
+      _toConsumableArray(labs).sort(function (a, b) {
+        return b.date.localeCompare(a.date);
+      }).forEach(function (lab) {
+        lines.push(fmtDate(lab.date) + ' — ' + lab.lab);
+        watch.filter(function (m) {
+          return lab.values[m] != null;
+        }).forEach(function (m) {
+          var ref = LAB_REFS[m];
+          var s = labStatus(m, firstNum(lab.values[m]));
+          var flag = s === 'high' ? ' [HIGH]' : s === 'low' ? ' [LOW]' : '';
+          var range = ref ? ref.low != null && ref.high != null ? ' (' + ref.low + '-' + ref.high + ')' : ref.high != null ? ' (<' + ref.high + ')' : ' (>' + ref.low + ')' : '';
+          lines.push('  ' + m + ': ' + lab.values[m] + (ref ? ' ' + ref.unit : '') + range + flag);
+        });
+      });
+      var activeMeds = meds.filter(function (m) {
+        return m.active;
+      });
+      if (activeMeds.length > 0) {
+        lines.push('');
+        hr('ACTIVE MEDICATIONS');
+        activeMeds.forEach(function (m) {
+          return lines.push('  ' + m.name + ' ' + m.dose + '  ' + m.frequency + '  (since ' + fmtDate(m.startDate) + ')');
+        });
+      }
+      lines.push('');
+      lines.push('For personal reference only. Consult your healthcare provider for medical advice.');
+      return lines.join('\n');
+    }
+    var _useState47 = useState(false),
+      _useState48 = _slicedToArray(_useState47, 2),
+      copied = _useState48[0],
+      setCopied = _useState48[1];
+    function copyText() {
+      var text = buildTextSummary();
+      navigator.clipboard.writeText(text).then(function () {
+        setCopied(true);
+        setTimeout(function () {
+          return setCopied(false);
+        }, 2500);
+      }).catch(function () {
+        // fallback
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        setCopied(true);
+        setTimeout(function () {
+          return setCopied(false);
+        }, 2500);
+      });
+    }
+    if (view && view.type === 'csv') return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("button", {
+      onClick: function onClick() {
+        return setView(null);
+      },
+      style: {
+        marginBottom: 14,
+        padding: '8px 14px',
+        borderRadius: 8,
+        border: '1px solid ' + C.border,
+        background: '#fff',
+        color: C.muted,
+        fontSize: 13,
+        cursor: 'pointer',
+        fontWeight: 600
+      }
+    }, '<', " Back"), /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, view.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: C.muted,
+        marginBottom: 10,
+        lineHeight: 1.5
+      }
+    }, "Tap the text box, select all, and copy \u2014 then paste into Notes or email to yourself."), /*#__PURE__*/React.createElement("textarea", {
+      readOnly: true,
+      value: view.content,
+      style: {
+        width: '100%',
+        height: '55vh',
+        fontFamily: 'monospace',
+        fontSize: 11,
+        padding: 10,
+        border: '1px solid ' + C.border,
+        borderRadius: 8,
+        background: '#f9fafb',
+        color: C.text,
+        boxSizing: 'border-box',
+        resize: 'none'
+      },
+      onFocus: function onFocus(e) {
+        return e.target.select();
+      }
+    })));
+    if (view && view.type === 'pdf') return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 10,
+        marginBottom: 14,
+        alignItems: 'center'
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: function onClick() {
+        return setView(null);
+      },
+      style: {
+        padding: '8px 14px',
+        borderRadius: 8,
+        border: '1px solid ' + C.border,
+        background: '#fff',
+        color: C.muted,
+        fontSize: 13,
+        cursor: 'pointer',
+        fontWeight: 600
+      }
+    }, '<', " Back"), /*#__PURE__*/React.createElement("button", {
+      onClick: copyText,
+      style: {
+        flex: 1,
+        padding: '8px 14px',
+        borderRadius: 8,
+        border: 'none',
+        background: copied ? '#22c55e' : C.accent,
+        color: '#fff',
+        fontSize: 13,
+        cursor: 'pointer',
+        fontWeight: 600,
+        transition: 'background 0.2s'
+      }
+    }, copied ? 'Copied!' : 'Copy as Text')), /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 12
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: C.muted,
+        lineHeight: 1.5
+      }
+    }, /*#__PURE__*/React.createElement("strong", {
+      style: {
+        color: C.text
+      }
+    }, "On iPhone:"), " tap ", /*#__PURE__*/React.createElement("strong", null, "Copy as Text"), " above, then paste into Mail, Notes, or Messages to share with your doctor. On PC: use browser Print to save as PDF.")), /*#__PURE__*/React.createElement(PDFSummary, {
+      bp: bp,
+      weight: weight,
+      labs: labs,
+      goals: goals,
+      journal: journal,
+      meds: meds
+    }));
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "PDF SUMMARY"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: C.muted,
+        marginBottom: 12
+      }
+    }, "Print-ready summary formatted for your doctor."), /*#__PURE__*/React.createElement("button", {
+      onClick: function onClick() {
+        return setView({
+          type: 'pdf'
+        });
+      },
+      style: _objectSpread(_objectSpread({}, btnSt), {}, {
+        background: C.accent,
+        color: '#fff',
+        border: 'none'
+      })
+    }, /*#__PURE__*/React.createElement("span", null, "View PDF Summary"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 16
+      }
+    }, '↗'))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "CSV DATA EXPORT"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: C.muted,
+        marginBottom: 12
+      }
+    }, "Tap a dataset to view and copy the raw data."), csvSets.map(function (_ref25) {
+      var label = _ref25.label,
+        count = _ref25.count,
+        build = _ref25.build;
+      return /*#__PURE__*/React.createElement("button", {
+        key: label,
+        onClick: function onClick() {
+          return setView({
+            type: 'csv',
+            name: label,
+            content: build()
+          });
+        },
+        style: btnSt
+      }, /*#__PURE__*/React.createElement("span", null, label, " ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: C.faint,
+          fontWeight: 400
+        }
+      }, "(", count, " ", count === 1 ? 'entry' : 'entries', ")")), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 13,
+          color: C.faint
+        }
+      }, "View ", '→'));
+    })));
+  }
+
+  // ── DASHBOARD ─────────────────────────────────────────────────────────────────
+  function Dashboard(_ref26) {
+    var setTab = _ref26.setTab,
+      bpData = _ref26.bp,
+      wData = _ref26.weight,
+      labData = _ref26.labs,
+      goals = _ref26.goals,
+      journal = _ref26.journal,
+      meds = _ref26.meds,
+      medLogs = _ref26.medLogs;
+    var latestBP = _toConsumableArray(bpData || []).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    })[0];
+    var prevBP = _toConsumableArray(bpData || []).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    })[1];
+    var latestW = _toConsumableArray(wData || []).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    })[0];
+    var prevW = _toConsumableArray(wData || []).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    })[1];
+    var watchMarkers = ["HbA1c", "HDL", "ALT", "Glucose", "Sodium"];
+    var activeMeds = (meds || []).filter(function (m) {
+      return m.active;
+    });
+    var recentJournal = _toConsumableArray(journal || []).sort(function (a, b) {
+      return b.date.localeCompare(a.date);
+    }).slice(0, 2);
+    var sortedLogs = _toConsumableArray(medLogs || []).sort(function (a, b) {
+      return b.date.localeCompare(a.date) || b.time.localeCompare(a.time);
+    });
+    function lastTaken(medId) {
+      return sortedLogs.find(function (l) {
+        return l.medId === medId;
+      });
+    }
+    function Arrow(_ref27) {
+      var curr = _ref27.curr,
+        prev = _ref27.prev,
+        _ref27$bad = _ref27.bad,
+        bad = _ref27$bad === void 0 ? "high" : _ref27$bad;
+      if (curr == null || prev == null) return null;
+      var d = curr - prev;
+      if (d === 0) return null;
+      var good = bad === "high" ? d < 0 : d > 0;
+      return /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 13,
+          fontWeight: 700,
+          color: good ? "#22c55e" : "#ef4444",
+          marginLeft: 4
+        }
+      }, d > 0 ? "↑" : "↓");
+    }
+    return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 10,
+        marginBottom: 14
+      }
+    }, latestBP && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        cursor: "pointer"
+      },
+      onClick: function onClick() {
+        return setTab("Vitals");
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "BLOOD PRESSURE"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 20,
+        fontWeight: 800,
+        color: C.text,
+        letterSpacing: -0.5
+      }
+    }, latestBP.systolic, "/", latestBP.diastolic, /*#__PURE__*/React.createElement(Arrow, {
+      curr: latestBP.systolic,
+      prev: prevBP === null || prevBP === void 0 ? void 0 : prevBP.systolic
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.faint,
+        marginBottom: 6
+      }
+    }, fmtDate(latestBP.date)), /*#__PURE__*/React.createElement(Badge, {
+      label: bpCat(latestBP.systolic, latestBP.diastolic).label,
+      color: bpCat(latestBP.systolic, latestBP.diastolic).color,
+      small: true
+    })), latestW && function () {
+      var b = parseFloat(bmi(latestW.weight));
+      return /*#__PURE__*/React.createElement(Card, {
+        style: {
+          cursor: "pointer"
+        },
+        onClick: function onClick() {
+          return setTab("Weight");
+        }
+      }, /*#__PURE__*/React.createElement(SectionTitle, null, "WEIGHT"), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 20,
+          fontWeight: 800,
+          color: C.text
+        }
+      }, latestW.weight, " ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 400,
+          color: C.faint
+        }
+      }, "lb"), /*#__PURE__*/React.createElement(Arrow, {
+        curr: latestW.weight,
+        prev: prevW === null || prevW === void 0 ? void 0 : prevW.weight
+      })), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: C.faint,
+          marginBottom: 6
+        }
+      }, fmtDate(latestW.date)), /*#__PURE__*/React.createElement(Badge, {
+        label: "BMI ".concat(b),
+        color: bmiCat(b).color,
+        small: true
+      }));
+    }()), goals && (latestBP || latestW) && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "PROGRESS TOWARD GOALS"), latestW && goals.weight && /*#__PURE__*/React.createElement(GoalBar, {
+      label: "Weight",
+      current: latestW.weight,
+      goal: goals.weight,
+      unit: "lb"
+    }), latestBP && goals.systolic && /*#__PURE__*/React.createElement(GoalBar, {
+      label: "Systolic BP",
+      current: latestBP.systolic,
+      goal: goals.systolic,
+      unit: "mmHg"
+    }), function () {
+      var labsSorted = _toConsumableArray(labData || []).sort(function (a, b) {
+        return b.date.localeCompare(a.date);
+      });
+      var latest = labsSorted[0];
+      if (!latest) return null;
+      return /*#__PURE__*/React.createElement(React.Fragment, null, goals.HbA1c && latest.values["HbA1c"] != null && /*#__PURE__*/React.createElement(GoalBar, {
+        label: "HbA1c",
+        current: firstNum(latest.values["HbA1c"]),
+        goal: goals.HbA1c,
+        unit: "%"
+      }), goals.HDL && latest.values["HDL"] != null && /*#__PURE__*/React.createElement(GoalBar, {
+        label: "HDL",
+        current: firstNum(latest.values["HDL"]),
+        goal: goals.HDL,
+        unit: "mg/dL",
+        bad: "low"
+      }));
+    }()), /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      },
+      onClick: function onClick() {
+        return setTab("Labs");
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "MARKERS TO WATCH"), watchMarkers.map(function (m) {
+      var r = LAB_REFS[m];
+      var labEntries = (labData || []).map(function (l) {
+        return {
+          date: l.date,
+          raw: l.values[m],
+          prev: null
+        };
+      }).filter(function (e) {
+        return e.raw != null;
+      }).sort(function (a, b) {
+        return b.date.localeCompare(a.date);
+      });
+      if (!labEntries.length) return null;
+      var le = labEntries[0];
+      var pe = labEntries[1];
+      var val = firstNum(le.raw);
+      var pval = pe ? firstNum(pe.raw) : null;
+      var status = labStatus(m, val);
+      var delta = pval != null ? val - pval : null;
+      var good = m === "HDL" ? delta != null && delta > 0 : delta != null && delta < 0;
+      return /*#__PURE__*/React.createElement("div", {
+        key: m,
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "7px 0",
+          borderBottom: "1px solid ".concat(C.border)
+        }
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 14,
+          fontWeight: 500,
+          color: C.text
+        }
+      }, m), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: C.faint,
+          marginLeft: 6
+        }
+      }, fmtDate(le.date))), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6
+        }
+      }, delta !== null && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 700,
+          color: good ? "#22c55e" : "#ef4444"
+        }
+      }, delta > 0 ? "↑" : "↓", Math.abs(delta).toFixed(1)), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 16,
+          fontWeight: 700,
+          color: status === "normal" ? C.text : statusColor(status)
+        }
+      }, String(le.raw).split("/")[0]), r && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: C.faint
+        }
+      }, r.unit), status !== "normal" && /*#__PURE__*/React.createElement(Badge, {
+        label: status.toUpperCase(),
+        color: statusColor(status),
+        small: true
+      })));
+    })), activeMeds.length > 0 && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "ACTIVE MEDICATIONS"), activeMeds.map(function (m) {
+      var last = lastTaken(m.id);
+      var takenToday = last && last.date === today();
+      return /*#__PURE__*/React.createElement("div", {
+        key: m.id,
+        style: {
+          padding: "8px 0",
+          borderBottom: "1px solid ".concat(C.border)
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 14,
+          fontWeight: 600,
+          color: C.text
+        }
+      }, "\uD83D\uDC8A ", m.name, " ", m.dose), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: C.faint
+        }
+      }, m.frequency)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          marginTop: 3,
+          color: takenToday ? "#22c55e" : last ? "#f97316" : "#ef4444",
+          fontWeight: 500
+        }
+      }, last ? takenToday ? "✓ Taken today @ " + last.time : "Last taken: " + fmtDate(last.date) + (last.time ? " @ " + last.time : "") : "No doses logged yet"));
+    })), recentJournal.length > 0 && /*#__PURE__*/React.createElement(Card, {
+      style: {
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "RECENT JOURNAL"), recentJournal.map(function (e) {
+      var _e$tags;
+      return /*#__PURE__*/React.createElement("div", {
+        key: e.id,
+        style: {
+          padding: "8px 0",
+          borderBottom: "1px solid ".concat(C.border)
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: C.faint,
+          marginBottom: 3
+        }
+      }, fmtDate(e.date), (_e$tags = e.tags) !== null && _e$tags !== void 0 && _e$tags.length ? " \xB7 ".concat(e.tags.join(", ")) : ""), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 13,
+          color: C.text,
+          lineHeight: 1.4,
+          overflow: "hidden",
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical"
+        }
+      }, e.text));
+    })));
+  }
+
+  // ── ROOT ──────────────────────────────────────────────────────────────────────
+  var TABS = ["Dashboard", "Vitals", "Weight", "Labs", "Goals", "Journal", "Meds", "Export"];
+  var TAB_LABELS = {
+    "Dashboard": "Home",
+    "Vitals": "BP",
+    "Weight": "Wt",
+    "Labs": "Labs",
+    "Goals": "Goals",
+    "Journal": "Journal",
+    "Meds": "Meds",
+    "Export": "Export"
+  };
+  function App() {
+    var _useState49 = useState("Dashboard"),
+      _useState50 = _slicedToArray(_useState49, 2),
+      tab = _useState50[0],
+      setTab = _useState50[1];
+    var _usePersistedState = usePersistedState("bp-readings", SEED_BP),
+      _usePersistedState2 = _slicedToArray(_usePersistedState, 3),
+      bp = _usePersistedState2[0],
+      setBp = _usePersistedState2[1],
+      bpLoaded = _usePersistedState2[2];
+    var _usePersistedState3 = usePersistedState("weight-entries", SEED_WEIGHT),
+      _usePersistedState4 = _slicedToArray(_usePersistedState3, 3),
+      weight = _usePersistedState4[0],
+      setWeight = _usePersistedState4[1],
+      wLoaded = _usePersistedState4[2];
+    var _usePersistedState5 = usePersistedState("lab-results", SEED_LABS),
+      _usePersistedState6 = _slicedToArray(_usePersistedState5, 3),
+      labs = _usePersistedState6[0],
+      setLabs = _usePersistedState6[1],
+      labLoaded = _usePersistedState6[2];
+    var _usePersistedState7 = usePersistedState("goals", SEED_GOALS),
+      _usePersistedState8 = _slicedToArray(_usePersistedState7, 3),
+      goals = _usePersistedState8[0],
+      setGoals = _usePersistedState8[1],
+      gLoaded = _usePersistedState8[2];
+    var _usePersistedState9 = usePersistedState("journal", []),
+      _usePersistedState0 = _slicedToArray(_usePersistedState9, 3),
+      journal = _usePersistedState0[0],
+      setJournal = _usePersistedState0[1],
+      jLoaded = _usePersistedState0[2];
+    var _usePersistedState1 = usePersistedState("medications", SEED_MEDS),
+      _usePersistedState10 = _slicedToArray(_usePersistedState1, 3),
+      meds = _usePersistedState10[0],
+      setMeds = _usePersistedState10[1],
+      mLoaded = _usePersistedState10[2];
+    var _usePersistedState11 = usePersistedState("med-logs", []),
+      _usePersistedState12 = _slicedToArray(_usePersistedState11, 3),
+      medLogs = _usePersistedState12[0],
+      setMedLogs = _usePersistedState12[1],
+      mlLoaded = _usePersistedState12[2];
+    var allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded;
+    var shared = {
+      bp: bp,
+      setBp: setBp,
+      weight: weight,
+      setWeight: setWeight,
+      labs: labs,
+      setLabs: setLabs,
+      goals: goals,
+      setGoals: setGoals,
+      journal: journal,
+      setJournal: setJournal,
+      meds: meds,
+      setMeds: setMeds,
+      medLogs: medLogs,
+      setMedLogs: setMedLogs
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "'Inter',system-ui,sans-serif",
+        background: C.bg,
+        minHeight: "100vh",
+        maxWidth: 520,
+        margin: "0 auto",
+        padding: "20px 14px 40px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 16
+      }
+    }, /*#__PURE__*/React.createElement("h1", {
+      style: {
+        fontSize: 20,
+        fontWeight: 800,
+        color: C.text,
+        margin: 0,
+        letterSpacing: -0.3
+      }
+    }, "Health Tracker"), /*#__PURE__*/React.createElement("p", {
+      style: {
+        fontSize: 12,
+        color: C.faint,
+        margin: "3px 0 0"
+      }
+    }, "Bob \xB7 5\u203211\u2033 \xB7 Started Jul 4, 2026")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 3,
+        marginBottom: 18,
+        background: "#e9ecef",
+        borderRadius: 10,
+        padding: 3,
+        overflowX: "auto"
+      }
+    }, TABS.map(function (t) {
+      return /*#__PURE__*/React.createElement("button", {
+        key: t,
+        onClick: function onClick() {
+          return setTab(t);
+        },
+        style: {
+          flex: "0 0 auto",
+          padding: "7px 10px",
+          borderRadius: 7,
+          border: "none",
+          background: tab === t ? "#fff" : "transparent",
+          color: tab === t ? C.text : C.muted,
+          fontSize: 12,
+          fontWeight: tab === t ? 700 : 500,
+          cursor: "pointer",
+          boxShadow: tab === t ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+          whiteSpace: "nowrap"
+        }
+      }, TAB_LABELS[t] || t);
+    })), !allLoaded && /*#__PURE__*/React.createElement(Spinner, null), allLoaded && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: tab === "Dashboard" ? "block" : "none"
+      }
+    }, /*#__PURE__*/React.createElement(Dashboard, _objectSpread({
+      setTab: setTab
+    }, shared))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: tab === "Vitals" ? "block" : "none"
+      }
+    }, /*#__PURE__*/React.createElement(VitalsTab, shared)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: tab === "Weight" ? "block" : "none"
+      }
+    }, /*#__PURE__*/React.createElement(WeightTab, shared)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: tab === "Labs" ? "block" : "none"
+      }
+    }, /*#__PURE__*/React.createElement(LabsTab, shared)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: tab === "Goals" ? "block" : "none"
+      }
+    }, /*#__PURE__*/React.createElement(GoalsTab, shared)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: tab === "Journal" ? "block" : "none"
+      }
+    }, /*#__PURE__*/React.createElement(JournalTab, shared)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: tab === "Meds" ? "block" : "none"
+      }
+    }, /*#__PURE__*/React.createElement(MedsTab, shared)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: tab === "Export" ? "block" : "none"
+      }
+    }, /*#__PURE__*/React.createElement(ExportTab, shared))));
+  }
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+  </script>
+</body>
+</html>
