@@ -10,6 +10,15 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #f4f6f8; font-family: system-ui, sans-serif; }
     input, select, textarea, button { font-family: inherit; }
+    @media print {
+      .no-print { display: none !important; }
+      .app-root { max-width: 100% !important; padding: 0 !important; background: white !important; }
+      body { background: white !important; }
+      table { page-break-inside: avoid; }
+      tr { page-break-inside: avoid; }
+      h2 { page-break-after: avoid; }
+      td, th { white-space: normal !important; word-break: break-word; }
+    }
   </style>
 </head>
 <body>
@@ -2356,7 +2365,8 @@ function PDFSummary({
       fontSize: 13,
       color: '#111827',
       background: '#fff',
-      padding: '24px 18px'
+      padding: '24px 18px',
+      maxWidth: '100%'
     },
     h1: {
       fontSize: 22,
@@ -2848,6 +2858,7 @@ function ExportTab({
     onFocus: e => e.target.select()
   })));
   if (view && view.type === 'pdf') return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "no-print",
     style: {
       display: 'flex',
       gap: 8,
@@ -2893,21 +2904,18 @@ function ExportTab({
       cursor: 'pointer',
       fontWeight: 600
     }
-  }, copied ? '✓ Copied' : 'Copy as Text')), /*#__PURE__*/React.createElement(Card, {
+  }, copied ? '✓ Copied' : 'Copy as Text')), /*#__PURE__*/React.createElement("div", {
+    className: "no-print",
     style: {
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
+      marginBottom: 14,
+      padding: '12px 16px',
+      background: '#f0f9ff',
+      border: '1px solid #bae6fd',
+      borderRadius: 10,
       fontSize: 13,
-      color: C.muted,
-      lineHeight: 1.5
+      color: '#0369a1'
     }
-  }, /*#__PURE__*/React.createElement("strong", {
-    style: {
-      color: C.text
-    }
-  }, "Save as PDF:"), " click ", /*#__PURE__*/React.createElement("strong", null, "Print / Save as PDF"), " above, then choose \"Save as PDF\" as the destination in the print dialog. On iPhone, use Share → Print instead.")), /*#__PURE__*/React.createElement(PDFSummary, {
+  }, "Click ", /*#__PURE__*/React.createElement("strong", null, "Print / Save as PDF"), " above → choose ", /*#__PURE__*/React.createElement("strong", null, "Save as PDF"), " as the destination. On iPhone: Share → Print."), /*#__PURE__*/React.createElement(PDFSummary, {
     bp: bp,
     weight: weight,
     labs: labs,
@@ -3281,6 +3289,7 @@ function App() {
     setMedLogs
   };
   return /*#__PURE__*/React.createElement("div", {
+    className: "app-root",
     style: {
       fontFamily: "'Inter',system-ui,sans-serif",
       background: C.bg,
@@ -3290,6 +3299,7 @@ function App() {
       padding: "20px 14px 40px"
     }
   }, /*#__PURE__*/React.createElement("div", {
+    className: "no-print",
     style: {
       marginBottom: 16
     }
@@ -3308,6 +3318,7 @@ function App() {
       margin: "3px 0 0"
     }
   }, "Bob · 5′11″ · Started Jul 4, 2026")), /*#__PURE__*/React.createElement("div", {
+    className: "no-print",
     style: {
       display: "flex",
       gap: 3,
