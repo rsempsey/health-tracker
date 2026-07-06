@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Health Tracker</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.2/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f4f6f8; font-family: system-ui, sans-serif; }
+    input, select, textarea, button { font-family: inherit; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+
+// ── FIRESTORE REST CONFIG ─────────────────────────────────────────────────────
+const FS_PROJECT = "health-tracker-fedf5";
+const FS_KEY     = "AIzaSyAOOAw1TVluE2At2rRXbxxmmU6iDBhUO-c";
+const FS_COL     = "health-tracker";
+const FS_USER    = "bob";
+const FS_BASE    = "https://firestore.googleapis.com/v1/projects/" + FS_PROJECT + "/databases/(default)/documents/" + FS_COL + "/";
+
+async function fsGet(key) {
+  try {
+    const res = await fetch(FS_BASE + FS_USER + "-" + key + "?key=" + FS_KEY);
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error("GET " + res.status);
+    const json = await res.json();
+    const raw = json.fields && json.fields.value && json.fields.value.stringValue;
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) {
+    throw e;
+  }
+}
+
+async function fsSet(key, data) {
+  try {
+    const url = FS_BASE + FS_USER + "-" + key + "?key=" + FS_KEY;
+    const body = { fields: { value: { stringValue: JSON.stringify(data) } } };
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error("SET " + res.status + ": " + txt.slice(0,100));
+    }
+  } catch(e) {
+    throw e;
+  }
+}
+
+
+// ── REFERENCE RANGES ──────────────────────────────────────────────────────────
+const LAB_REFS = {
+  "Glucose":       { low:70,   high:99,   unit:"mg/dL" },
+  "HbA1c":         { low:null, high:5.6,  unit:"%"     },
+  "eAG":           { low:null, high:114,  unit:"mg/dL" },
+  "Total Chol":    { low:null, high:200,  unit:"mg/dL" },
+  "LDL":           { low:null, high:100,  unit:"mg/dL" },
+  "HDL":           { low:40,   high:null, unit:"mg/dL" },
+  "Triglycerides": { low:null, high:150,  unit:"mg/dL" },
+  "Non-HDL Chol":  { low:null, high:130,  unit:"mg/dL" },
+  "ALT":           { low:null, high:56,   unit:"U/L"   },
+  "AST":           { low:null, high:40,   unit:"U/L"   },
+  "Alk Phos":      { low:44,   high:147,  unit:"U/L"   },
+  "T Bili":        { low:null, high:1.2,  unit:"mg/dL" },
+  "Albumin":       { low:3.5,  high:5.0,  unit:"g/dL"  },
+  "Total Protein": { low:6.0,  high:8.3,  unit:"g/dL"  },
+  "Sodium":        { low:135,  high:145,  unit:"mEq/L" },
+  "Potassium":     { low:3.5,  high:5.0,  unit:"mEq/L" },
+  "Chloride":      { low:96,   high:106,  unit:"mEq/L" },
+  "CO2":           { low:22,   high:29,   unit:"mEq/L" },
+  "BUN":           { low:7,    high:20,   unit:"mg/dL" },
+  "Creatinine":    { low:0.6,  high:1.2,  unit:"mg/dL" },
+  "Calcium":       { low:8.5,  high:10.5, unit:"mg/dL" },
+  "WBC":           { low:4.5,  high:11.0, unit:"K/µL"  },
+  "Hemoglobin":    { low:13.5, high:17.5, unit:"g/dL"  },
+  "Hematocrit":    { low:41,   high:53,   unit:"%"     },
+  "Platelets":     { low:150,  high:400,  unit:"K/µL"  },
+  "TSH":           { low:0.4,  high:4.0,  unit:"mIU/L" },
+  "PSA":           { low:null, high:4.0,  unit:"ng/mL" },
+  "Magnesium":     { low:1.7,  high:2.3,  unit:"mg/dL" },
+  "Cardiac Risk":  { low:null, high:5.0,  unit:""      },
+};
+
+function labStatus(name, value) {
+  const ref = LAB_REFS[name];
+  if (!ref || value == null || isNaN(value)) return "normal";
+  if (ref.high !== null && value > ref.high) return "high";
+  if (ref.low  !== null && value < ref.low)  return "low";
+  return "normal";
+}
+function statusColor(s) {
+  if (s === "high") return "#ef4444";
+  if (s === "low")  return "#3b82f6";
+  return "#22c55e";
+}
+
+// ── SEED DATA ─────────────────────────────────────────────────────────────────
+const SEED_BP = [
+  { id:1, date:"2025-03-26", time:"",      systolic:144, diastolic:92, heartRate:87, medication:"", notes:"Penn State Hershey — office visit" },
+  { id:2, date:"2026-07-04", time:"13:26", systolic:125, diastolic:81, heartRate:91, medication:"Amlodipine Besylate 5mg @ ~11:00 AM", notes:"First home reading — resting" },
+];
+const SEED_WEIGHT = [
+  { id:1, date:"2025-03-26", weight:306.44, notes:"Penn State Hershey office" },
+  { id:2, date:"2026-07-01", weight:310,    notes:"ER visit" },
+];
+const SEED_LABS = [
+  { id:1, date:"2024-03-06", lab:"Penn State Hershey", values:{ "Sodium":137,"Potassium":4.3,"Chloride":103,"CO2":25.7,"BUN":17,"Creatinine":0.74,"Glucose":122,"Calcium":9.8,"WBC":9.36,"Hemoglobin":16.5,"Hematocrit":49.2,"Platelets":176,"ALT":73,"T Bili":0.5,"Alk Phos":84,"AST":37,"Albumin":4.5,"Total Protein":7.1,"Total Chol":133,"LDL":72,"HDL":45,"Cardiac Risk":2.96,"Triglycerides":79 } },
+  { id:2, date:"2024-09-09", lab:"Penn State Hershey", values:{ "Sodium":137,"Potassium":4.3,"Chloride":102,"CO2":27.1,"BUN":13,"Creatinine":0.77,"Glucose":109,"Calcium":9.1,"WBC":9.68,"Hemoglobin":16.8,"Hematocrit":48.7,"Platelets":172,"ALT":66,"T Bili":0.8,"Alk Phos":79,"AST":38,"Albumin":4.4,"Total Protein":7.5,"Total Chol":145,"LDL":88,"HDL":43,"Cardiac Risk":3.37,"Triglycerides":69,"HbA1c":6.1,"eAG":128,"PSA":0.73 } },
+  { id:3, date:"2026-07-01", lab:"ER — Penn State Hershey", values:{ "Sodium":134,"Potassium":3.7,"Chloride":103,"CO2":22,"Glucose":153,"BUN":12,"Creatinine":0.79,"Albumin":"4.7 / 4.4","Total Protein":"7.9 / 7.4","T Bili":"0.6 / 1.0","Alk Phos":"76 / 74","AST":"40 / 38","ALT":"68 / 65","Calcium":9.4,"WBC":9.86,"Hemoglobin":17.2,"Hematocrit":51,"Platelets":177,"Magnesium":2.0,"TSH":2.514,"Total Chol":140,"Triglycerides":56,"HDL":32,"LDL":94,"Non-HDL Chol":108,"HbA1c":6.8,"eAG":148 } },
+];
+const SEED_GOALS = {
+  weight: 250,
+  systolic: 120, diastolic: 80,
+  HbA1c: 5.6, HDL: 50, LDL: 80,
+};
+const SEED_MEDS = [
+  { id:1, name:"Amlodipine Besylate", dose:"5mg", frequency:"Daily", startDate:"2026-07-04", notes:"For blood pressure", active:true },
+];
+
+const HEIGHT_IN = 71;
+const LAB_PANELS = {
+  "Metabolic":   ["Glucose","Sodium","Potassium","Chloride","CO2","BUN","Creatinine","Calcium","Albumin","Total Protein"],
+  "Liver":       ["ALT","AST","Alk Phos","T Bili"],
+  "Lipids":      ["Total Chol","LDL","HDL","Triglycerides","Non-HDL Chol","Cardiac Risk"],
+  "Blood / CBC": ["WBC","Hemoglobin","Hematocrit","Platelets"],
+  "Diabetes":    ["HbA1c","eAG"],
+  "Other":       ["TSH","PSA","Magnesium"],
+};
+const BLANK_VALS = () => { const v={}; Object.values(LAB_PANELS).flat().forEach(m=>{v[m]="";}); return v; };
+
+// ── STORAGE HOOK ──────────────────────────────────────────────────────────────
+function usePersistedState(key, seed) {
+  const CACHE_KEY = 'ht2026:' + key;
+
+  // Instant render from localStorage cache
+  const [data, setData] = useState(() => {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  });
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const val = await fsGet(key);
+        if (val !== null) {
+          setData(val);
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify(val)); } catch {}
+        } else {
+          // First run — seed Firestore
+          await fsSet(key, seed);
+          setData(seed);
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify(seed)); } catch {}
+        }
+      } catch (e) {
+        console.error("Firestore load error", key, e);
+        // Fall back to cache or seed
+        setData(d => d !== null ? d : seed);
+      }
+      setLoaded(true);
+    }
+    load();
+  }, [key]);
+
+  async function update(d) {
+    setData(d);
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(d)); } catch {}
+    try { await fsSet(key, d); } catch (e) { console.error("Firestore write error", key, e); }
+  }
+
+  return [data, update, loaded];
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function bmi(lbs)  { return ((lbs/(HEIGHT_IN*HEIGHT_IN))*703).toFixed(1); }
+function bmiCat(b) {
+  if (b<18.5) return {label:"Underweight",color:"#3b82f6"};
+  if (b<25)   return {label:"Normal",     color:"#22c55e"};
+  if (b<30)   return {label:"Overweight", color:"#eab308"};
+  return             {label:"Obese",      color:"#ef4444"};
+}
+function bpCat(s,d) {
+  if (s<120&&d<80) return {label:"Normal",      color:"#22c55e"};
+  if (s<130&&d<80) return {label:"Elevated",    color:"#eab308"};
+  if (s<140||d<90) return {label:"High Stage 1",color:"#f97316"};
+  return                  {label:"High Stage 2", color:"#ef4444"};
+}
+function fmtDate(d) {
+  if (!d) return "—";
+  const [y,m,day]=d.split("-");
+  return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+m-1]} ${+day}, ${y}`;
+}
+function firstNum(v) { return parseFloat(String(v).split("/")[0]); }
+function today() { return new Date().toISOString().slice(0,10); }
+
+// ── STYLE TOKENS ──────────────────────────────────────────────────────────────
+const C={bg:"#f4f6f8",card:"#fff",border:"#e5e7eb",text:"#111827",muted:"#6b7280",faint:"#9ca3af",accent:"#2563eb"};
+const inputSt={width:"100%",padding:"8px 10px",border:`1px solid ${C.border}`,borderRadius:8,fontSize:14,background:"#fafafa",color:C.text,boxSizing:"border-box"};
+const labelSt={fontSize:12,color:C.muted,fontWeight:600,marginBottom:3,display:"block"};
+const taSt={...inputSt,resize:"vertical",minHeight:80,fontFamily:"inherit",lineHeight:1.5};
+
+function Badge({label,color,small}){
+  return <span style={{background:color+"18",color,border:`1px solid ${color}40`,borderRadius:5,padding:small?"1px 7px":"2px 9px",fontSize:small?11:12,fontWeight:600,whiteSpace:"nowrap"}}>{label}</span>;
+}
+function Card({children,style}){
+  return <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:"16px 18px",...style}}>{children}</div>;
+}
+function SectionTitle({children}){
+  return <div style={{fontSize:11,fontWeight:700,color:C.faint,letterSpacing:0.8,marginBottom:10}}>{children}</div>;
+}
+function DelBtn({onClick}){
+  return <button onClick={onClick} style={{background:"none",border:"none",color:"#d1d5db",cursor:"pointer",fontSize:18,padding:2,lineHeight:1}} title="Delete">×</button>;
+}
+function AddBtn({onClick,label}){
+  return <button onClick={onClick} style={{width:"100%",padding:"11px",background:C.accent,color:"#fff",border:"none",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:14}}>{label}</button>;
+}
+function SaveBtn({onClick,label="Save"}){
+  return <button onClick={onClick} style={{width:"100%",padding:"10px",background:C.text,color:"#fff",border:"none",borderRadius:8,fontSize:14,fontWeight:600,cursor:"pointer"}}>{label}</button>;
+}
+function Spinner(){return <div style={{textAlign:"center",padding:"60px 0",color:C.faint,fontSize:14}}>Loading…</div>;}
+
+// ── MINI LINE CHART ───────────────────────────────────────────────────────────
+function MiniChart({points,color="#2563eb",goal,unit,bad="high"}){
+  const W=280,H=70,pad=8;
+  if(!points||points.length<2) return null;
+  const vals=points.map(p=>p.y);
+  const allVals=goal!=null?[...vals,goal]:vals;
+  const mn=Math.min(...allVals),mx=Math.max(...allVals);
+  const rng=mx-mn||1;
+  const xs=points.map((_,i)=>pad+i*(W-2*pad)/(points.length-1));
+  const ys=points.map(p=>H-pad-(p.y-mn)/(rng)*(H-2*pad));
+  const path="M"+xs.map((x,i)=>`${x},${ys[i]}`).join(" L");
+  const goalY=goal!=null ? H-pad-(goal-mn)/rng*(H-2*pad) : null;
+  const last=points[points.length-1];
+  const prev=points[points.length-2];
+  const delta=last.y-prev.y;
+  const goodDir=bad==="high"?delta<0:delta>0;
+  const arrow=delta===0?"→":delta>0?"↑":"↓";
+  const arrowColor=delta===0?C.faint:goodDir?"#22c55e":"#ef4444";
+  return(
+    <div>
+      <svg width={W} height={H} style={{display:"block",overflow:"visible"}}>
+        {goalY!=null&&<line x1={pad} y1={goalY} x2={W-pad} y2={goalY} stroke="#22c55e" strokeWidth={1} strokeDasharray="4,3" opacity={0.7}/>}
+        <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round"/>
+        {points.map((p,i)=><circle key={i} cx={xs[i]} cy={ys[i]} r={3} fill={color}/>)}
+      </svg>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
+        <div style={{fontSize:11,color:C.faint}}>{fmtDate(points[0].date)} → {fmtDate(last.date)}</div>
+        <div style={{fontSize:13,fontWeight:700,color:arrowColor}}>{arrow} {Math.abs(delta).toFixed(1)} {unit}</div>
+      </div>
+    </div>
+  );
+}
+
+// ── GOAL PROGRESS BAR ─────────────────────────────────────────────────────────
+function GoalBar({label,current,goal,unit,bad="high"}){
+  if(current==null||goal==null) return null;
+  const met = bad==="high" ? current<=goal : current>=goal;
+  const pct = bad==="high"
+    ? Math.max(0,Math.min(100,100-(current-goal)/Math.max(goal,1)*50))
+    : Math.max(0,Math.min(100,current/goal*100));
+  const barColor = met ? "#22c55e" : current===goal ? "#22c55e" : "#f97316";
+  return(
+    <div style={{marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:4}}>
+        <span style={{fontSize:13,fontWeight:600,color:C.text}}>{label}</span>
+        <span style={{fontSize:12,color:C.muted}}>
+          <span style={{fontWeight:700,color:met?"#22c55e":C.text}}>{current}</span>
+          <span style={{color:C.faint}}> / goal {goal} {unit}</span>
+          {met && <span style={{marginLeft:6,color:"#22c55e",fontWeight:700}}>✓</span>}
+        </span>
+      </div>
+      <div style={{background:C.border,borderRadius:4,height:6,overflow:"hidden"}}>
+        <div style={{width:`${pct}%`,background:barColor,height:"100%",borderRadius:4,transition:"width 0.4s"}}/>
+      </div>
+    </div>
+  );
+}
+
+// ── VITALS TAB ────────────────────────────────────────────────────────────────
+function VitalsTab({bp:readings,setBp:setReadings,goals}){
+  const [open,setOpen]=useState(false);
+  const [f,setF]=useState({date:"",time:"",systolic:"",diastolic:"",heartRate:"",medication:"",notes:""});
+  const sorted=[...readings].sort((a,b)=>b.date.localeCompare(a.date));
+  const latest=sorted[0]; const prev=sorted[1];
+  function save(){
+    if(!f.systolic||!f.diastolic||!f.heartRate||!f.date) return;
+    setReadings([...readings,{id:Date.now(),...f,systolic:+f.systolic,diastolic:+f.diastolic,heartRate:+f.heartRate}]);
+    setF({date:"",time:"",systolic:"",diastolic:"",heartRate:"",medication:"",notes:""});
+    setOpen(false);
+  }
+  const chartPts=[...readings].sort((a,b)=>a.date.localeCompare(b.date)).map(r=>({date:r.date,y:r.systolic}));
+  const bp=latest?bpCat(latest.systolic,latest.diastolic):null;
+  return(
+    <div>
+      {latest&&(
+        <Card style={{marginBottom:14}}>
+          <SectionTitle>LATEST · {fmtDate(latest.date)}</SectionTitle>
+          <div style={{display:"flex",gap:24,alignItems:"flex-end",flexWrap:"wrap",marginBottom:12}}>
+            <div>
+              <span style={{fontSize:34,fontWeight:800,color:C.text,letterSpacing:-1}}>{latest.systolic}/{latest.diastolic}</span>
+              <span style={{fontSize:13,color:C.faint,marginLeft:6}}>mmHg</span>
+              <div style={{marginTop:5}}><Badge label={bp.label} color={bp.color}/></div>
+            </div>
+            <div>
+              <span style={{fontSize:26,fontWeight:700,color:C.text}}>{latest.heartRate}</span>
+              <span style={{fontSize:13,color:C.faint,marginLeft:4}}>bpm</span>
+              {prev&&<div style={{fontSize:12,color:C.faint,marginTop:2}}>prev {prev.systolic}/{prev.diastolic} · {prev.heartRate} bpm</div>}
+            </div>
+          </div>
+          {chartPts.length>=2&&<MiniChart points={chartPts} color={bp.color} goal={goals?.systolic} unit="mmHg"/>}
+        </Card>
+      )}
+      {goals&&(latest||prev)&&(
+        <Card style={{marginBottom:14}}>
+          <SectionTitle>GOALS</SectionTitle>
+          <GoalBar label="Systolic BP" current={latest?.systolic} goal={goals.systolic} unit="mmHg"/>
+          <GoalBar label="Diastolic BP" current={latest?.diastolic} goal={goals.diastolic} unit="mmHg"/>
+        </Card>
+      )}
+      <AddBtn onClick={()=>setOpen(!open)} label={open?"Cancel":"+ Log Reading"}/>
+      {open&&(
+        <Card style={{marginBottom:14}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div><label style={labelSt}>Date</label><input style={inputSt} type="date" value={f.date} onChange={e=>setF({...f,date:e.target.value})}/></div>
+            <div><label style={labelSt}>Time</label><input style={inputSt} type="time" value={f.time} onChange={e=>setF({...f,time:e.target.value})}/></div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:10}}>
+            <div><label style={labelSt}>Systolic</label><input style={inputSt} type="number" placeholder="120" value={f.systolic} onChange={e=>setF({...f,systolic:e.target.value})}/></div>
+            <div><label style={labelSt}>Diastolic</label><input style={inputSt} type="number" placeholder="80" value={f.diastolic} onChange={e=>setF({...f,diastolic:e.target.value})}/></div>
+            <div><label style={labelSt}>HR (bpm)</label><input style={inputSt} type="number" placeholder="72" value={f.heartRate} onChange={e=>setF({...f,heartRate:e.target.value})}/></div>
+          </div>
+          <div style={{marginBottom:10}}><label style={labelSt}>Medication</label><input style={inputSt} type="text" placeholder="e.g. Amlodipine 5mg @ 8 AM" value={f.medication} onChange={e=>setF({...f,medication:e.target.value})}/></div>
+          <div style={{marginBottom:12}}><label style={labelSt}>Notes</label><input style={inputSt} type="text" placeholder="e.g. resting, after walk" value={f.notes} onChange={e=>setF({...f,notes:e.target.value})}/></div>
+          <SaveBtn onClick={save}/>
+        </Card>
+      )}
+      <SectionTitle>ALL READINGS</SectionTitle>
+      {sorted.map(r=>{const bp=bpCat(r.systolic,r.diastolic);return(
+        <Card key={r.id} style={{marginBottom:10}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div>
+              <div style={{fontSize:12,color:C.faint,marginBottom:4}}>{fmtDate(r.date)}{r.time&&r.time!=="—"?` · ${r.time}`:""}</div>
+              <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
+                <span style={{fontSize:22,fontWeight:700,color:C.text}}>{r.systolic}/{r.diastolic} <span style={{fontSize:12,color:C.faint,fontWeight:400}}>mmHg</span></span>
+                <Badge label={bp.label} color={bp.color} small/>
+              </div>
+              <div style={{fontSize:15,color:C.muted,marginTop:2}}>{r.heartRate} bpm</div>
+              {r.medication&&<div style={{fontSize:11,color:C.faint,marginTop:5}}>💊 {r.medication}</div>}
+              {r.notes&&<div style={{fontSize:11,color:C.faint,marginTop:2}}>📝 {r.notes}</div>}
+            </div>
+            <DelBtn onClick={()=>setReadings(readings.filter(x=>x.id!==r.id))}/>
+          </div>
+        </Card>
+      );})}
+    </div>
+  );
+}
+
+// ── WEIGHT TAB ────────────────────────────────────────────────────────────────
+function WeightTab({weight:entries,setWeight:setEntries,goals}){
+  const [open,setOpen]=useState(false);
+  const [f,setF]=useState({date:"",weight:"",notes:""});
+  const sorted=[...entries].sort((a,b)=>b.date.localeCompare(a.date));
+  const latest=sorted[0]; const first=sorted[sorted.length-1];
+  const change=latest&&first&&latest.id!==first.id?(latest.weight-first.weight).toFixed(1):null;
+  function save(){
+    if(!f.weight||!f.date) return;
+    setEntries([...entries,{id:Date.now(),date:f.date,weight:+f.weight,notes:f.notes}]);
+    setF({date:"",weight:"",notes:""}); setOpen(false);
+  }
+  const chartPts=[...entries].sort((a,b)=>a.date.localeCompare(b.date)).map(e=>({date:e.date,y:e.weight}));
+  return(
+    <div>
+      {latest&&(()=>{const b=parseFloat(bmi(latest.weight));const cat=bmiCat(b);return(
+        <Card style={{marginBottom:14}}>
+          <SectionTitle>LATEST · {fmtDate(latest.date)}</SectionTitle>
+          <div style={{display:"flex",gap:28,alignItems:"flex-end",flexWrap:"wrap",marginBottom:12}}>
+            <div>
+              <span style={{fontSize:36,fontWeight:800,color:C.text,letterSpacing:-1}}>{latest.weight}</span>
+              <span style={{fontSize:14,color:C.faint,marginLeft:5}}>lb</span>
+              {change!==null&&<div style={{fontSize:13,color:+change>0?"#ef4444":"#22c55e",marginTop:2,fontWeight:600}}>{+change>0?"+":""}{change} lb since {fmtDate(first.date)}</div>}
+            </div>
+            <div>
+              <span style={{fontSize:26,fontWeight:700,color:C.text}}>{b}</span>
+              <span style={{fontSize:13,color:C.faint,marginLeft:4}}>BMI</span>
+              <div style={{marginTop:4}}><Badge label={cat.label} color={cat.color}/></div>
+            </div>
+          </div>
+          {chartPts.length>=2&&<MiniChart points={chartPts} color="#8b5cf6" goal={goals?.weight} unit="lb"/>}
+        </Card>
+      );})()}
+      {goals&&latest&&(
+        <Card style={{marginBottom:14}}>
+          <SectionTitle>GOALS</SectionTitle>
+          <GoalBar label="Weight" current={latest.weight} goal={goals.weight} unit="lb"/>
+        </Card>
+      )}
+      <AddBtn onClick={()=>setOpen(!open)} label={open?"Cancel":"+ Log Weight"}/>
+      {open&&(
+        <Card style={{marginBottom:14}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div><label style={labelSt}>Date</label><input style={inputSt} type="date" value={f.date} onChange={e=>setF({...f,date:e.target.value})}/></div>
+            <div><label style={labelSt}>Weight (lb)</label><input style={inputSt} type="number" step="0.1" placeholder="300" value={f.weight} onChange={e=>setF({...f,weight:e.target.value})}/></div>
+          </div>
+          <div style={{marginBottom:12}}><label style={labelSt}>Notes</label><input style={inputSt} type="text" placeholder="e.g. morning, before breakfast" value={f.notes} onChange={e=>setF({...f,notes:e.target.value})}/></div>
+          <SaveBtn onClick={save}/>
+        </Card>
+      )}
+      <SectionTitle>ALL ENTRIES</SectionTitle>
+      {sorted.map(e=>{const b=parseFloat(bmi(e.weight));const cat=bmiCat(b);return(
+        <Card key={e.id} style={{marginBottom:10}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+            <div>
+              <div style={{fontSize:12,color:C.faint,marginBottom:4}}>{fmtDate(e.date)}</div>
+              <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap"}}>
+                <span style={{fontSize:22,fontWeight:700,color:C.text}}>{e.weight} <span style={{fontSize:12,color:C.faint,fontWeight:400}}>lb</span></span>
+                <span style={{fontSize:14,color:C.muted}}>{b} BMI</span>
+                <Badge label={cat.label} color={cat.color} small/>
+              </div>
+              {e.notes&&<div style={{fontSize:11,color:C.faint,marginTop:4}}>📝 {e.notes}</div>}
+            </div>
+            <DelBtn onClick={()=>setEntries(entries.filter(x=>x.id!==e.id))}/>
+          </div>
+        </Card>
+      );})}
+    </div>
+  );
+}
+
+// ── LABS TAB ──────────────────────────────────────────────────────────────────
+function LabsTab({labs,setLabs,goals}){
+  const [selected,setSelected]=useState(null);
+  const [view,setView]=useState("panel");
+  const [trendMarker,setTrendMarker]=useState("HbA1c");
+  const [open,setOpen]=useState(false);
+  const [fDate,setFDate]=useState(""); const [fLab,setFLab]=useState(""); const [fVals,setFVals]=useState(BLANK_VALS());
+  const sorted=[...labs].sort((a,b)=>b.date.localeCompare(a.date));
+  const activeId=selected??sorted[0]?.id;
+  const current=labs.find(l=>l.id===activeId)||sorted[0];
+  const allMarkers=[...new Set(labs.flatMap(l=>Object.keys(l.values)))].sort();
+  const trendData=labs.filter(l=>l.values[trendMarker]!=null).map(l=>({date:l.date,y:firstNum(l.values[trendMarker])})).sort((a,b)=>a.date.localeCompare(b.date));
+  const ref=LAB_REFS[trendMarker];
+  function flagCount(lab){return Object.entries(lab.values).filter(([k,v])=>labStatus(k,firstNum(v))!=="normal").length;}
+  function savePanel(){
+    if(!fDate) return;
+    const values={};
+    Object.entries(fVals).forEach(([k,v])=>{if(v!=="") values[k]=isNaN(+v)?v:+v;});
+    if(!Object.keys(values).length) return;
+    const nl={id:Date.now(),date:fDate,lab:fLab||"Lab",values};
+    const next=[...labs,nl]; setLabs(next); setSelected(nl.id);
+    setFDate(""); setFLab(""); setFVals(BLANK_VALS()); setOpen(false); setView("panel");
+  }
+  function delLab(id){const next=labs.filter(l=>l.id!==id);setLabs(next);if(activeId===id)setSelected(null);}
+  const goalMarkers=["HbA1c","HDL","LDL"];
+  return(
+    <div>
+      <div style={{display:"flex",gap:8,marginBottom:14,flexWrap:"wrap"}}>
+        {sorted.map(l=>{const flags=flagCount(l);const active=l.id===activeId;return(
+          <button key={l.id} onClick={()=>{setSelected(l.id);setView("panel");}} style={{padding:"8px 12px",borderRadius:8,border:`1px solid ${active?C.accent:C.border}`,background:active?C.accent:"#fff",color:active?"#fff":C.text,fontSize:13,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:6}}>
+            {fmtDate(l.date)}
+            {flags>0&&<span style={{background:active?"rgba(255,255,255,0.3)":"#fee2e2",color:active?"#fff":"#ef4444",borderRadius:10,padding:"1px 6px",fontSize:11}}>{flags}</span>}
+          </button>
+        );})}
+      </div>
+      <AddBtn onClick={()=>setOpen(!open)} label={open?"Cancel":"+ Add Lab Results"}/>
+      {open&&(
+        <Card style={{marginBottom:14}}>
+          <div style={{fontWeight:700,color:C.text,fontSize:15,marginBottom:14}}>New Lab Results</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+            <div><label style={labelSt}>Date</label><input style={inputSt} type="date" value={fDate} onChange={e=>setFDate(e.target.value)}/></div>
+            <div><label style={labelSt}>Lab / Location</label><input style={inputSt} type="text" placeholder="e.g. Penn State Hershey" value={fLab} onChange={e=>setFLab(e.target.value)}/></div>
+          </div>
+          <div style={{fontSize:12,color:C.faint,marginBottom:12}}>Enter only the values from your results — leave the rest blank.</div>
+          {Object.entries(LAB_PANELS).map(([panel,markers])=>(
+            <div key={panel} style={{marginBottom:16}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.faint,letterSpacing:0.8,marginBottom:8,paddingBottom:4,borderBottom:`1px solid ${C.border}`}}>{panel.toUpperCase()}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                {markers.map(m=>{const r=LAB_REFS[m];return(
+                  <div key={m}>
+                    <label style={{...labelSt,marginBottom:2}}>{m}{r&&<span style={{fontWeight:400,color:C.faint,marginLeft:4}}>{r.unit}</span>}</label>
+                    <input style={{...inputSt,padding:"6px 8px"}} type="text"
+                      placeholder={r?(r.low!=null&&r.high!=null?`${r.low}–${r.high}`:r.high!=null?`<${r.high}`:`>${r.low}`):""}
+                      value={fVals[m]} onChange={e=>setFVals(v=>({...v,[m]:e.target.value}))}/>
+                  </div>
+                );})}
+              </div>
+            </div>
+          ))}
+          <SaveBtn onClick={savePanel}/>
+        </Card>
+      )}
+      {!open&&(
+        <>
+          <div style={{display:"flex",gap:6,marginBottom:14}}>
+            {["panel","trend"].map(v=>(
+              <button key={v} onClick={()=>setView(v)} style={{padding:"6px 14px",borderRadius:7,border:`1px solid ${C.border}`,background:view===v?C.text:"#fff",color:view===v?"#fff":C.muted,fontSize:13,fontWeight:600,cursor:"pointer"}}>
+                {v==="panel"?"Panel View":"Trend"}
+              </button>
+            ))}
+          </div>
+          {view==="panel"&&current&&(
+            <div>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                <div style={{fontSize:12,color:C.faint}}>{current.lab}</div>
+                <DelBtn onClick={()=>delLab(current.id)}/>
+              </div>
+              {goals&&goalMarkers.some(m=>current.values[m]!=null)&&(
+                <Card style={{marginBottom:12}}>
+                  <SectionTitle>GOALS</SectionTitle>
+                  {goalMarkers.map(m=>{
+                    if(current.values[m]==null||goals[m]==null) return null;
+                    const ref=LAB_REFS[m];
+                    return <GoalBar key={m} label={m} current={firstNum(current.values[m])} goal={goals[m]} unit={ref?.unit||""} bad={m==="HDL"?"low":"high"}/>;
+                  })}
+                </Card>
+              )}
+              {Object.entries(LAB_PANELS).map(([panel,markers])=>{
+                const rows=markers.filter(m=>current.values[m]!=null);
+                if(!rows.length) return null;
+                return(
+                  <Card key={panel} style={{marginBottom:12}}>
+                    <SectionTitle>{panel.toUpperCase()}</SectionTitle>
+                    {rows.map(m=>{
+                      const raw=String(current.values[m]);
+                      const status=labStatus(m,firstNum(raw));
+                      const r=LAB_REFS[m];
+                      return(
+                        <div key={m} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:`1px solid ${C.border}`}}>
+                          <div>
+                            <span style={{fontSize:14,color:C.text,fontWeight:500}}>{m}</span>
+                            {r&&<span style={{fontSize:11,color:C.faint,marginLeft:6}}>{r.low!=null&&r.high!=null?`${r.low}–${r.high}`:r.high!=null?`<${r.high}`:`>${r.low}`} {r.unit}</span>}
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <span style={{fontSize:15,fontWeight:700,color:status==="normal"?C.text:statusColor(status)}}>{raw}</span>
+                            {r&&<span style={{fontSize:11,color:C.faint}}>{r.unit}</span>}
+                            {status!=="normal"&&<Badge label={status.toUpperCase()} color={statusColor(status)} small/>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+          {view==="trend"&&(
+            <Card>
+              <div style={{marginBottom:12}}>
+                <label style={labelSt}>Marker</label>
+                <select value={trendMarker} onChange={e=>setTrendMarker(e.target.value)} style={{...inputSt,width:"auto",cursor:"pointer"}}>
+                  {allMarkers.map(m=><option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              {trendData.length>=2&&<MiniChart points={trendData} color={C.accent} goal={goals?.[trendMarker]} unit={ref?.unit||""} bad={trendMarker==="HDL"?"low":"high"}/>}
+              {trendData.length<2&&<div style={{color:C.faint,fontSize:13,marginBottom:12}}>Need at least two tests to show a trend.</div>}
+              <div style={{marginTop:12}}>
+                {trendData.map((pt,i)=>{
+                  const status=labStatus(trendMarker,pt.y);
+                  const prevPt=trendData[i-1];
+                  const delta=prevPt?(pt.y-prevPt.y):null;
+                  return(
+                    <div key={pt.date} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
+                      <div style={{fontSize:13,color:C.muted}}>{fmtDate(pt.date)}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        {delta!==null&&<span style={{fontSize:12,color:delta>0?"#ef4444":delta<0?"#22c55e":C.faint,fontWeight:600}}>{delta>0?"+":""}{delta.toFixed(2)}</span>}
+                        <span style={{fontSize:17,fontWeight:700,color:status==="normal"?C.text:statusColor(status)}}>{pt.y}</span>
+                        {ref&&<span style={{fontSize:11,color:C.faint}}>{ref.unit}</span>}
+                        {status!=="normal"&&<Badge label={status.toUpperCase()} color={statusColor(status)} small/>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── GOALS TAB ─────────────────────────────────────────────────────────────────
+function GoalsTab({goals,setGoals}){
+  const [editing,setEditing]=useState(false);
+  const [draft,setDraft]=useState(null);
+
+  const goalDefs=[
+    {key:"weight",     label:"Weight",         unit:"lb",    bad:"high"},
+    {key:"systolic",   label:"Systolic BP",     unit:"mmHg",  bad:"high"},
+    {key:"diastolic",  label:"Diastolic BP",    unit:"mmHg",  bad:"high"},
+    {key:"HbA1c",      label:"HbA1c",           unit:"%",     bad:"high"},
+    {key:"HDL",        label:"HDL Cholesterol", unit:"mg/dL", bad:"low" },
+    {key:"LDL",        label:"LDL Cholesterol", unit:"mg/dL", bad:"high"},
+  ];
+  function startEdit(){setDraft({...goals});setEditing(true);}
+  function saveEdit(){setGoals(draft);setEditing(false);}
+  return(
+    <div>
+      <Card style={{marginBottom:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+          <SectionTitle style={{marginBottom:0}}>YOUR TARGETS</SectionTitle>
+          {!editing
+            ?<button onClick={startEdit} style={{fontSize:13,color:C.accent,background:"none",border:"none",cursor:"pointer",fontWeight:600,padding:0}}>Edit</button>
+            :<button onClick={saveEdit} style={{fontSize:13,color:"#22c55e",background:"none",border:"none",cursor:"pointer",fontWeight:600,padding:0}}>Save</button>
+          }
+        </div>
+        {editing
+          ?<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {goalDefs.map(g=>(
+              <div key={g.key}>
+                <label style={labelSt}>{g.label} <span style={{fontWeight:400,color:C.faint}}>({g.unit})</span></label>
+                <input style={{...inputSt,padding:"7px 9px"}} type="number" step="0.1" value={draft[g.key]||""} onChange={e=>setDraft(d=>({...d,[g.key]:+e.target.value}))}/>
+              </div>
+            ))}
+          </div>
+          :<div>
+            {goalDefs.map(g=>(
+              <div key={g.key} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
+                <span style={{fontSize:14,color:C.text}}>{g.label}</span>
+                <span style={{fontSize:14,fontWeight:700,color:C.text}}>{goals[g.key]} <span style={{fontWeight:400,color:C.faint,fontSize:12}}>{g.unit}</span></span>
+              </div>
+            ))}
+          </div>
+        }
+      </Card>
+      <div style={{fontSize:12,color:C.faint,textAlign:"center",padding:"0 16px"}}>Goals appear as progress bars and chart reference lines throughout the tracker.</div>
+
+    </div>
+  );
+}
+
+// ── JOURNAL TAB ───────────────────────────────────────────────────────────────
+function JournalTab({journal:entries,setJournal:setEntries}){
+  const [open,setOpen]=useState(false);
+  const [fDate,setFDate]=useState(today());
+  const [fText,setFText]=useState("");
+  const [fTags,setFTags]=useState([]);
+  const tagOpts=["Exercise","Diet","Medication","Stress","Sleep","Symptom","Doctor visit","Other"];
+  const sorted=[...entries].sort((a,b)=>b.date.localeCompare(a.date));
+  function save(){
+    if(!fText.trim()||!fDate) return;
+    setEntries([...entries,{id:Date.now(),date:fDate,text:fText.trim(),tags:fTags}]);
+    setFDate(today()); setFText(""); setFTags([]); setOpen(false);
+  }
+  function toggleTag(t){setFTags(ts=>ts.includes(t)?ts.filter(x=>x!==t):[...ts,t]);}
+  return(
+    <div>
+      <AddBtn onClick={()=>setOpen(!open)} label={open?"Cancel":"+ New Entry"}/>
+      {open&&(
+        <Card style={{marginBottom:14}}>
+          <div style={{marginBottom:10}}><label style={labelSt}>Date</label><input style={inputSt} type="date" value={fDate} onChange={e=>setFDate(e.target.value)}/></div>
+          <div style={{marginBottom:10}}>
+            <label style={labelSt}>Tags</label>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {tagOpts.map(t=>(
+                <button key={t} onClick={()=>toggleTag(t)} style={{padding:"4px 10px",borderRadius:20,border:`1px solid ${fTags.includes(t)?C.accent:C.border}`,background:fTags.includes(t)?C.accent+"18":"#fff",color:fTags.includes(t)?C.accent:C.muted,fontSize:12,cursor:"pointer",fontWeight:500}}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={{marginBottom:12}}><label style={labelSt}>Note</label><textarea style={taSt} placeholder="What happened today? Changes to diet, exercise, how you're feeling, symptoms, anything worth remembering…" value={fText} onChange={e=>setFText(e.target.value)}/></div>
+          <SaveBtn onClick={save}/>
+        </Card>
+      )}
+      {sorted.length===0&&!open&&<div style={{textAlign:"center",color:C.faint,fontSize:14,padding:"40px 0"}}>No entries yet. Use the journal to connect the dots between lifestyle and your numbers.</div>}
+      {sorted.map(e=>(
+        <Card key={e.id} style={{marginBottom:10}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+            <div style={{fontSize:12,color:C.faint}}>{fmtDate(e.date)}</div>
+            <DelBtn onClick={()=>setEntries(entries.filter(x=>x.id!==e.id))}/>
+          </div>
+          {e.tags&&e.tags.length>0&&(
+            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+              {e.tags.map(t=><span key={t} style={{fontSize:11,background:C.accent+"12",color:C.accent,border:`1px solid ${C.accent}30`,borderRadius:4,padding:"1px 7px"}}>{t}</span>)}
+            </div>
+          )}
+          <div style={{fontSize:14,color:C.text,lineHeight:1.55,whiteSpace:"pre-wrap"}}>{e.text}</div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ── MEDICATIONS TAB ───────────────────────────────────────────────────────────
+function MedsTab({meds,setMeds,medLogs,setMedLogs}){
+  const [open,setOpen]=useState(false);
+  const [logOpen,setLogOpen]=useState(false);
+  const [f,setF]=useState({name:"",dose:"",frequency:"Daily",startDate:today(),notes:"",active:true});
+
+  // default log form to now
+  function nowTime(){ return new Date().toTimeString().slice(0,5); }
+  const [lf,setLf]=useState({medId:"",date:today(),time:nowTime(),notes:""});
+
+  const active=meds.filter(m=>m.active);
+  const inactive=meds.filter(m=>!m.active);
+
+  function saveMed(){
+    if(!f.name) return;
+    setMeds([...meds,{id:Date.now(),...f}]);
+    setF({name:"",dose:"",frequency:"Daily",startDate:today(),notes:"",active:true}); setOpen(false);
+  }
+  function saveLog(){
+    if(!lf.medId||!lf.date) return;
+    const med=meds.find(m=>m.id===+lf.medId);
+    if(!med) return;
+    setMedLogs([...medLogs,{id:Date.now(),medId:+lf.medId,medName:med.name,dose:med.dose,date:lf.date,time:lf.time,notes:lf.notes}]);
+    setLf({medId:lf.medId,date:today(),time:nowTime(),notes:""});
+    setLogOpen(false);
+  }
+  function toggle(id){setMeds(meds.map(m=>m.id===id?{...m,active:!m.active}:m));}
+
+  // group logs by date, most recent first
+  const logsByDate=[...medLogs].sort((a,b)=>b.date.localeCompare(a.date)||b.time.localeCompare(a.time));
+  const recentLogs=logsByDate.slice(0,20);
+
+  function MedCard({m}){return(
+    <Card style={{marginBottom:10,opacity:m.active?1:0.6}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div style={{flex:1}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
+            <span style={{fontSize:15,fontWeight:700,color:C.text}}>💊 {m.name}</span>
+            {m.dose&&<span style={{fontSize:13,color:C.muted}}>{m.dose}</span>}
+            <Badge label={m.active?"Active":"Inactive"} color={m.active?"#22c55e":"#9ca3af"} small/>
+          </div>
+          <div style={{fontSize:12,color:C.faint}}>{m.frequency} · Started {fmtDate(m.startDate)}</div>
+          {m.notes&&<div style={{fontSize:12,color:C.faint,marginTop:3}}>📝 {m.notes}</div>}
+          {(()=>{
+            const lastLog=logsByDate.find(l=>l.medId===m.id);
+            if(!lastLog) return <div style={{fontSize:11,color:"#f97316",marginTop:4}}>No doses logged yet</div>;
+            return <div style={{fontSize:11,color:"#22c55e",marginTop:4}}>Last taken: {fmtDate(lastLog.date)}{lastLog.time?" @ "+lastLog.time:""}</div>;
+          })()}
+        </div>
+        <div style={{display:"flex",gap:4,alignItems:"center"}}>
+          <button onClick={()=>toggle(m.id)} style={{fontSize:12,color:C.accent,background:"none",border:`1px solid ${C.border}`,borderRadius:6,cursor:"pointer",padding:"3px 8px",fontWeight:600}}>
+            {m.active?"Stop":"Resume"}
+          </button>
+          <DelBtn onClick={()=>setMeds(meds.filter(x=>x.id!==m.id))}/>
+        </div>
+      </div>
+    </Card>
+  );}
+
+  return(
+    <div>
+      {/* Log a dose */}
+      <Card style={{marginBottom:14}}>
+        <SectionTitle>LOG A DOSE</SectionTitle>
+        {active.length===0
+          ? <div style={{fontSize:13,color:C.faint}}>Add a medication below before logging doses.</div>
+          : logOpen ? (
+            <div>
+              <div style={{marginBottom:10}}>
+                <label style={labelSt}>Medication</label>
+                <select style={inputSt} value={lf.medId} onChange={e=>setLf({...lf,medId:e.target.value})}>
+                  <option value="">Select…</option>
+                  {active.map(m=><option key={m.id} value={m.id}>{m.name}{m.dose?" "+m.dose:""}</option>)}
+                </select>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+                <div><label style={labelSt}>Date</label><input style={inputSt} type="date" value={lf.date} onChange={e=>setLf({...lf,date:e.target.value})}/></div>
+                <div><label style={labelSt}>Time</label><input style={inputSt} type="time" value={lf.time} onChange={e=>setLf({...lf,time:e.target.value})}/></div>
+              </div>
+              <div style={{marginBottom:12}}><label style={labelSt}>Notes (optional)</label><input style={inputSt} type="text" placeholder="e.g. taken with food" value={lf.notes} onChange={e=>setLf({...lf,notes:e.target.value})}/></div>
+              <div style={{display:"flex",gap:8}}>
+                <SaveBtn onClick={saveLog}/>
+                <button onClick={()=>setLogOpen(false)} style={{flex:1,padding:"10px",background:"none",border:`1px solid ${C.border}`,borderRadius:8,fontSize:14,cursor:"pointer",color:C.muted}}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={()=>{setLf({medId:active.length===1?String(active[0].id):"",date:today(),time:nowTime(),notes:""});setLogOpen(true);}}
+              style={{width:"100%",padding:"11px",background:"#22c55e",color:"#fff",border:"none",borderRadius:9,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+              + Log Dose Taken
+            </button>
+          )
+        }
+      </Card>
+
+      {/* Recent dose log */}
+      {recentLogs.length>0&&(
+        <Card style={{marginBottom:14}}>
+          <SectionTitle>RECENT DOSES</SectionTitle>
+          {recentLogs.map(l=>(
+            <div key={l.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:600,color:C.text}}>💊 {l.medName}{l.dose?" "+l.dose:""}</div>
+                <div style={{fontSize:11,color:C.faint}}>{fmtDate(l.date)}{l.time?" @ "+l.time:""}{l.notes?" · "+l.notes:""}</div>
+              </div>
+              <DelBtn onClick={()=>setMedLogs(medLogs.filter(x=>x.id!==l.id))}/>
+            </div>
+          ))}
+        </Card>
+      )}
+
+      {/* Add medication */}
+      <AddBtn onClick={()=>setOpen(!open)} label={open?"Cancel":"+ Add Medication"}/>
+      {open&&(
+        <Card style={{marginBottom:14}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:10}}>
+            <div style={{gridColumn:"1/-1"}}><label style={labelSt}>Medication Name</label><input style={inputSt} type="text" placeholder="e.g. Amlodipine Besylate" value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></div>
+            <div><label style={labelSt}>Dose</label><input style={inputSt} type="text" placeholder="e.g. 5mg" value={f.dose} onChange={e=>setF({...f,dose:e.target.value})}/></div>
+            <div><label style={labelSt}>Frequency</label>
+              <select style={inputSt} value={f.frequency} onChange={e=>setF({...f,frequency:e.target.value})}>
+                {["Daily","Twice daily","As needed","Weekly","Other"].map(o=><option key={o}>{o}</option>)}
+              </select>
+            </div>
+            <div><label style={labelSt}>Start Date</label><input style={inputSt} type="date" value={f.startDate} onChange={e=>setF({...f,startDate:e.target.value})}/></div>
+          </div>
+          <div style={{marginBottom:12}}><label style={labelSt}>Notes</label><input style={inputSt} type="text" placeholder="e.g. Take with food, for blood pressure" value={f.notes} onChange={e=>setF({...f,notes:e.target.value})}/></div>
+          <SaveBtn onClick={saveMed}/>
+        </Card>
+      )}
+
+      {active.length>0&&<><SectionTitle>ACTIVE MEDICATIONS</SectionTitle>{active.map(m=><MedCard key={m.id} m={m}/>)}</>}
+      {inactive.length>0&&<><SectionTitle style={{marginTop:8}}>INACTIVE</SectionTitle>{inactive.map(m=><MedCard key={m.id} m={m}/>)}</>}
+      {meds.length===0&&!open&&<div style={{textAlign:"center",color:C.faint,fontSize:14,padding:"40px 0"}}>No medications added yet.</div>}
+    </div>
+  );
+}
+
+// ── PDF SUMMARY COMPONENT ────────────────────────────────────────────────────
+function PDFSummary({bp,weight,labs,goals,journal,meds}){
+  const latestBP  =[...bp].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const latestW   =[...weight].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const latestLab =[...labs].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const activeMeds=meds.filter(m=>m.active);
+  const watch=['HbA1c','HDL','ALT','Glucose','Sodium','LDL','Triglycerides'];
+  const todayStr=new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+
+  const S={
+    wrap:{fontFamily:'system-ui,sans-serif',fontSize:13,color:'#111827',background:'#fff',padding:'24px 18px'},
+    h1:{fontSize:22,fontWeight:800,margin:'0 0 4px'},
+    sub:{color:'#6b7280',fontSize:12,marginBottom:16},
+    h2:{fontSize:14,fontWeight:700,margin:'24px 0 8px',paddingBottom:4,borderBottom:'2px solid #e5e7eb',color:'#1d4ed8'},
+    h3:{fontSize:12,fontWeight:700,margin:'10px 0 4px',color:'#374151'},
+    hero:{display:'flex',gap:12,flexWrap:'wrap',marginBottom:16},
+    stat:{background:'#f9fafb',border:'1px solid #e5e7eb',borderRadius:8,padding:'10px 14px',minWidth:120},
+    statLbl:{fontSize:10,color:'#6b7280',fontWeight:700,textTransform:'uppercase',letterSpacing:0.5,marginBottom:2},
+    statVal:{fontSize:22,fontWeight:800,letterSpacing:-0.5},
+    statSub:{fontSize:10,color:'#9ca3af',marginTop:2},
+    table:{width:'100%',borderCollapse:'collapse',marginBottom:8,fontSize:12},
+    th:{textAlign:'left',fontSize:10,fontWeight:700,color:'#6b7280',textTransform:'uppercase',padding:'4px 6px',borderBottom:'2px solid #e5e7eb'},
+    td:{padding:'5px 6px',borderBottom:'1px solid #f3f4f6',fontSize:12},
+    hi:{color:'#dc2626',fontWeight:700},
+    lo:{color:'#2563eb',fontWeight:700},
+    note:{marginTop:24,fontSize:10,color:'#9ca3af'},
+  };
+
+  function Stat({label,value,sub,hi}){
+    return(
+      <div style={S.stat}>
+        <div style={S.statLbl}>{label}</div>
+        <div style={{...S.statVal,color:hi?'#dc2626':'#111827'}}>{value}</div>
+        {sub&&<div style={S.statSub}>{sub}</div>}
+      </div>
+    );
+  }
+
+  function refRange(m){
+    const r=LAB_REFS[m]; if(!r) return '';
+    if(r.low!=null&&r.high!=null) return r.low+'–'+r.high;
+    if(r.high!=null) return '<'+r.high;
+    return '>'+r.low;
+  }
+
+  return(
+    <div style={S.wrap}>
+      <div style={S.h1}>Health Summary</div>
+      <div style={S.sub}>Bob Sempsey · Generated {todayStr}</div>
+
+      {/* Hero stats */}
+      <div style={S.hero}>
+        {latestBP&&<Stat label='Blood Pressure' value={latestBP.systolic+'/'+latestBP.diastolic} sub={fmtDate(latestBP.date)+' · '+bpCat(latestBP.systolic,latestBP.diastolic).label}/>}
+        {latestW&&<Stat label='Weight' value={latestW.weight+' lb'} sub={fmtDate(latestW.date)+' · BMI '+bmi(latestW.weight)}/>}
+        {latestLab&&latestLab.values['HbA1c']!=null&&<Stat label='HbA1c' value={firstNum(latestLab.values['HbA1c'])+'%'} sub={fmtDate(latestLab.date)} hi/>}
+        {latestLab&&latestLab.values['HDL']!=null&&<Stat label='HDL' value={firstNum(latestLab.values['HDL'])+' mg/dL'} sub={fmtDate(latestLab.date)} hi/>}
+      </div>
+
+      {/* BP */}
+      <div style={S.h2}>Blood Pressure History</div>
+      <table style={S.table}>
+        <thead><tr>{['Date','BP','HR','Category','Medication'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <tbody>{[...bp].sort((a,b)=>b.date.localeCompare(a.date)).map(r=>(
+          <tr key={r.id}>
+            <td style={S.td}>{fmtDate(r.date)}</td>
+            <td style={S.td}>{r.systolic}/{r.diastolic}</td>
+            <td style={S.td}>{r.heartRate}</td>
+            <td style={S.td}>{bpCat(r.systolic,r.diastolic).label}</td>
+            <td style={S.td}>{r.medication||''}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+
+      {/* Weight */}
+      <div style={S.h2}>Weight History</div>
+      <table style={S.table}>
+        <thead><tr>{['Date','Weight','BMI','Category','Notes'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+        <tbody>{[...weight].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>(
+          <tr key={e.id}>
+            <td style={S.td}>{fmtDate(e.date)}</td>
+            <td style={S.td}>{e.weight} lb</td>
+            <td style={S.td}>{bmi(e.weight)}</td>
+            <td style={S.td}>{bmiCat(parseFloat(bmi(e.weight))).label}</td>
+            <td style={S.td}>{e.notes||''}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+
+      {/* Labs */}
+      <div style={S.h2}>Lab Results — Key Markers</div>
+      {[...labs].sort((a,b)=>b.date.localeCompare(a.date)).map(lab=>(
+        <div key={lab.id}>
+          <div style={S.h3}>{fmtDate(lab.date)} — {lab.lab}</div>
+          <table style={S.table}>
+            <thead><tr>{['Marker','Value','Unit','Range'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+            <tbody>{watch.filter(m=>lab.values[m]!=null).map(m=>{
+              const status=labStatus(m,firstNum(lab.values[m]));
+              const ref=LAB_REFS[m];
+              return(
+                <tr key={m}>
+                  <td style={S.td}>{m}</td>
+                  <td style={{...S.td,...(status==='high'?S.hi:status==='low'?S.lo:{})}}>{String(lab.values[m])}</td>
+                  <td style={S.td}>{ref&&ref.unit||''}</td>
+                  <td style={S.td}>{refRange(m)}</td>
+                </tr>
+              );
+            })}</tbody>
+          </table>
+        </div>
+      ))}
+
+      {/* Meds */}
+      {activeMeds.length>0&&(
+        <>
+          <div style={S.h2}>Active Medications</div>
+          <table style={S.table}>
+            <thead><tr>{['Medication','Dose','Frequency','Since'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+            <tbody>{activeMeds.map(m=>(
+              <tr key={m.id}>
+                <td style={S.td}>{m.name}</td>
+                <td style={S.td}>{m.dose||''}</td>
+                <td style={S.td}>{m.frequency}</td>
+                <td style={S.td}>{fmtDate(m.startDate)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </>
+      )}
+
+      {/* Goals */}
+      {(()=>{
+        const rows=[];
+        if(goals.weight&&latestW) rows.push({label:'Weight',target:goals.weight+' lb',current:latestW.weight+' lb',met:latestW.weight<=goals.weight});
+        if(goals.systolic&&latestBP) rows.push({label:'Systolic BP',target:goals.systolic+' mmHg',current:latestBP.systolic+' mmHg',met:latestBP.systolic<=goals.systolic});
+        if(goals.HbA1c&&latestLab&&latestLab.values['HbA1c']!=null) rows.push({label:'HbA1c',target:goals.HbA1c+'%',current:firstNum(latestLab.values['HbA1c'])+'%',met:firstNum(latestLab.values['HbA1c'])<=goals.HbA1c});
+        if(goals.HDL&&latestLab&&latestLab.values['HDL']!=null) rows.push({label:'HDL',target:goals.HDL+' mg/dL',current:firstNum(latestLab.values['HDL'])+' mg/dL',met:firstNum(latestLab.values['HDL'])>=goals.HDL});
+        if(!rows.length) return null;
+        return(
+          <>
+            <div style={S.h2}>Goals</div>
+            <table style={S.table}>
+              <thead><tr>{['Goal','Target','Current','Status'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+              <tbody>{rows.map(r=>(
+                <tr key={r.label}>
+                  <td style={S.td}>{r.label}</td>
+                  <td style={S.td}>{r.target}</td>
+                  <td style={S.td}>{r.current}</td>
+                  <td style={{...S.td,color:r.met?'#22c55e':'#6b7280',fontWeight:r.met?700:400}}>{r.met?'✓ Met':'In progress'}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </>
+        );
+      })()}
+
+      {/* Journal */}
+      {journal.length>0&&(
+        <>
+          <div style={S.h2}>Journal (recent)</div>
+          <table style={S.table}>
+            <thead><tr>{['Date','Tags','Note'].map(h=><th key={h} style={S.th}>{h}</th>)}</tr></thead>
+            <tbody>{[...journal].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,15).map(e=>(
+              <tr key={e.id}>
+                <td style={{...S.td,whiteSpace:'nowrap'}}>{fmtDate(e.date)}</td>
+                <td style={S.td}>{(e.tags||[]).join(', ')}</td>
+                <td style={S.td}>{e.text}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </>
+      )}
+
+      <div style={S.note}>For personal reference only. Consult your healthcare provider for medical advice.</div>
+    </div>
+  );
+}
+
+// ── EXPORT TAB ────────────────────────────────────────────────────────────────
+function ExportTab({bp,weight,labs,goals,journal,meds}){
+  const [view,setView]=useState(null); // null | {type:'csv',name,content} | {type:'pdf',html}
+
+  // ── CSV ──────────────────────────────────────────────────────────────────────
+  function makeCSV(rows){
+    return rows.map(r=>r.map(cell=>{
+      const s=String(cell??'');
+      return (s.includes(',')||s.includes('\n')||s.includes('"')) ? '"'+s.replace(/"/g,'""')+'"' : s;
+    }).join(',')).join('\n');
+  }
+  const csvSets=[
+    {label:'Blood Pressure & Heart Rate', count:bp.length, build:()=>{
+      const rows=[['Date','Time','Systolic','Diastolic','Heart Rate','Category','Medication','Notes']];
+      [...bp].sort((a,b)=>a.date.localeCompare(b.date)).forEach(r=>
+        rows.push([r.date,r.time||'',r.systolic,r.diastolic,r.heartRate,bpCat(r.systolic,r.diastolic).label,r.medication||'',r.notes||'']));
+      return makeCSV(rows);
+    }},
+    {label:'Weight', count:weight.length, build:()=>{
+      const rows=[['Date','Weight (lb)','BMI','Notes']];
+      [...weight].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>
+        rows.push([e.date,e.weight,bmi(e.weight),e.notes||'']));
+      return makeCSV(rows);
+    }},
+    {label:'Lab Results', count:labs.length, build:()=>{
+      const markers=[...new Set(labs.flatMap(l=>Object.keys(l.values)))].sort();
+      const rows=[['Date','Lab',...markers]];
+      [...labs].sort((a,b)=>a.date.localeCompare(b.date)).forEach(l=>
+        rows.push([l.date,l.lab,...markers.map(m=>l.values[m]!=null?String(l.values[m]):'')]));
+      return makeCSV(rows);
+    }},
+    {label:'Journal', count:journal.length, build:()=>{
+      const rows=[['Date','Tags','Note']];
+      [...journal].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>
+        rows.push([e.date,(e.tags||[]).join('; '),e.text]));
+      return makeCSV(rows);
+    }},
+    {label:'Medications', count:meds.length, build:()=>{
+      const rows=[['Name','Dose','Frequency','Start Date','Status','Notes']];
+      meds.forEach(m=>rows.push([m.name,m.dose||'',m.frequency,m.startDate,m.active?'Active':'Inactive',m.notes||'']));
+      return makeCSV(rows);
+    }},
+  ];
+
+
+
+  // ── UI ────────────────────────────────────────────────────────────────────────
+  const btnSt={width:'100%',padding:'12px',borderRadius:9,border:'1px solid '+C.border,background:'#fff',color:C.text,fontSize:14,fontWeight:600,cursor:'pointer',textAlign:'left',display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10};
+
+  function buildTextSummary(){
+    const latestBP=[...bp].sort((a,b)=>b.date.localeCompare(a.date))[0];
+    const latestW=[...weight].sort((a,b)=>b.date.localeCompare(a.date))[0];
+    const latestLab=[...labs].sort((a,b)=>b.date.localeCompare(a.date))[0];
+    const watch=['HbA1c','HDL','ALT','Glucose','Sodium','LDL','Triglycerides'];
+    const lines=[];
+    const hr=s=>lines.push(s,'─'.repeat(40));
+    lines.push('HEALTH SUMMARY — BOB SEMPSEY');
+    lines.push('Generated '+new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}));
+    lines.push('');
+    if(latestBP){
+      lines.push('BLOOD PRESSURE: '+latestBP.systolic+'/'+latestBP.diastolic+' mmHg ('+bpCat(latestBP.systolic,latestBP.diastolic).label+')');
+      lines.push('  As of: '+fmtDate(latestBP.date));
+    }
+    if(latestW){
+      lines.push('WEIGHT: '+latestW.weight+' lb  |  BMI: '+bmi(latestW.weight));
+      lines.push('  As of: '+fmtDate(latestW.date));
+    }
+    lines.push('');
+    hr('BP HISTORY');
+    [...bp].sort((a,b)=>b.date.localeCompare(a.date)).forEach(r=>{
+      lines.push(fmtDate(r.date)+'  '+r.systolic+'/'+r.diastolic+' mmHg  '+r.heartRate+' bpm  '+bpCat(r.systolic,r.diastolic).label);
+      if(r.medication) lines.push('  Medication: '+r.medication);
+    });
+    lines.push('');
+    hr('WEIGHT HISTORY');
+    [...weight].sort((a,b)=>b.date.localeCompare(a.date)).forEach(e=>{
+      lines.push(fmtDate(e.date)+'  '+e.weight+' lb  BMI '+bmi(e.weight)+'  '+bmiCat(parseFloat(bmi(e.weight))).label);
+    });
+    lines.push('');
+    hr('LAB RESULTS — KEY MARKERS');
+    [...labs].sort((a,b)=>b.date.localeCompare(a.date)).forEach(lab=>{
+      lines.push(fmtDate(lab.date)+' — '+lab.lab);
+      watch.filter(m=>lab.values[m]!=null).forEach(m=>{
+        const ref=LAB_REFS[m];
+        const s=labStatus(m,firstNum(lab.values[m]));
+        const flag=s==='high'?' [HIGH]':s==='low'?' [LOW]':'';
+        const range=ref?(ref.low!=null&&ref.high!=null?' ('+ref.low+'-'+ref.high+')':ref.high!=null?' (<'+ref.high+')':' (>'+ref.low+')'):'';
+        lines.push('  '+m+': '+lab.values[m]+(ref?' '+ref.unit:'')+range+flag);
+      });
+    });
+    const activeMeds=meds.filter(m=>m.active);
+    if(activeMeds.length>0){
+      lines.push('');
+      hr('ACTIVE MEDICATIONS');
+      activeMeds.forEach(m=>lines.push('  '+m.name+' '+m.dose+'  '+m.frequency+'  (since '+fmtDate(m.startDate)+')'));
+    }
+    lines.push('');
+    lines.push('For personal reference only. Consult your healthcare provider for medical advice.');
+    return lines.join('\n');
+  }
+
+  const [copied,setCopied]=useState(false);
+  function copyText(){
+    const text=buildTextSummary();
+    navigator.clipboard.writeText(text).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2500);}).catch(()=>{
+      // fallback
+      const ta=document.createElement('textarea');
+      ta.value=text; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); document.body.removeChild(ta);
+      setCopied(true); setTimeout(()=>setCopied(false),2500);
+    });
+  }
+
+  if(view&&view.type==='csv') return(
+    <div>
+      <button onClick={()=>setView(null)} style={{marginBottom:14,padding:'8px 14px',borderRadius:8,border:'1px solid '+C.border,background:'#fff',color:C.muted,fontSize:13,cursor:'pointer',fontWeight:600}}>
+        {'<'} Back
+      </button>
+      <Card style={{marginBottom:12}}>
+        <SectionTitle>{view.name}</SectionTitle>
+        <div style={{fontSize:13,color:C.muted,marginBottom:10,lineHeight:1.5}}>
+          Tap the text box, select all, and copy — then paste into Notes or email to yourself.
+        </div>
+        <textarea readOnly value={view.content}
+          style={{width:'100%',height:'55vh',fontFamily:'monospace',fontSize:11,padding:10,border:'1px solid '+C.border,borderRadius:8,background:'#f9fafb',color:C.text,boxSizing:'border-box',resize:'none'}}
+          onFocus={e=>e.target.select()}/>
+      </Card>
+    </div>
+  );
+
+  if(view&&view.type==='pdf') return(
+    <div>
+      <div style={{display:'flex',gap:10,marginBottom:14,alignItems:'center'}}>
+        <button onClick={()=>setView(null)} style={{padding:'8px 14px',borderRadius:8,border:'1px solid '+C.border,background:'#fff',color:C.muted,fontSize:13,cursor:'pointer',fontWeight:600}}>
+          {'<'} Back
+        </button>
+        <button onClick={copyText} style={{flex:1,padding:'8px 14px',borderRadius:8,border:'none',background:copied?'#22c55e':C.accent,color:'#fff',fontSize:13,cursor:'pointer',fontWeight:600,transition:'background 0.2s'}}>
+          {copied?'Copied!':'Copy as Text'}
+        </button>
+      </div>
+      <Card style={{marginBottom:12}}>
+        <div style={{fontSize:13,color:C.muted,lineHeight:1.5}}>
+          <strong style={{color:C.text}}>On iPhone:</strong> tap <strong>Copy as Text</strong> above, then paste into Mail, Notes, or Messages to share with your doctor. On PC: use browser Print to save as PDF.
+        </div>
+      </Card>
+      <PDFSummary bp={bp} weight={weight} labs={labs} goals={goals} journal={journal} meds={meds}/>
+    </div>
+  );
+
+  return(
+    <div>
+      <Card style={{marginBottom:14}}>
+        <SectionTitle>PDF SUMMARY</SectionTitle>
+        <div style={{fontSize:13,color:C.muted,marginBottom:12}}>Print-ready summary formatted for your doctor.</div>
+        <button onClick={()=>setView({type:'pdf'})} style={{...btnSt,background:C.accent,color:'#fff',border:'none'}}>
+          <span>View PDF Summary</span>
+          <span style={{fontSize:16}}>{'↗'}</span>
+        </button>
+      </Card>
+      <Card>
+        <SectionTitle>CSV DATA EXPORT</SectionTitle>
+        <div style={{fontSize:13,color:C.muted,marginBottom:12}}>Tap a dataset to view and copy the raw data.</div>
+        {csvSets.map(({label,count,build})=>(
+          <button key={label} onClick={()=>setView({type:'csv',name:label,content:build()})} style={btnSt}>
+            <span>{label} <span style={{fontSize:12,color:C.faint,fontWeight:400}}>({count} {count===1?'entry':'entries'})</span></span>
+            <span style={{fontSize:13,color:C.faint}}>View {'→'}</span>
+          </button>
+        ))}
+      </Card>
+    </div>
+  );
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────────
+function Dashboard({setTab,bp:bpData,weight:wData,labs:labData,goals,journal,meds,medLogs}){
+  const latestBP=[...(bpData||[])].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const prevBP  =[...(bpData||[])].sort((a,b)=>b.date.localeCompare(a.date))[1];
+  const latestW =[...(wData||[])].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const prevW   =[...(wData||[])].sort((a,b)=>b.date.localeCompare(a.date))[1];
+  const watchMarkers=["HbA1c","HDL","ALT","Glucose","Sodium"];
+  const activeMeds=(meds||[]).filter(m=>m.active);
+  const recentJournal=[...(journal||[])].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,2);
+  const sortedLogs=[...(medLogs||[])].sort((a,b)=>b.date.localeCompare(a.date)||b.time.localeCompare(a.time));
+  function lastTaken(medId){ return sortedLogs.find(l=>l.medId===medId); }
+
+  function Arrow({curr,prev,bad="high"}){
+    if(curr==null||prev==null) return null;
+    const d=curr-prev; if(d===0) return null;
+    const good=bad==="high"?d<0:d>0;
+    return <span style={{fontSize:13,fontWeight:700,color:good?"#22c55e":"#ef4444",marginLeft:4}}>{d>0?"↑":"↓"}</span>;
+  }
+
+  return(
+    <div>
+      {/* Top tiles */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:14}}>
+        {latestBP&&(
+          <Card style={{cursor:"pointer"}} onClick={()=>setTab("Vitals")}>
+            <SectionTitle>BLOOD PRESSURE</SectionTitle>
+            <div style={{fontSize:20,fontWeight:800,color:C.text,letterSpacing:-0.5}}>
+              {latestBP.systolic}/{latestBP.diastolic}
+              <Arrow curr={latestBP.systolic} prev={prevBP?.systolic}/>
+            </div>
+            <div style={{fontSize:11,color:C.faint,marginBottom:6}}>{fmtDate(latestBP.date)}</div>
+            <Badge label={bpCat(latestBP.systolic,latestBP.diastolic).label} color={bpCat(latestBP.systolic,latestBP.diastolic).color} small/>
+          </Card>
+        )}
+        {latestW&&(()=>{const b=parseFloat(bmi(latestW.weight));return(
+          <Card style={{cursor:"pointer"}} onClick={()=>setTab("Weight")}>
+            <SectionTitle>WEIGHT</SectionTitle>
+            <div style={{fontSize:20,fontWeight:800,color:C.text}}>
+              {latestW.weight} <span style={{fontSize:12,fontWeight:400,color:C.faint}}>lb</span>
+              <Arrow curr={latestW.weight} prev={prevW?.weight}/>
+            </div>
+            <div style={{fontSize:11,color:C.faint,marginBottom:6}}>{fmtDate(latestW.date)}</div>
+            <Badge label={`BMI ${b}`} color={bmiCat(b).color} small/>
+          </Card>
+        );})()}
+      </div>
+
+      {/* Goal progress */}
+      {goals&&(latestBP||latestW)&&(
+        <Card style={{marginBottom:14}}>
+          <SectionTitle>PROGRESS TOWARD GOALS</SectionTitle>
+          {latestW&&goals.weight&&<GoalBar label="Weight" current={latestW.weight} goal={goals.weight} unit="lb"/>}
+          {latestBP&&goals.systolic&&<GoalBar label="Systolic BP" current={latestBP.systolic} goal={goals.systolic} unit="mmHg"/>}
+          {(()=>{
+            const labsSorted=[...(labData||[])].sort((a,b)=>b.date.localeCompare(a.date));
+            const latest=labsSorted[0];
+            if(!latest) return null;
+            return <>
+              {goals.HbA1c&&latest.values["HbA1c"]!=null&&<GoalBar label="HbA1c" current={firstNum(latest.values["HbA1c"])} goal={goals.HbA1c} unit="%"/>}
+              {goals.HDL&&latest.values["HDL"]!=null&&<GoalBar label="HDL" current={firstNum(latest.values["HDL"])} goal={goals.HDL} unit="mg/dL" bad="low"/>}
+            </>;
+          })()}
+        </Card>
+      )}
+
+      {/* Markers to watch */}
+      <Card style={{marginBottom:14}} onClick={()=>setTab("Labs")}>
+        <SectionTitle>MARKERS TO WATCH</SectionTitle>
+        {watchMarkers.map(m=>{
+          const r=LAB_REFS[m];
+          const labEntries=(labData||[]).map(l=>({date:l.date,raw:l.values[m],prev:null})).filter(e=>e.raw!=null).sort((a,b)=>b.date.localeCompare(a.date));
+          if(!labEntries.length) return null;
+          const le=labEntries[0]; const pe=labEntries[1];
+          const val=firstNum(le.raw); const pval=pe?firstNum(pe.raw):null;
+          const status=labStatus(m,val);
+          const delta=pval!=null?val-pval:null;
+          const good=m==="HDL"?(delta!=null&&delta>0):(delta!=null&&delta<0);
+          return(
+            <div key={m} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:`1px solid ${C.border}`}}>
+              <div>
+                <span style={{fontSize:14,fontWeight:500,color:C.text}}>{m}</span>
+                <span style={{fontSize:11,color:C.faint,marginLeft:6}}>{fmtDate(le.date)}</span>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                {delta!==null&&<span style={{fontSize:12,fontWeight:700,color:good?"#22c55e":"#ef4444"}}>{delta>0?"↑":"↓"}{Math.abs(delta).toFixed(1)}</span>}
+                <span style={{fontSize:16,fontWeight:700,color:status==="normal"?C.text:statusColor(status)}}>{String(le.raw).split("/")[0]}</span>
+                {r&&<span style={{fontSize:11,color:C.faint}}>{r.unit}</span>}
+                {status!=="normal"&&<Badge label={status.toUpperCase()} color={statusColor(status)} small/>}
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+
+      {/* Active meds */}
+      {activeMeds.length>0&&(
+        <Card style={{marginBottom:14}}>
+          <SectionTitle>ACTIVE MEDICATIONS</SectionTitle>
+          {activeMeds.map(m=>{
+            const last=lastTaken(m.id);
+            const takenToday=last&&last.date===today();
+            return(
+              <div key={m.id} style={{padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+                  <span style={{fontSize:14,fontWeight:600,color:C.text}}>💊 {m.name} {m.dose}</span>
+                  <span style={{fontSize:12,color:C.faint}}>{m.frequency}</span>
+                </div>
+                <div style={{fontSize:11,marginTop:3,color:takenToday?"#22c55e":last?"#f97316":"#ef4444",fontWeight:500}}>
+                  {last
+                    ? (takenToday
+                        ? "✓ Taken today @ "+last.time
+                        : "Last taken: "+fmtDate(last.date)+(last.time?" @ "+last.time:""))
+                    : "No doses logged yet"}
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+      )}
+
+      {/* Recent journal */}
+      {recentJournal.length>0&&(
+        <Card style={{marginBottom:14}}>
+          <SectionTitle>RECENT JOURNAL</SectionTitle>
+          {recentJournal.map(e=>(
+            <div key={e.id} style={{padding:"8px 0",borderBottom:`1px solid ${C.border}`}}>
+              <div style={{fontSize:11,color:C.faint,marginBottom:3}}>{fmtDate(e.date)}{e.tags?.length?` · ${e.tags.join(", ")}`:""}</div>
+              <div style={{fontSize:13,color:C.text,lineHeight:1.4,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{e.text}</div>
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// ── ROOT ──────────────────────────────────────────────────────────────────────
+const TABS=["Dashboard","Vitals","Weight","Labs","Goals","Journal","Meds","Export"];
+const TAB_LABELS={"Dashboard":"Home","Vitals":"BP","Weight":"Wt","Labs":"Labs","Goals":"Goals","Journal":"Journal","Meds":"Meds","Export":"Export"};
+
+export default function App(){
+  const [tab,setTab]=useState("Dashboard");
+  const [bp,    setBp,    bpLoaded]  = usePersistedState("bp-readings",   SEED_BP);
+  const [weight,setWeight,wLoaded]   = usePersistedState("weight-entries", SEED_WEIGHT);
+  const [labs,  setLabs,  labLoaded] = usePersistedState("lab-results",    SEED_LABS);
+  const [goals, setGoals, gLoaded]   = usePersistedState("goals",          SEED_GOALS);
+  const [journal,setJournal,jLoaded] = usePersistedState("journal",        []);
+  const [meds,    setMeds,    mLoaded]   = usePersistedState("medications", SEED_MEDS);
+  const [medLogs, setMedLogs, mlLoaded]  = usePersistedState("med-logs",     []);
+  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded;
+  const shared = { bp, setBp, weight, setWeight, labs, setLabs, goals, setGoals, journal, setJournal, meds, setMeds, medLogs, setMedLogs };
+  return(
+    <div style={{fontFamily:"'Inter',system-ui,sans-serif",background:C.bg,minHeight:"100vh",maxWidth:520,margin:"0 auto",padding:"20px 14px 40px"}}>
+      <div style={{marginBottom:16}}>
+        <h1 style={{fontSize:20,fontWeight:800,color:C.text,margin:0,letterSpacing:-0.3}}>Health Tracker</h1>
+        <p style={{fontSize:12,color:C.faint,margin:"3px 0 0"}}>Bob · 5′11″ · Started Jul 4, 2026</p>
+      </div>
+      <div style={{display:"flex",gap:3,marginBottom:18,background:"#e9ecef",borderRadius:10,padding:3,overflowX:"auto"}}>
+        {TABS.map(t=>(
+          <button key={t} onClick={()=>setTab(t)} style={{flex:"0 0 auto",padding:"7px 10px",borderRadius:7,border:"none",background:tab===t?"#fff":"transparent",color:tab===t?C.text:C.muted,fontSize:12,fontWeight:tab===t?700:500,cursor:"pointer",boxShadow:tab===t?"0 1px 3px rgba(0,0,0,0.08)":"none",whiteSpace:"nowrap"}}>
+            {TAB_LABELS[t]||t}
+          </button>
+        ))}
+      </div>
+      {!allLoaded && <Spinner/>}
+      {allLoaded && (<>
+        <div style={{display:tab==="Dashboard"?"block":"none"}}><Dashboard setTab={setTab} {...shared}/></div>
+        <div style={{display:tab==="Vitals"   ?"block":"none"}}><VitalsTab  {...shared}/></div>
+        <div style={{display:tab==="Weight"   ?"block":"none"}}><WeightTab  {...shared}/></div>
+        <div style={{display:tab==="Labs"     ?"block":"none"}}><LabsTab    {...shared}/></div>
+        <div style={{display:tab==="Goals"    ?"block":"none"}}><GoalsTab   {...shared}/></div>
+        <div style={{display:tab==="Journal"  ?"block":"none"}}><JournalTab {...shared}/></div>
+        <div style={{display:tab==="Meds"     ?"block":"none"}}><MedsTab    {...shared}/></div>
+        <div style={{display:tab==="Export"   ?"block":"none"}}><ExportTab  {...shared}/></div>
+      </>)}
+    </div>
+  );
+}
+
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+  </script>
+</body>
+</html>
