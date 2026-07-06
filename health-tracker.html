@@ -11,13 +11,21 @@
     body { background: #f4f6f8; font-family: system-ui, sans-serif; }
     input, select, textarea, button { font-family: inherit; }
     @media print {
+      @page { size: letter; margin: 0.75in; }
       .no-print { display: none !important; }
-      .app-root { max-width: 100% !important; padding: 0 !important; background: white !important; }
-      body { background: white !important; }
-      table { page-break-inside: avoid; }
+      body { background: white !important; margin: 0 !important; padding: 0 !important; }
+      .app-root { max-width: 100% !important; width: 100% !important; padding: 0 !important; background: white !important; margin: 0 !important; }
+      /* PDFSummary wrapper — full width, reset padding */
+      .pdf-summary { max-width: 100% !important; width: 100% !important; padding: 0 !important; font-size: 11pt !important; }
+      .pdf-hero { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 10px !important; margin-bottom: 16px !important; }
+      .pdf-stat { padding: 8px 10px !important; }
+      .pdf-stat-val { font-size: 18pt !important; }
+      table { width: 100% !important; page-break-inside: auto; border-collapse: collapse !important; font-size: 10pt !important; }
+      thead { display: table-header-group; }
       tr { page-break-inside: avoid; }
-      h2 { page-break-after: avoid; }
-      td, th { white-space: normal !important; word-break: break-word; }
+      h2 { page-break-after: avoid; font-size: 12pt !important; margin-top: 16px !important; }
+      h3 { page-break-after: avoid; font-size: 10pt !important; }
+      td, th { white-space: normal !important; word-break: break-word; padding: 4px 6px !important; }
     }
   </style>
 </head>
@@ -2464,10 +2472,12 @@ function PDFSummary({
     hi
   }) {
     return /*#__PURE__*/React.createElement("div", {
+      className: "pdf-stat",
       style: S.stat
     }, /*#__PURE__*/React.createElement("div", {
       style: S.statLbl
     }, label), /*#__PURE__*/React.createElement("div", {
+      className: "pdf-stat-val",
       style: {
         ...S.statVal,
         color: hi ? '#dc2626' : '#111827'
@@ -2484,12 +2494,14 @@ function PDFSummary({
     return '>' + r.low;
   }
   return /*#__PURE__*/React.createElement("div", {
+    className: "pdf-summary",
     style: S.wrap
   }, /*#__PURE__*/React.createElement("div", {
     style: S.h1
   }, "Health Summary"), /*#__PURE__*/React.createElement("div", {
     style: S.sub
   }, "Bob Sempsey · Generated ", todayStr), /*#__PURE__*/React.createElement("div", {
+    className: "pdf-hero",
     style: S.hero
   }, latestBP && /*#__PURE__*/React.createElement(Stat, {
     label: "Blood Pressure",
