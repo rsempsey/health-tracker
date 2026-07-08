@@ -4,6 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Health Tracker</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❤️</text></svg>">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <style>
@@ -863,33 +864,57 @@ function VitalsTab({
     systolic: "",
     diastolic: "",
     heartRate: "",
-    cuffType: "wrist-home",
-    medication: "",
-    notes: ""
+    cuffType: "wrist-home"
   });
+  const [editId, setEditId] = useState(null);
   const sorted = [...readings].sort((a, b) => b.date.localeCompare(a.date));
   const latest = sorted[0];
   const prev = sorted[1];
   function save() {
     if (!f.systolic || !f.diastolic || !f.heartRate || !f.date) return;
-    setReadings([...readings, {
-      id: Date.now(),
+    const entry = {
       ...f,
       systolic: +f.systolic,
       diastolic: +f.diastolic,
       heartRate: +f.heartRate
-    }]);
+    };
+    if (editId) {
+      setReadings(readings.map(r => r.id === editId ? {
+        ...r,
+        ...entry
+      } : r));
+      setEditId(null);
+    } else {
+      setReadings([...readings, {
+        id: Date.now(),
+        ...entry
+      }]);
+    }
     setF({
       date: "",
       time: "",
       systolic: "",
       diastolic: "",
       heartRate: "",
-      cuffType: "wrist-home",
-      medication: "",
-      notes: ""
+      cuffType: "wrist-home"
     });
     setOpen(false);
+  }
+  function startEdit(r) {
+    setF({
+      date: r.date,
+      time: r.time || "",
+      systolic: String(r.systolic),
+      diastolic: String(r.diastolic),
+      heartRate: String(r.heartRate),
+      cuffType: r.cuffType || "wrist-home"
+    });
+    setEditId(r.id);
+    setOpen(true);
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   }
   const chartPts = [...readings].sort((a, b) => a.date.localeCompare(b.date)).map(r => ({
     date: r.date,
@@ -984,8 +1009,21 @@ function VitalsTab({
     goal: goals.diastolic,
     unit: "mmHg"
   })), /*#__PURE__*/React.createElement(AddBtn, {
-    onClick: () => setOpen(!open),
-    label: open ? "Cancel" : "+ Log Reading"
+    onClick: () => {
+      if (open) {
+        setOpen(false);
+        setEditId(null);
+        setF({
+          date: "",
+          time: "",
+          systolic: "",
+          diastolic: "",
+          heartRate: "",
+          cuffType: "wrist-home"
+        });
+      } else setOpen(true);
+    },
+    label: open ? "Cancel" : editId ? "Editing Reading…" : "+ Log Reading"
   }), open && /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 14
@@ -1059,7 +1097,7 @@ function VitalsTab({
     })
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 10
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("label", {
     style: labelSt
@@ -1078,38 +1116,9 @@ function VitalsTab({
     value: "arm-office"
   }, "Arm — Office"), /*#__PURE__*/React.createElement("option", {
     value: "wrist-office"
-  }, "Wrist — Office"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: labelSt
-  }, "Medication"), /*#__PURE__*/React.createElement("input", {
-    style: inputSt,
-    type: "text",
-    placeholder: "e.g. Amlodipine 5mg @ 8 AM",
-    value: f.medication,
-    onChange: e => setF({
-      ...f,
-      medication: e.target.value
-    })
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: labelSt
-  }, "Notes"), /*#__PURE__*/React.createElement("input", {
-    style: inputSt,
-    type: "text",
-    placeholder: "e.g. resting, after walk",
-    value: f.notes,
-    onChange: e => setF({
-      ...f,
-      notes: e.target.value
-    })
-  })), /*#__PURE__*/React.createElement(SaveBtn, {
-    onClick: save
+  }, "Wrist — Office"))), /*#__PURE__*/React.createElement(SaveBtn, {
+    onClick: save,
+    label: editId ? "Update Reading" : "Save"
   })), /*#__PURE__*/React.createElement(SectionTitle, null, "ALL READINGS"), sorted.map(r => {
     const bp = bpCat(r.systolic, r.diastolic);
     return /*#__PURE__*/React.createElement(Card, {
@@ -1173,21 +1182,28 @@ function VitalsTab({
         marginTop: 4,
         fontStyle: "italic"
       }
-    }, "Est. arm equivalent: ", r.systolic + WRIST_OFFSET.systolic, "/", r.diastolic + WRIST_OFFSET.diastolic, " mmHg"), r.medication && /*#__PURE__*/React.createElement("div", {
+    }, "Est. arm equivalent: ", r.systolic + WRIST_OFFSET.systolic, "/", r.diastolic + WRIST_OFFSET.diastolic, " mmHg")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        alignItems: "flex-end"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => startEdit(r),
       style: {
         fontSize: 11,
-        color: C.faint,
-        marginTop: 5
+        color: C.accent,
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        cursor: "pointer",
+        padding: "2px 8px",
+        fontWeight: 600
       }
-    }, "💊 ", r.medication), r.notes && /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: C.faint,
-        marginTop: 2
-      }
-    }, "📝 ", r.notes)), /*#__PURE__*/React.createElement(DelBtn, {
+    }, "Edit"), /*#__PURE__*/React.createElement(DelBtn, {
       onClick: () => setReadings(readings.filter(x => x.id !== r.id))
-    })));
+    }))));
   }));
 }
 
@@ -1198,8 +1214,10 @@ function WeightTab({
   goals
 }) {
   const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState(null);
   const [f, setF] = useState({
     date: "",
+    time: "",
     weight: "",
     notes: ""
   });
@@ -1209,18 +1227,45 @@ function WeightTab({
   const change = latest && first && latest.id !== first.id ? (latest.weight - first.weight).toFixed(1) : null;
   function save() {
     if (!f.weight || !f.date) return;
-    setEntries([...entries, {
-      id: Date.now(),
+    const entry = {
       date: f.date,
+      time: f.time || "",
       weight: +f.weight,
       notes: f.notes
-    }]);
+    };
+    if (editId) {
+      setEntries(entries.map(e => e.id === editId ? {
+        ...e,
+        ...entry
+      } : e));
+      setEditId(null);
+    } else {
+      setEntries([...entries, {
+        id: Date.now(),
+        ...entry
+      }]);
+    }
     setF({
       date: "",
+      time: "",
       weight: "",
       notes: ""
     });
     setOpen(false);
+  }
+  function startEdit(e) {
+    setF({
+      date: e.date,
+      time: e.time || "",
+      weight: String(e.weight),
+      notes: e.notes || ""
+    });
+    setEditId(e.id);
+    setOpen(true);
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   }
   const chartPts = [...entries].sort((a, b) => a.date.localeCompare(b.date)).map(e => ({
     date: e.date,
@@ -1296,8 +1341,19 @@ function WeightTab({
     goal: goals.weight,
     unit: "lb"
   })), /*#__PURE__*/React.createElement(AddBtn, {
-    onClick: () => setOpen(!open),
-    label: open ? "Cancel" : "+ Log Weight"
+    onClick: () => {
+      if (open) {
+        setOpen(false);
+        setEditId(null);
+        setF({
+          date: "",
+          time: "",
+          weight: "",
+          notes: ""
+        });
+      } else setOpen(true);
+    },
+    label: open ? "Cancel" : editId ? "Editing Entry…" : "+ Log Weight"
   }), open && /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 14
@@ -1321,6 +1377,20 @@ function WeightTab({
     })
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: labelSt
+  }, "Time (optional)"), /*#__PURE__*/React.createElement("input", {
+    style: inputSt,
+    type: "time",
+    value: f.time,
+    onChange: e => setF({
+      ...f,
+      time: e.target.value
+    })
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: labelSt
   }, "Weight (lb)"), /*#__PURE__*/React.createElement("input", {
     style: inputSt,
     type: "number",
@@ -1331,7 +1401,7 @@ function WeightTab({
       ...f,
       weight: e.target.value
     })
-  }))), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 12
     }
@@ -1347,7 +1417,8 @@ function WeightTab({
       notes: e.target.value
     })
   })), /*#__PURE__*/React.createElement(SaveBtn, {
-    onClick: save
+    onClick: save,
+    label: editId ? "Update Entry" : "Save"
   })), /*#__PURE__*/React.createElement(SectionTitle, null, "ALL ENTRIES"), sorted.map(e => {
     const b = parseFloat(bmi(e.weight));
     const cat = bmiCat(b);
@@ -1368,7 +1439,7 @@ function WeightTab({
         color: C.faint,
         marginBottom: 4
       }
-    }, fmtDate(e.date)), /*#__PURE__*/React.createElement("div", {
+    }, fmtDate(e.date), e.time ? ` · ${e.time}` : ""), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "baseline",
@@ -1402,9 +1473,28 @@ function WeightTab({
         color: C.faint,
         marginTop: 4
       }
-    }, "📝 ", e.notes)), /*#__PURE__*/React.createElement(DelBtn, {
+    }, "📝 ", e.notes)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        gap: 4,
+        alignItems: "flex-end"
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => startEdit(e),
+      style: {
+        fontSize: 11,
+        color: C.accent,
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        cursor: "pointer",
+        padding: "2px 8px",
+        fontWeight: 600
+      }
+    }, "Edit"), /*#__PURE__*/React.createElement(DelBtn, {
       onClick: () => setEntries(entries.filter(x => x.id !== e.id))
-    })));
+    }))));
   }));
 }
 
