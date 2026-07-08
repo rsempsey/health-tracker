@@ -3247,10 +3247,16 @@ function Dashboard({
   meds,
   medLogs
 }) {
-  const latestBP = [...(bpData || [])].sort((a, b) => b.date.localeCompare(a.date))[0];
-  const prevBP = [...(bpData || [])].sort((a, b) => b.date.localeCompare(a.date))[1];
-  const latestW = [...(wData || [])].sort((a, b) => b.date.localeCompare(a.date))[0];
-  const prevW = [...(wData || [])].sort((a, b) => b.date.localeCompare(a.date))[1];
+  const bpSorted = [...(bpData || [])].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  const latestBP = bpSorted[0];
+  const prevBP = bpSorted[1];
+  const wSorted = [...(wData || [])].sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
+  const latestW = wSorted[0];
+  const prevW = wSorted[1];
+
+  // Normalised values for goal progress — use arm-equivalent BP and nude-equivalent weight
+  const goalBPSystolic = latestBP ? latestBP.cuffType === "wrist-home" || latestBP.cuffType === "wrist-office" ? latestBP.systolic + WRIST_OFFSET.systolic : latestBP.systolic : null;
+  const goalWeight = latestW ? latestW.condition === "clinical" || latestW.condition === "clothed" || latestW.condition === "light" ? +(latestW.weight + CLOTHING_OFFSET).toFixed(1) : latestW.weight : null;
   const watchMarkers = ["HbA1c", "HDL", "ALT", "Glucose", "Sodium"];
   const activeMeds = (meds || []).filter(m => m.active);
   const recentJournal = [...(journal || [])].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 2);
@@ -3345,14 +3351,14 @@ function Dashboard({
     style: {
       marginBottom: 14
     }
-  }, /*#__PURE__*/React.createElement(SectionTitle, null, "PROGRESS TOWARD GOALS"), latestW && goals.weight && /*#__PURE__*/React.createElement(GoalBar, {
-    label: "Weight",
-    current: latestW.weight,
+  }, /*#__PURE__*/React.createElement(SectionTitle, null, "PROGRESS TOWARD GOALS"), latestW && goals.weight && goalWeight != null && /*#__PURE__*/React.createElement(GoalBar, {
+    label: latestW.condition !== "nude" ? "Weight (est. nude)" : "Weight",
+    current: goalWeight,
     goal: goals.weight,
     unit: "lb"
-  }), latestBP && goals.systolic && /*#__PURE__*/React.createElement(GoalBar, {
-    label: "Systolic BP",
-    current: latestBP.systolic,
+  }), latestBP && goals.systolic && goalBPSystolic != null && /*#__PURE__*/React.createElement(GoalBar, {
+    label: latestBP.cuffType === "wrist-home" || latestBP.cuffType === "wrist-office" ? "Systolic BP (est. arm)" : "Systolic BP",
+    current: goalBPSystolic,
     goal: goals.systolic,
     unit: "mmHg"
   }), (() => {
