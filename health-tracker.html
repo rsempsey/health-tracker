@@ -257,6 +257,24 @@ const SEED_BP = [{
   heartRate: 91,
   medication: "Amlodipine Besylate 5mg @ ~11:00 AM",
   notes: "First home reading — resting"
+}, {
+  id: 3,
+  date: "2026-07-08",
+  time: "07:25",
+  systolic: 144,
+  diastolic: 92,
+  heartRate: 72,
+  medication: "",
+  notes: "Office — arm cuff — Jessica Eager, Penn State Health"
+}, {
+  id: 4,
+  date: "2026-07-08",
+  time: "07:30",
+  systolic: 138,
+  diastolic: 98,
+  heartRate: 0,
+  medication: "",
+  notes: "Office — wrist cuff — opposite arm, directly after office reading"
 }];
 const SEED_WEIGHT = [{
   id: 1,
@@ -268,6 +286,11 @@ const SEED_WEIGHT = [{
   date: "2026-07-01",
   weight: 310,
   notes: "ER visit"
+}, {
+  id: 3,
+  date: "2026-07-08",
+  weight: 308.21,
+  notes: "Jessica Eager office visit"
 }];
 const SEED_LABS = [{
   id: 1,
@@ -378,8 +401,32 @@ const SEED_MEDS = [{
   dose: "5mg",
   frequency: "Daily",
   startDate: "2026-07-04",
-  notes: "For blood pressure",
+  notes: "For blood pressure — ER changed from 2.5mg. Jessica prefers to eventually transition to Lisinopril only.",
   active: true
+}, {
+  id: 2,
+  name: "Atorvastatin",
+  dose: "20mg",
+  frequency: "Daily",
+  startDate: "2026-07-08",
+  notes: "For cholesterol / HDL. Prescribed by Jessica Eager.",
+  active: true
+}, {
+  id: 3,
+  name: "Lisinopril",
+  dose: "5mg",
+  frequency: "Daily",
+  startDate: "2026-07-08",
+  notes: "For blood pressure. Jessica may increase to 10mg. Goal to eventually replace Amlodipine.",
+  active: true
+}, {
+  id: 4,
+  name: "Semaglutide (Ozempic)",
+  dose: "0.25mg",
+  frequency: "Weekly",
+  startDate: "2026-07-08",
+  notes: "0.25mg subQ every 7 days. Pending pharmacy availability. Prescribed for Type 2 diabetes.",
+  active: false
 }];
 const HEIGHT_IN = 71;
 const LAB_PANELS = {
