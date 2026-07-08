@@ -246,6 +246,8 @@ const WRIST_OFFSET = {
   systolic: 6,
   diastolic: -6
 };
+// Clothing offset: office clothed 308.21 vs home nude 304.4 → -3.81 lbs
+const CLOTHING_OFFSET = -3.81;
 const SEED_BP = [{
   id: 1,
   date: "2025-03-26",
@@ -291,16 +293,19 @@ const SEED_WEIGHT = [{
   id: 1,
   date: "2025-03-26",
   weight: 306.44,
+  condition: "clinical",
   notes: "Penn State Hershey office"
 }, {
   id: 2,
   date: "2026-07-01",
   weight: 310,
+  condition: "clinical",
   notes: "ER visit"
 }, {
   id: 3,
   date: "2026-07-08",
   weight: 308.21,
+  condition: "clinical",
   notes: "Jessica Eager office visit"
 }];
 const SEED_LABS = [{
@@ -1219,6 +1224,7 @@ function WeightTab({
     date: "",
     time: "",
     weight: "",
+    condition: "nude",
     notes: ""
   });
   const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
@@ -1231,6 +1237,7 @@ function WeightTab({
       date: f.date,
       time: f.time || "",
       weight: +f.weight,
+      condition: f.condition || "nude",
       notes: f.notes
     };
     if (editId) {
@@ -1249,6 +1256,7 @@ function WeightTab({
       date: "",
       time: "",
       weight: "",
+      condition: "nude",
       notes: ""
     });
     setOpen(false);
@@ -1258,6 +1266,7 @@ function WeightTab({
       date: e.date,
       time: e.time || "",
       weight: String(e.weight),
+      condition: e.condition || "nude",
       notes: e.notes || ""
     });
     setEditId(e.id);
@@ -1387,9 +1396,12 @@ function WeightTab({
     })
   }))), /*#__PURE__*/React.createElement("div", {
     style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 10,
       marginBottom: 10
     }
-  }, /*#__PURE__*/React.createElement("label", {
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: labelSt
   }, "Weight (lb)"), /*#__PURE__*/React.createElement("input", {
     style: inputSt,
@@ -1401,7 +1413,24 @@ function WeightTab({
       ...f,
       weight: e.target.value
     })
-  })), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: labelSt
+  }, "Condition"), /*#__PURE__*/React.createElement("select", {
+    style: inputSt,
+    value: f.condition,
+    onChange: e => setF({
+      ...f,
+      condition: e.target.value
+    })
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "nude"
+  }, "Nude"), /*#__PURE__*/React.createElement("option", {
+    value: "light"
+  }, "Light clothing"), /*#__PURE__*/React.createElement("option", {
+    value: "clothed"
+  }, "Fully clothed"), /*#__PURE__*/React.createElement("option", {
+    value: "clinical"
+  }, "Clinical / Office")))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 12
     }
@@ -1467,11 +1496,24 @@ function WeightTab({
       label: cat.label,
       color: cat.color,
       small: true
-    })), e.notes && /*#__PURE__*/React.createElement("div", {
+    })), (e.condition === "clothed" || e.condition === "clinical" || e.condition === "light") && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "#6366f1",
+        marginTop: 4,
+        fontStyle: "italic"
+      }
+    }, "Est. nude: ", (e.weight + CLOTHING_OFFSET).toFixed(1), " lb"), e.condition && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         color: C.faint,
-        marginTop: 4
+        marginTop: 3
+      }
+    }, "👕 ", e.condition === "nude" ? "Nude" : e.condition === "light" ? "Light clothing" : e.condition === "clothed" ? "Fully clothed" : "Clinical / Office"), e.notes && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.faint,
+        marginTop: 2
       }
     }, "📝 ", e.notes)), /*#__PURE__*/React.createElement("div", {
       style: {
