@@ -872,7 +872,7 @@ function VitalsTab({
     cuffType: "wrist-home"
   });
   const [editId, setEditId] = useState(null);
-  const sorted = [...readings].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = [...readings].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const latest = sorted[0];
   const prev = sorted[1];
   function save() {
@@ -1227,7 +1227,7 @@ function WeightTab({
     condition: "nude",
     notes: ""
   });
-  const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+  const sorted = [...entries].sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
   const latest = sorted[0];
   const first = sorted[sorted.length - 1];
   const change = latest && first && latest.id !== first.id ? (latest.weight - first.weight).toFixed(1) : null;
