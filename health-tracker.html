@@ -239,6 +239,12 @@ function statusColor(s) {
 }
 
 // ── SEED DATA ─────────────────────────────────────────────────────────────────
+// Wrist-to-arm offset calculated from Jul 8 paired readings:
+// Office arm: 144/92, Wrist same session: 138/98 → sys +6, dia -6
+const WRIST_OFFSET = {
+  systolic: 6,
+  diastolic: -6
+};
 const SEED_BP = [{
   id: 1,
   date: "2025-03-26",
@@ -246,6 +252,7 @@ const SEED_BP = [{
   systolic: 144,
   diastolic: 92,
   heartRate: 87,
+  cuffType: "arm-office",
   medication: "",
   notes: "Penn State Hershey — office visit"
 }, {
@@ -255,6 +262,7 @@ const SEED_BP = [{
   systolic: 125,
   diastolic: 81,
   heartRate: 91,
+  cuffType: "wrist-home",
   medication: "Amlodipine Besylate 5mg @ ~11:00 AM",
   notes: "First home reading — resting"
 }, {
@@ -264,8 +272,9 @@ const SEED_BP = [{
   systolic: 144,
   diastolic: 92,
   heartRate: 72,
+  cuffType: "arm-office",
   medication: "",
-  notes: "Office — arm cuff — Jessica Eager, Penn State Health"
+  notes: "Jessica Eager, Penn State Health"
 }, {
   id: 4,
   date: "2026-07-08",
@@ -273,8 +282,9 @@ const SEED_BP = [{
   systolic: 138,
   diastolic: 98,
   heartRate: 0,
+  cuffType: "wrist-office",
   medication: "",
-  notes: "Office — wrist cuff — opposite arm, directly after office reading"
+  notes: "Opposite arm, directly after office arm reading — used for offset calibration"
 }];
 const SEED_WEIGHT = [{
   id: 1,
@@ -853,6 +863,7 @@ function VitalsTab({
     systolic: "",
     diastolic: "",
     heartRate: "",
+    cuffType: "wrist-home",
     medication: "",
     notes: ""
   });
@@ -874,6 +885,7 @@ function VitalsTab({
       systolic: "",
       diastolic: "",
       heartRate: "",
+      cuffType: "wrist-home",
       medication: "",
       notes: ""
     });
@@ -911,30 +923,48 @@ function VitalsTab({
     }
   }, "mmHg"), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 5
+      marginTop: 5,
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap"
     }
   }, /*#__PURE__*/React.createElement(Badge, {
     label: bp.label,
     color: bp.color
-  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+  }), latest.cuffType && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: C.faint,
+      background: C.border,
+      borderRadius: 4,
+      padding: "2px 7px"
+    }
+  }, latest.cuffType === "wrist-home" ? "🏠 Wrist" : latest.cuffType === "arm-home" ? "🏠 Arm" : latest.cuffType === "arm-office" ? "🏥 Arm" : "🏥 Wrist")), (latest.cuffType === "wrist-home" || latest.cuffType === "wrist-office") && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#6366f1",
+      marginTop: 5,
+      fontStyle: "italic"
+    }
+  }, "Est. arm equiv: ", latest.systolic + WRIST_OFFSET.systolic, "/", latest.diastolic + WRIST_OFFSET.diastolic, " mmHg")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 26,
       fontWeight: 700,
       color: C.text
     }
-  }, latest.heartRate), /*#__PURE__*/React.createElement("span", {
+  }, latest.heartRate > 0 ? latest.heartRate : "—"), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 13,
       color: C.faint,
       marginLeft: 4
     }
-  }, "bpm"), prev && /*#__PURE__*/React.createElement("div", {
+  }, latest.heartRate > 0 ? "bpm" : ""), prev && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: C.faint,
       marginTop: 2
     }
-  }, "prev ", prev.systolic, "/", prev.diastolic, " · ", prev.heartRate, " bpm"))), chartPts.length >= 2 && /*#__PURE__*/React.createElement(MiniChart, {
+  }, "prev ", prev.systolic, "/", prev.diastolic, " · ", prev.heartRate > 0 ? prev.heartRate + " bpm" : "—"))), chartPts.length >= 2 && /*#__PURE__*/React.createElement(MiniChart, {
     points: chartPts,
     color: bp.color,
     goal: goals?.systolic,
@@ -1033,6 +1063,27 @@ function VitalsTab({
     }
   }, /*#__PURE__*/React.createElement("label", {
     style: labelSt
+  }, "Cuff Type"), /*#__PURE__*/React.createElement("select", {
+    style: inputSt,
+    value: f.cuffType,
+    onChange: e => setF({
+      ...f,
+      cuffType: e.target.value
+    })
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "wrist-home"
+  }, "Wrist — Home"), /*#__PURE__*/React.createElement("option", {
+    value: "arm-home"
+  }, "Arm — Home"), /*#__PURE__*/React.createElement("option", {
+    value: "arm-office"
+  }, "Arm — Office"), /*#__PURE__*/React.createElement("option", {
+    value: "wrist-office"
+  }, "Wrist — Office"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: labelSt
   }, "Medication"), /*#__PURE__*/React.createElement("input", {
     style: inputSt,
     type: "text",
@@ -1101,13 +1152,28 @@ function VitalsTab({
       label: bp.label,
       color: bp.color,
       small: true
-    })), /*#__PURE__*/React.createElement("div", {
+    }), r.cuffType && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: C.faint,
+        background: C.border,
+        borderRadius: 4,
+        padding: "1px 6px"
+      }
+    }, r.cuffType === "wrist-home" ? "🏠 Wrist" : r.cuffType === "arm-home" ? "🏠 Arm" : r.cuffType === "arm-office" ? "🏥 Arm" : r.cuffType === "wrist-office" ? "🏥 Wrist" : "")), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 15,
         color: C.muted,
         marginTop: 2
       }
-    }, r.heartRate, " bpm"), r.medication && /*#__PURE__*/React.createElement("div", {
+    }, r.heartRate > 0 ? `${r.heartRate} bpm` : "—"), (r.cuffType === "wrist-home" || r.cuffType === "wrist-office") && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: "#6366f1",
+        marginTop: 4,
+        fontStyle: "italic"
+      }
+    }, "Est. arm equivalent: ", r.systolic + WRIST_OFFSET.systolic, "/", r.diastolic + WRIST_OFFSET.diastolic, " mmHg"), r.medication && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         color: C.faint,
