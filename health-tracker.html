@@ -921,9 +921,9 @@ function VitalsTab({
       behavior: 'smooth'
     });
   }
-  const chartPts = [...readings].sort((a, b) => a.date.localeCompare(b.date)).map(r => ({
+  const chartPts = [...readings].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).map(r => ({
     date: r.date,
-    y: r.systolic
+    y: r.cuffType === "wrist-home" || r.cuffType === "wrist-office" ? r.systolic + WRIST_OFFSET.systolic : r.systolic
   }));
   const bp = latest ? bpCat(latest.systolic, latest.diastolic) : null;
   return /*#__PURE__*/React.createElement("div", null, latest && /*#__PURE__*/React.createElement(Card, {
@@ -1276,9 +1276,9 @@ function WeightTab({
       behavior: 'smooth'
     });
   }
-  const chartPts = [...entries].sort((a, b) => a.date.localeCompare(b.date)).map(e => ({
+  const chartPts = [...entries].sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || ""))).map(e => ({
     date: e.date,
-    y: e.weight
+    y: e.condition === "clinical" || e.condition === "clothed" || e.condition === "light" ? +(e.weight + CLOTHING_OFFSET).toFixed(1) : e.weight
   }));
   return /*#__PURE__*/React.createElement("div", null, latest && (() => {
     const b = parseFloat(bmi(latest.weight));
@@ -3289,53 +3289,62 @@ function Dashboard({
       gap: 10,
       marginBottom: 14
     }
-  }, latestBP && /*#__PURE__*/React.createElement(Card, {
-    style: {
-      cursor: "pointer"
-    },
-    onClick: () => setTab("Vitals")
-  }, /*#__PURE__*/React.createElement(SectionTitle, null, "BLOOD PRESSURE"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 20,
-      fontWeight: 800,
-      color: C.text,
-      letterSpacing: -0.5
-    }
-  }, latestBP.systolic, "/", latestBP.diastolic, /*#__PURE__*/React.createElement(Arrow, {
-    curr: latestBP.systolic,
-    prev: prevBP?.systolic
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.faint,
-      marginBottom: 6
-    }
-  }, fmtDate(latestBP.date)), /*#__PURE__*/React.createElement(Badge, {
-    label: bpCat(latestBP.systolic, latestBP.diastolic).label,
-    color: bpCat(latestBP.systolic, latestBP.diastolic).color,
-    small: true
-  })), latestW && (() => {
-    const b = parseFloat(bmi(latestW.weight));
+  }, latestBP && (() => {
+    const isWrist = latestBP.cuffType === "wrist-home" || latestBP.cuffType === "wrist-office";
+    const dispSys = isWrist ? latestBP.systolic + WRIST_OFFSET.systolic : latestBP.systolic;
+    const dispDia = isWrist ? latestBP.diastolic + WRIST_OFFSET.diastolic : latestBP.diastolic;
+    const prevSys = prevBP ? prevBP.cuffType === "wrist-home" || prevBP.cuffType === "wrist-office" ? prevBP.systolic + WRIST_OFFSET.systolic : prevBP.systolic : null;
+    return /*#__PURE__*/React.createElement(Card, {
+      style: {
+        cursor: "pointer"
+      },
+      onClick: () => setTab("Vitals")
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "BLOOD PRESSURE", isWrist ? " (est.)" : ""), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 20,
+        fontWeight: 800,
+        color: C.text,
+        letterSpacing: -0.5
+      }
+    }, dispSys, "/", dispDia, /*#__PURE__*/React.createElement(Arrow, {
+      curr: dispSys,
+      prev: prevSys
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: C.faint,
+        marginBottom: 6
+      }
+    }, fmtDate(latestBP.date)), /*#__PURE__*/React.createElement(Badge, {
+      label: bpCat(dispSys, dispDia).label,
+      color: bpCat(dispSys, dispDia).color,
+      small: true
+    }));
+  })(), latestW && (() => {
+    const isClothed = latestW.condition === "clinical" || latestW.condition === "clothed" || latestW.condition === "light";
+    const dispW = isClothed ? +(latestW.weight + CLOTHING_OFFSET).toFixed(1) : latestW.weight;
+    const prevDispW = prevW ? prevW.condition === "clinical" || prevW.condition === "clothed" || prevW.condition === "light" ? +(prevW.weight + CLOTHING_OFFSET).toFixed(1) : prevW.weight : null;
+    const b = parseFloat(bmi(dispW));
     return /*#__PURE__*/React.createElement(Card, {
       style: {
         cursor: "pointer"
       },
       onClick: () => setTab("Weight")
-    }, /*#__PURE__*/React.createElement(SectionTitle, null, "WEIGHT"), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "WEIGHT", isClothed ? " (est. nude)" : ""), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 20,
         fontWeight: 800,
         color: C.text
       }
-    }, latestW.weight, " ", /*#__PURE__*/React.createElement("span", {
+    }, dispW, " ", /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
         fontWeight: 400,
         color: C.faint
       }
     }, "lb"), /*#__PURE__*/React.createElement(Arrow, {
-      curr: latestW.weight,
-      prev: prevW?.weight
+      curr: dispW,
+      prev: prevDispW
     })), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
