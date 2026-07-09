@@ -3702,20 +3702,19 @@ function Dashboard({
     if (!weekEntries.length) return null;
     const [expanded, setExpanded] = useState(false);
     const dayCount = weekEntries.length;
-    const avg = key => +(weekEntries.reduce((s, e) => s + (e[key] || 0), 0) / dayCount).toFixed(1);
-    const weekdayCount = weekEntries.filter(e => !isWeekend(e.date)).length;
-    const weekendCount = weekEntries.filter(e => isWeekend(e.date)).length;
-    const calTarget = weekdayCount && weekendCount ? Math.round((goals.caloriesWeekday * weekdayCount + goals.caloriesWeekend * weekendCount) / dayCount) : weekdayCount ? goals.caloriesWeekday : goals.caloriesWeekend;
+    const total = key => weekEntries.reduce((s, e) => s + (e[key] || 0), 0);
+    const weekCalTarget = Math.round((goals.caloriesWeekday || 1785) * 5 + (goals.caloriesWeekend || 2053) * 2);
+    const weekTarget = key => key === "calories" ? weekCalTarget : (goals[key] || 0) * 7;
     function MacroBar({
       mkey,
       label,
       unit,
-      target,
       bad = "high"
     }) {
-      const val = avg(mkey);
+      const val = total(mkey);
+      const target = weekTarget(mkey);
       const met = bad === "high" ? val <= target : val >= target;
-      const pct = bad === "high" ? Math.min(100, val / target * 100) : Math.min(100, val / target * 100);
+      const pct = target > 0 ? Math.min(100, val / target * 100) : 0;
       const barColor = met ? "#22c55e" : bad === "high" && val <= target * 1.1 ? "#eab308" : "#ef4444";
       return /*#__PURE__*/React.createElement("div", {
         style: {
@@ -3743,7 +3742,7 @@ function Dashboard({
           color: C.faint,
           fontWeight: 400
         }
-      }, "/ ", target, " ", unit))), /*#__PURE__*/React.createElement("div", {
+      }, "of ", target, " ", unit))), /*#__PURE__*/React.createElement("div", {
         style: {
           background: C.border,
           borderRadius: 3,
@@ -3779,7 +3778,7 @@ function Dashboard({
         fontWeight: 400,
         fontSize: 10
       }
-    }, "(", dayCount, "/7 days · daily avg)")), /*#__PURE__*/React.createElement("button", {
+    }, "(", dayCount, "/7 days logged)")), /*#__PURE__*/React.createElement("button", {
       onClick: () => setExpanded(!expanded),
       style: {
         fontSize: 12,
@@ -3794,43 +3793,36 @@ function Dashboard({
       mkey: "calories",
       label: "Calories",
       unit: "kcal",
-      target: calTarget,
       bad: "high"
     }), /*#__PURE__*/React.createElement(MacroBar, {
       mkey: "protein",
       label: "Protein",
       unit: "g",
-      target: goals.protein || 166,
       bad: "low"
     }), /*#__PURE__*/React.createElement(MacroBar, {
       mkey: "sugar",
       label: "Sugar",
       unit: "g",
-      target: goals.sugar || 25,
       bad: "high"
     }), expanded && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(MacroBar, {
       mkey: "carbs",
       label: "Carbs",
       unit: "g",
-      target: goals.carbs || 163,
       bad: "high"
     }), /*#__PURE__*/React.createElement(MacroBar, {
       mkey: "saturatedFat",
       label: "Saturated Fat",
       unit: "g",
-      target: goals.saturatedFat || 13,
       bad: "high"
     }), /*#__PURE__*/React.createElement(MacroBar, {
       mkey: "fiber",
       label: "Fiber",
       unit: "g",
-      target: goals.fiber || 37,
       bad: "low"
     }), /*#__PURE__*/React.createElement(MacroBar, {
       mkey: "sodium",
       label: "Sodium",
       unit: "mg",
-      target: goals.sodium || 1500,
       bad: "high"
     }), /*#__PURE__*/React.createElement("div", {
       style: {
