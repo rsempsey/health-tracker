@@ -418,7 +418,8 @@ const SEED_GOALS = {
   carbs: 163,
   saturatedFat: 13,
   fiber: 37,
-  sodium: 1500
+  sodium: 1500,
+  water: 120
 };
 const SEED_MEDS = [{
   id: 1,
@@ -1989,6 +1990,10 @@ function GoalsTab({
     key: "sodium",
     label: "Sodium",
     unit: "mg"
+  }, {
+    key: "water",
+    label: "Water",
+    unit: "oz"
   }];
   function startEdit() {
     setDraft({
@@ -2193,9 +2198,7 @@ const MACRO_DEFS = [{
   label: "Calories",
   unit: "kcal",
   goalKey: null
-},
-// handled separately (weekday/weekend)
-{
+}, {
   key: "protein",
   label: "Protein",
   unit: "g",
@@ -2229,6 +2232,12 @@ const MACRO_DEFS = [{
   unit: "mg",
   goalKey: "sodium",
   bad: "high"
+}, {
+  key: "water",
+  label: "Water",
+  unit: "oz",
+  goalKey: "water",
+  bad: "low"
 }];
 function isWeekend(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
@@ -2263,7 +2272,8 @@ function NutritionTab({
     carbs: "",
     saturatedFat: "",
     fiber: "",
-    sodium: ""
+    sodium: "",
+    water: ""
   });
   const [f, setF] = useState(blankF());
   const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
@@ -2277,7 +2287,8 @@ function NutritionTab({
       carbs: +f.carbs || 0,
       saturatedFat: +f.saturatedFat || 0,
       fiber: +f.fiber || 0,
-      sodium: +f.sodium || 0
+      sodium: +f.sodium || 0,
+      water: +f.water || 0
     };
     if (editId) {
       setEntries(entries.map(e => e.id === editId ? {
@@ -3530,6 +3541,12 @@ function PDFSummary({
       unit: 'mg',
       target: goals.sodium || 1500,
       bad: 'high'
+    }, {
+      key: 'water',
+      label: 'Water',
+      unit: 'oz',
+      target: goals.water || 120,
+      bad: 'low'
     }];
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: S.h2
@@ -3783,8 +3800,8 @@ function ExportTab({
     label: 'Nutrition Log',
     count: journal.length,
     build: () => {
-      const rows = [['Date', 'Calories', 'Protein (g)', 'Sugar (g)', 'Carbs (g)', 'Sat Fat (g)', 'Fiber (g)', 'Sodium (mg)']];
-      [...journal].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => rows.push([e.date, e.calories || 0, e.protein || 0, e.sugar || 0, e.carbs || 0, e.saturatedFat || 0, e.fiber || 0, e.sodium || 0]));
+      const rows = [['Date', 'Calories', 'Protein (g)', 'Sugar (g)', 'Carbs (g)', 'Sat Fat (g)', 'Fiber (g)', 'Sodium (mg)', 'Water (oz)']];
+      [...journal].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => rows.push([e.date, e.calories || 0, e.protein || 0, e.sugar || 0, e.carbs || 0, e.saturatedFat || 0, e.fiber || 0, e.sodium || 0, e.water || 0]));
       return makeCSV(rows);
     }
   }, {
@@ -4290,6 +4307,7 @@ function Dashboard({
     const total = key => weekEntries.reduce((s, e) => s + (e[key] || 0), 0);
     const weekCalTarget = Math.round((goals.caloriesWeekday || 1785) * 5 + (goals.caloriesWeekend || 2053) * 2);
     const weekTarget = key => key === "calories" ? weekCalTarget : (goals[key] || 0) * 7;
+    const waterWeekTarget = (goals.water || 120) * 7;
     function MacroBar({
       mkey,
       label,
@@ -4409,6 +4427,11 @@ function Dashboard({
       label: "Sodium",
       unit: "mg",
       bad: "high"
+    }), /*#__PURE__*/React.createElement(MacroBar, {
+      mkey: "water",
+      label: "Water",
+      unit: "oz",
+      bad: "low"
     }), /*#__PURE__*/React.createElement("div", {
       style: {
         marginTop: 10,
