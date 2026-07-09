@@ -409,7 +409,16 @@ const SEED_GOALS = {
   diastolic: 80,
   HbA1c: 5.6,
   HDL: 50,
-  LDL: 80
+  LDL: 80,
+  // Nutrition targets
+  caloriesWeekday: 1785,
+  caloriesWeekend: 2053,
+  protein: 166,
+  sugar: 25,
+  carbs: 163,
+  saturatedFat: 13,
+  fiber: 37,
+  sodium: 1500
 };
 const SEED_MEDS = [{
   id: 1,
@@ -1948,6 +1957,39 @@ function GoalsTab({
     unit: "mg/dL",
     bad: "high"
   }];
+  const nutritionDefs = [{
+    key: "caloriesWeekday",
+    label: "Calories (M–Th)",
+    unit: "kcal"
+  }, {
+    key: "caloriesWeekend",
+    label: "Calories (F–Su)",
+    unit: "kcal"
+  }, {
+    key: "protein",
+    label: "Protein",
+    unit: "g"
+  }, {
+    key: "sugar",
+    label: "Added Sugar",
+    unit: "g"
+  }, {
+    key: "carbs",
+    label: "Carbs",
+    unit: "g"
+  }, {
+    key: "saturatedFat",
+    label: "Saturated Fat",
+    unit: "g"
+  }, {
+    key: "fiber",
+    label: "Fiber",
+    unit: "g"
+  }, {
+    key: "sodium",
+    label: "Sodium",
+    unit: "mg"
+  }];
   function startEdit() {
     setDraft({
       ...goals
@@ -2054,100 +2096,307 @@ function GoalsTab({
       textAlign: "center",
       padding: "0 16px"
     }
-  }, "Goals appear as progress bars and chart reference lines throughout the tracker."));
+  }, "Goals appear as progress bars and chart reference lines throughout the tracker."), /*#__PURE__*/React.createElement(Card, {
+    style: {
+      marginTop: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(SectionTitle, {
+    style: {
+      marginBottom: 0
+    }
+  }, "NUTRITION TARGETS"), !editing ? /*#__PURE__*/React.createElement("button", {
+    onClick: startEdit,
+    style: {
+      fontSize: 13,
+      color: C.accent,
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      fontWeight: 600,
+      padding: 0
+    }
+  }, "Edit") : /*#__PURE__*/React.createElement("button", {
+    onClick: saveEdit,
+    style: {
+      fontSize: 13,
+      color: "#22c55e",
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      fontWeight: 600,
+      padding: 0
+    }
+  }, "Save")), editing ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 10
+    }
+  }, nutritionDefs.map(g => /*#__PURE__*/React.createElement("div", {
+    key: g.key
+  }, /*#__PURE__*/React.createElement("label", {
+    style: labelSt
+  }, g.label, " ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 400,
+      color: C.faint
+    }
+  }, "(", g.unit, ")")), /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...inputSt,
+      padding: "7px 9px"
+    },
+    type: "number",
+    value: draft[g.key] || "",
+    onChange: e => setDraft(d => ({
+      ...d,
+      [g.key]: +e.target.value
+    }))
+  })))) : /*#__PURE__*/React.createElement("div", null, nutritionDefs.map(g => /*#__PURE__*/React.createElement("div", {
+    key: g.key,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "7px 0",
+      borderBottom: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      color: C.text
+    }
+  }, g.label), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: C.text
+    }
+  }, goals[g.key], " ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 400,
+      color: C.faint,
+      fontSize: 12
+    }
+  }, g.unit)))))));
 }
 
-// ── JOURNAL TAB ───────────────────────────────────────────────────────────────
-function JournalTab({
+// ── NUTRITION TAB ────────────────────────────────────────────────────────────
+const MACRO_DEFS = [{
+  key: "calories",
+  label: "Calories",
+  unit: "kcal",
+  goalKey: null
+},
+// handled separately (weekday/weekend)
+{
+  key: "protein",
+  label: "Protein",
+  unit: "g",
+  goalKey: "protein"
+}, {
+  key: "sugar",
+  label: "Added Sugar",
+  unit: "g",
+  goalKey: "sugar",
+  bad: "high"
+}, {
+  key: "carbs",
+  label: "Carbs",
+  unit: "g",
+  goalKey: "carbs"
+}, {
+  key: "saturatedFat",
+  label: "Saturated Fat",
+  unit: "g",
+  goalKey: "saturatedFat",
+  bad: "high"
+}, {
+  key: "fiber",
+  label: "Fiber",
+  unit: "g",
+  goalKey: "fiber",
+  bad: "low"
+}, {
+  key: "sodium",
+  label: "Sodium",
+  unit: "mg",
+  goalKey: "sodium",
+  bad: "high"
+}];
+function isWeekend(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.getDay() === 0 || d.getDay() === 6;
+}
+function getWeekBounds() {
+  // Mon–Sun week containing today
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun
+  const mon = new Date(now);
+  mon.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(mon);
+    d.setDate(mon.getDate() + i);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  return dates;
+}
+function NutritionTab({
   journal: entries,
-  setJournal: setEntries
+  setJournal: setEntries,
+  goals
 }) {
   const [open, setOpen] = useState(false);
-  const [fDate, setFDate] = useState(today());
-  const [fText, setFText] = useState("");
-  const [fTags, setFTags] = useState([]);
-  const tagOpts = ["Exercise", "Diet", "Medication", "Stress", "Sleep", "Symptom", "Doctor visit", "Other"];
+  const [editId, setEditId] = useState(null);
+  const blankF = () => ({
+    date: today(),
+    calories: "",
+    protein: "",
+    sugar: "",
+    carbs: "",
+    saturatedFat: "",
+    fiber: "",
+    sodium: ""
+  });
+  const [f, setF] = useState(blankF());
   const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
   function save() {
-    if (!fText.trim() || !fDate) return;
-    setEntries([...entries, {
-      id: Date.now(),
-      date: fDate,
-      text: fText.trim(),
-      tags: fTags
-    }]);
-    setFDate(today());
-    setFText("");
-    setFTags([]);
+    if (!f.date) return;
+    const entry = {
+      date: f.date,
+      calories: +f.calories || 0,
+      protein: +f.protein || 0,
+      sugar: +f.sugar || 0,
+      carbs: +f.carbs || 0,
+      saturatedFat: +f.saturatedFat || 0,
+      fiber: +f.fiber || 0,
+      sodium: +f.sodium || 0
+    };
+    if (editId) {
+      setEntries(entries.map(e => e.id === editId ? {
+        ...e,
+        ...entry
+      } : e));
+      setEditId(null);
+    } else {
+      setEntries([...entries, {
+        id: Date.now(),
+        ...entry
+      }]);
+    }
+    setF(blankF());
     setOpen(false);
   }
-  function toggleTag(t) {
-    setFTags(ts => ts.includes(t) ? ts.filter(x => x !== t) : [...ts, t]);
+  function startEdit(e) {
+    setF({
+      date: e.date,
+      calories: String(e.calories || ""),
+      protein: String(e.protein || ""),
+      sugar: String(e.sugar || ""),
+      carbs: String(e.carbs || ""),
+      saturatedFat: String(e.saturatedFat || ""),
+      fiber: String(e.fiber || ""),
+      sodium: String(e.sodium || "")
+    });
+    setEditId(e.id);
+    setOpen(true);
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }
+  function macroTarget(key, dateStr) {
+    if (!goals) return null;
+    if (key === "calories") return isWeekend(dateStr) ? goals.caloriesWeekend : goals.caloriesWeekday;
+    return goals[key] || null;
+  }
+  function macroColor(key, val, dateStr) {
+    const target = macroTarget(key, dateStr);
+    if (!target || !val) return C.faint;
+    const def = MACRO_DEFS.find(m => m.key === key);
+    const bad = def?.bad || "high";
+    if (bad === "high") return val <= target ? "#22c55e" : val <= target * 1.1 ? "#eab308" : "#ef4444";
+    return val >= target ? "#22c55e" : val >= target * 0.9 ? "#eab308" : "#ef4444";
   }
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(AddBtn, {
-    onClick: () => setOpen(!open),
-    label: open ? "Cancel" : "+ New Entry"
+    onClick: () => {
+      if (open) {
+        setOpen(false);
+        setEditId(null);
+        setF(blankF());
+      } else setOpen(true);
+    },
+    label: open ? "Cancel" : editId ? "Editing Entry…" : "+ Log Day"
   }), open && /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 14
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 10
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("label", {
     style: labelSt
   }, "Date"), /*#__PURE__*/React.createElement("input", {
     style: inputSt,
     type: "date",
-    value: fDate,
-    onChange: e => setFDate(e.target.value)
+    value: f.date,
+    onChange: e => setF({
+      ...f,
+      date: e.target.value
+    })
   })), /*#__PURE__*/React.createElement("div", {
     style: {
+      fontSize: 12,
+      color: C.faint,
       marginBottom: 10
     }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: labelSt
-  }, "Tags"), /*#__PURE__*/React.createElement("div", {
+  }, "Enter your LoseIt daily totals for this date."), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 6
-    }
-  }, tagOpts.map(t => /*#__PURE__*/React.createElement("button", {
-    key: t,
-    onClick: () => toggleTag(t),
-    style: {
-      padding: "4px 10px",
-      borderRadius: 20,
-      border: `1px solid ${fTags.includes(t) ? C.accent : C.border}`,
-      background: fTags.includes(t) ? C.accent + "18" : "#fff",
-      color: fTags.includes(t) ? C.accent : C.muted,
-      fontSize: 12,
-      cursor: "pointer",
-      fontWeight: 500
-    }
-  }, t)))), /*#__PURE__*/React.createElement("div", {
-    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 10,
       marginBottom: 12
     }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: labelSt
-  }, "Note"), /*#__PURE__*/React.createElement("textarea", {
-    style: taSt,
-    placeholder: "What happened today? Changes to diet, exercise, how you're feeling, symptoms, anything worth remembering…",
-    value: fText,
-    onChange: e => setFText(e.target.value)
+  }, MACRO_DEFS.map(m => {
+    const target = macroTarget(m.key, f.date);
+    return /*#__PURE__*/React.createElement("div", {
+      key: m.key
+    }, /*#__PURE__*/React.createElement("label", {
+      style: labelSt
+    }, m.label, " ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 400,
+        color: C.faint
+      }
+    }, "(", m.unit, ")", target ? ` · goal ${target}` : "")), /*#__PURE__*/React.createElement("input", {
+      style: inputSt,
+      type: "number",
+      placeholder: "0",
+      value: f[m.key],
+      onChange: e => setF({
+        ...f,
+        [m.key]: e.target.value
+      })
+    }));
   })), /*#__PURE__*/React.createElement(SaveBtn, {
-    onClick: save
-  })), sorted.length === 0 && !open && /*#__PURE__*/React.createElement("div", {
+    onClick: save,
+    label: editId ? "Update Entry" : "Save"
+  })), /*#__PURE__*/React.createElement(SectionTitle, null, "ALL ENTRIES"), sorted.length === 0 && !open && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       color: C.faint,
       fontSize: 14,
       padding: "40px 0"
     }
-  }, "No entries yet. Use the journal to connect the dots between lifestyle and your numbers."), sorted.map(e => /*#__PURE__*/React.createElement(Card, {
+  }, "No entries yet. Log your LoseIt daily totals here each evening."), sorted.map(e => /*#__PURE__*/React.createElement(Card, {
     key: e.id,
     style: {
       marginBottom: 10
@@ -2157,40 +2406,62 @@ function JournalTab({
       display: "flex",
       justifyContent: "space-between",
       alignItems: "flex-start",
-      marginBottom: 6
+      marginBottom: 8
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: C.faint
     }
-  }, fmtDate(e.date)), /*#__PURE__*/React.createElement(DelBtn, {
-    onClick: () => setEntries(entries.filter(x => x.id !== e.id))
-  })), e.tags && e.tags.length > 0 && /*#__PURE__*/React.createElement("div", {
+  }, fmtDate(e.date), isWeekend(e.date) ? " · Weekend" : ""), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
-      flexWrap: "wrap",
-      gap: 4,
-      marginBottom: 8
+      gap: 4
     }
-  }, e.tags.map(t => /*#__PURE__*/React.createElement("span", {
-    key: t,
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => startEdit(e),
     style: {
       fontSize: 11,
-      background: C.accent + "12",
       color: C.accent,
-      border: `1px solid ${C.accent}30`,
-      borderRadius: 4,
-      padding: "1px 7px"
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      cursor: "pointer",
+      padding: "2px 8px",
+      fontWeight: 600
     }
-  }, t))), /*#__PURE__*/React.createElement("div", {
+  }, "Edit"), /*#__PURE__*/React.createElement(DelBtn, {
+    onClick: () => setEntries(entries.filter(x => x.id !== e.id))
+  }))), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 14,
-      color: C.text,
-      lineHeight: 1.55,
-      whiteSpace: "pre-wrap"
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 4
     }
-  }, e.text))));
+  }, MACRO_DEFS.map(m => {
+    const val = e[m.key] || 0;
+    const target = macroTarget(m.key, e.date);
+    const color = macroColor(m.key, val, e.date);
+    return /*#__PURE__*/React.createElement("div", {
+      key: m.key,
+      style: {
+        fontSize: 12
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.faint
+      }
+    }, m.label, ": "), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 700,
+        color
+      }
+    }, val), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: C.faint
+      }
+    }, " ", m.unit, target ? ` / ${target}` : ""));
+  })))));
 }
 
 // ── MEDICATIONS TAB ───────────────────────────────────────────────────────────
@@ -3257,9 +3528,7 @@ function Dashboard({
   // Normalised values for goal progress — use arm-equivalent BP and nude-equivalent weight
   const goalBPSystolic = latestBP ? latestBP.cuffType === "wrist-home" || latestBP.cuffType === "wrist-office" ? latestBP.systolic + WRIST_OFFSET.systolic : latestBP.systolic : null;
   const goalWeight = latestW ? latestW.condition === "clinical" || latestW.condition === "clothed" || latestW.condition === "light" ? +(latestW.weight + CLOTHING_OFFSET).toFixed(1) : latestW.weight : null;
-  const watchMarkers = ["HbA1c", "HDL", "ALT", "Glucose", "Sodium"];
   const activeMeds = (meds || []).filter(m => m.active);
-  const recentJournal = [...(journal || [])].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 2);
   const sortedLogs = [...(medLogs || [])].sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
   function lastTaken(medId) {
     return sortedLogs.find(l => l.medId === medId);
@@ -3386,151 +3655,260 @@ function Dashboard({
       unit: "mg/dL",
       bad: "low"
     }));
-  })()), /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 14
-    },
-    onClick: () => setTab("Labs")
-  }, /*#__PURE__*/React.createElement(SectionTitle, null, "MARKERS TO WATCH"), watchMarkers.map(m => {
-    const r = LAB_REFS[m];
-    const labEntries = (labData || []).map(l => ({
-      date: l.date,
-      raw: l.values[m],
-      prev: null
-    })).filter(e => e.raw != null).sort((a, b) => b.date.localeCompare(a.date));
-    if (!labEntries.length) return null;
-    const le = labEntries[0];
-    const pe = labEntries[1];
-    const val = firstNum(le.raw);
-    const pval = pe ? firstNum(pe.raw) : null;
-    const status = labStatus(m, val);
-    const delta = pval != null ? val - pval : null;
-    const good = m === "HDL" ? delta != null && delta > 0 : delta != null && delta < 0;
-    return /*#__PURE__*/React.createElement("div", {
-      key: m,
-      style: {
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "7px 0",
-        borderBottom: `1px solid ${C.border}`
+  })()), (() => {
+    const scheduledMeds = activeMeds.filter(m => m.frequency !== "As needed");
+    if (!scheduledMeds.length) return null;
+    const todayStr = today();
+    const statuses = scheduledMeds.map(m => {
+      if (m.frequency === "Weekly" || m.frequency === "weekly") {
+        // Check within last 7 days
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 7);
+        const cutoffStr = cutoff.toISOString().slice(0, 10);
+        const lastLog = sortedLogs.find(l => l.medId === m.id && l.date >= cutoffStr);
+        if (!lastLog) return "overdue";
+        return "ok";
+      } else {
+        // Daily — check today
+        const takenToday = sortedLogs.find(l => l.medId === m.id && l.date === todayStr);
+        return takenToday ? "ok" : "pending";
       }
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    });
+    const allOk = statuses.every(s => s === "ok");
+    const anyOverdue = statuses.some(s => "overdue");
+    const color = allOk ? "#22c55e" : anyOverdue ? "#ef4444" : "#f97316";
+    const icon = allOk ? "✓" : "!";
+    const label = allOk ? "All meds taken" : anyOverdue ? "Meds overdue" : "Check meds";
+    return /*#__PURE__*/React.createElement(Card, {
       style: {
-        fontSize: 14,
-        fontWeight: 500,
-        color: C.text
-      }
-    }, m), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
-        color: C.faint,
-        marginLeft: 6
-      }
-    }, fmtDate(le.date))), /*#__PURE__*/React.createElement("div", {
+        marginBottom: 14,
+        cursor: "pointer",
+        borderLeft: `4px solid ${color}`
+      },
+      onClick: () => setTab("Meds")
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         alignItems: "center",
-        gap: 6
+        gap: 12
       }
-    }, delta !== null && /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 12,
-        fontWeight: 700,
-        color: good ? "#22c55e" : "#ef4444"
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        background: color + "20",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 18,
+        fontWeight: 800,
+        color
       }
-    }, delta > 0 ? "↑" : "↓", Math.abs(delta).toFixed(1)), /*#__PURE__*/React.createElement("span", {
+    }, icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: 700,
-        color: status === "normal" ? C.text : statusColor(status)
+        color
       }
-    }, String(le.raw).split("/")[0]), r && /*#__PURE__*/React.createElement("span", {
+    }, label), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         color: C.faint
       }
-    }, r.unit), status !== "normal" && /*#__PURE__*/React.createElement(Badge, {
-      label: status.toUpperCase(),
-      color: statusColor(status),
-      small: true
-    })));
-  })), activeMeds.length > 0 && /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 14
+    }, scheduledMeds.length, " active scheduled medication", scheduledMeds.length !== 1 ? "s" : ""))));
+  })(), (() => {
+    if (!goals || !journal || !journal.length) return null;
+    const weekDates = getWeekBounds();
+    const weekEntries = journal.filter(e => weekDates.includes(e.date));
+    if (!weekEntries.length) return null;
+    const [expanded, setExpanded] = useState(false);
+    const dayCount = weekEntries.length;
+    const avg = key => +(weekEntries.reduce((s, e) => s + (e[key] || 0), 0) / dayCount).toFixed(1);
+    const weekdayCount = weekEntries.filter(e => !isWeekend(e.date)).length;
+    const weekendCount = weekEntries.filter(e => isWeekend(e.date)).length;
+    const calTarget = weekdayCount && weekendCount ? Math.round((goals.caloriesWeekday * weekdayCount + goals.caloriesWeekend * weekendCount) / dayCount) : weekdayCount ? goals.caloriesWeekday : goals.caloriesWeekend;
+    function MacroBar({
+      mkey,
+      label,
+      unit,
+      target,
+      bad = "high"
+    }) {
+      const val = avg(mkey);
+      const met = bad === "high" ? val <= target : val >= target;
+      const pct = bad === "high" ? Math.min(100, val / target * 100) : Math.min(100, val / target * 100);
+      const barColor = met ? "#22c55e" : bad === "high" && val <= target * 1.1 ? "#eab308" : "#ef4444";
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginBottom: 8
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 12,
+          marginBottom: 3
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: C.text,
+          fontWeight: 500
+        }
+      }, label), /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: barColor,
+          fontWeight: 700
+        }
+      }, val, " ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: C.faint,
+          fontWeight: 400
+        }
+      }, "/ ", target, " ", unit))), /*#__PURE__*/React.createElement("div", {
+        style: {
+          background: C.border,
+          borderRadius: 3,
+          height: 5,
+          overflow: "hidden"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: `${pct}%`,
+          background: barColor,
+          height: "100%",
+          borderRadius: 3
+        }
+      })));
     }
-  }, /*#__PURE__*/React.createElement(SectionTitle, null, "ACTIVE MEDICATIONS"), activeMeds.map(m => {
-    const last = lastTaken(m.id);
-    const takenToday = last && last.date === today();
-    return /*#__PURE__*/React.createElement("div", {
-      key: m.id,
+    return /*#__PURE__*/React.createElement(Card, {
       style: {
-        padding: "8px 0",
-        borderBottom: `1px solid ${C.border}`
+        marginBottom: 14
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         justifyContent: "space-between",
-        alignItems: "baseline"
+        alignItems: "center",
+        marginBottom: 12
       }
-    }, /*#__PURE__*/React.createElement("span", {
+    }, /*#__PURE__*/React.createElement(SectionTitle, {
       style: {
-        fontSize: 14,
-        fontWeight: 600,
-        color: C.text
+        marginBottom: 0
       }
-    }, "💊 ", m.name, " ", m.dose), /*#__PURE__*/React.createElement("span", {
+    }, "THIS WEEK · NUTRITION ", /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 400,
+        fontSize: 10
+      }
+    }, "(", dayCount, "/7 days logged)")), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setExpanded(!expanded),
       style: {
         fontSize: 12,
-        color: C.faint
+        color: C.accent,
+        background: "none",
+        border: "none",
+        cursor: "pointer",
+        fontWeight: 600,
+        padding: 0
       }
-    }, m.frequency)), /*#__PURE__*/React.createElement("div", {
+    }, expanded ? "Less" : "More")), /*#__PURE__*/React.createElement(MacroBar, {
+      mkey: "calories",
+      label: "Calories",
+      unit: "kcal",
+      target: calTarget,
+      bad: "high"
+    }), /*#__PURE__*/React.createElement(MacroBar, {
+      mkey: "protein",
+      label: "Protein",
+      unit: "g",
+      target: goals.protein || 166,
+      bad: "low"
+    }), /*#__PURE__*/React.createElement(MacroBar, {
+      mkey: "sugar",
+      label: "Sugar",
+      unit: "g",
+      target: goals.sugar || 25,
+      bad: "high"
+    }), expanded && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(MacroBar, {
+      mkey: "carbs",
+      label: "Carbs",
+      unit: "g",
+      target: goals.carbs || 163,
+      bad: "high"
+    }), /*#__PURE__*/React.createElement(MacroBar, {
+      mkey: "saturatedFat",
+      label: "Saturated Fat",
+      unit: "g",
+      target: goals.saturatedFat || 13,
+      bad: "high"
+    }), /*#__PURE__*/React.createElement(MacroBar, {
+      mkey: "fiber",
+      label: "Fiber",
+      unit: "g",
+      target: goals.fiber || 37,
+      bad: "low"
+    }), /*#__PURE__*/React.createElement(MacroBar, {
+      mkey: "sodium",
+      label: "Sodium",
+      unit: "mg",
+      target: goals.sodium || 1500,
+      bad: "high"
+    }), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 10,
+        borderTop: `1px solid ${C.border}`,
+        paddingTop: 10
+      }
+    }, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
-        marginTop: 3,
-        color: takenToday ? "#22c55e" : last ? "#f97316" : "#ef4444",
-        fontWeight: 500
+        color: C.faint,
+        marginBottom: 6
       }
-    }, last ? takenToday ? "✓ Taken today @ " + last.time : "Last taken: " + fmtDate(last.date) + (last.time ? " @ " + last.time : "") : "No doses logged yet"));
-  })), recentJournal.length > 0 && /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 14
-    }
-  }, /*#__PURE__*/React.createElement(SectionTitle, null, "RECENT JOURNAL"), recentJournal.map(e => /*#__PURE__*/React.createElement("div", {
-    key: e.id,
-    style: {
-      padding: "8px 0",
-      borderBottom: `1px solid ${C.border}`
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.faint,
-      marginBottom: 3
-    }
-  }, fmtDate(e.date), e.tags?.length ? ` · ${e.tags.join(", ")}` : ""), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      color: C.text,
-      lineHeight: 1.4,
-      overflow: "hidden",
-      display: "-webkit-box",
-      WebkitLineClamp: 2,
-      WebkitBoxOrient: "vertical"
-    }
-  }, e.text)))));
+    }, "DAY BY DAY"), weekDates.map(d => {
+      const entry = weekEntries.find(e => e.date === d);
+      const dayLabel = new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'numeric',
+        day: 'numeric'
+      });
+      return /*#__PURE__*/React.createElement("div", {
+        key: d,
+        style: {
+          display: "flex",
+          justifyContent: "space-between",
+          padding: "4px 0",
+          borderBottom: `1px solid ${C.border}`,
+          fontSize: 12
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: C.muted
+        }
+      }, dayLabel), entry ? /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: C.text
+        }
+      }, entry.calories, " kcal · ", entry.protein, "g protein · ", entry.sugar, "g sugar") : /*#__PURE__*/React.createElement("span", {
+        style: {
+          color: C.faint,
+          fontStyle: "italic"
+        }
+      }, "Not logged"));
+    }))));
+  })());
 }
 
 // ── ROOT ──────────────────────────────────────────────────────────────────────
-const TABS = ["Dashboard", "Vitals", "Weight", "Labs", "Goals", "Journal", "Meds", "Export"];
+const TABS = ["Dashboard", "Vitals", "Weight", "Labs", "Goals", "Nutrition", "Meds", "Export"];
 const TAB_LABELS = {
   "Dashboard": "Home",
   "Vitals": "BP",
   "Weight": "Wt",
   "Labs": "Labs",
   "Goals": "Goals",
-  "Journal": "Journal",
+  "Nutrition": "Nutrition",
   "Meds": "Meds",
   "Export": "Export"
 };
@@ -3540,7 +3918,7 @@ function App() {
   const [weight, setWeight, wLoaded] = usePersistedState("weight-entries", SEED_WEIGHT);
   const [labs, setLabs, labLoaded] = usePersistedState("lab-results", SEED_LABS);
   const [goals, setGoals, gLoaded] = usePersistedState("goals", SEED_GOALS);
-  const [journal, setJournal, jLoaded] = usePersistedState("journal", []);
+  const [journal, setJournal, jLoaded] = usePersistedState("nutrition-log", []);
   const [meds, setMeds, mLoaded] = usePersistedState("medications", SEED_MEDS);
   const [medLogs, setMedLogs, mlLoaded] = usePersistedState("med-logs", []);
   const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded;
@@ -3641,9 +4019,9 @@ function App() {
     }
   }, /*#__PURE__*/React.createElement(GoalsTab, shared)), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: tab === "Journal" ? "block" : "none"
+      display: tab === "Nutrition" ? "block" : "none"
     }
-  }, /*#__PURE__*/React.createElement(JournalTab, shared)), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(NutritionTab, shared)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: tab === "Meds" ? "block" : "none"
     }
