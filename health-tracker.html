@@ -4120,6 +4120,9 @@ function Dashboard({
   function lastTaken(medId) {
     return sortedLogs.find(l => l.medId === medId);
   }
+
+  // Today's nutrition entry for hero cards
+  const todayNutrition = (journal || []).find(e => e.date === today()) || null;
   function Arrow({
     curr,
     prev,
@@ -4298,22 +4301,49 @@ function Dashboard({
       bad: "low"
     }));
   })()), (() => {
-    if (!journal || !journal.length) return null;
-    const todayStr = today();
-    const todayEntry = journal.find(e => e.date === todayStr);
-    if (!todayEntry) return null;
-    function NutriCard({
+    if (!goals || !journal || !journal.length) return null;
+    const weekDates = getWeekBounds();
+    const weekEntries = journal.filter(e => weekDates.includes(e.date));
+    if (!weekEntries.length) return null;
+    const weekTotal = key => weekEntries.reduce((s, e) => s + (e[key] || 0), 0);
+    const items = [{
+      label: "PROTEIN",
+      val: weekTotal("protein"),
+      target: (goals?.protein || 166) * 7,
+      unit: "g",
+      bad: "low"
+    }, {
+      label: "SUGAR",
+      val: weekTotal("sugar"),
+      target: (goals?.sugar || 25) * 7,
+      unit: "g",
+      bad: "high"
+    }, {
+      label: "WATER",
+      val: weekTotal("water"),
+      target: (goals?.water || 120) * 7,
+      unit: "oz",
+      bad: "low"
+    }];
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr 1fr",
+        gap: 10,
+        marginBottom: 14
+      }
+    }, items.map(({
       label,
-      value,
+      val,
       target,
       unit,
-      bad = "high",
-      color
-    }) {
-      const met = bad === "high" ? value <= target : value >= target;
-      const pct = target > 0 ? Math.min(100, value / target * 100) : 0;
-      const barColor = met ? "#22c55e" : bad === "high" && value <= target * 1.1 ? "#eab308" : "#ef4444";
+      bad
+    }) => {
+      const met = bad === "high" ? val <= target : val >= target;
+      const pct = target > 0 ? Math.min(100, val / target * 100) : 0;
+      const barColor = met ? "#22c55e" : bad === "high" && val <= target * 1.1 ? "#eab308" : "#ef4444";
       return /*#__PURE__*/React.createElement(Card, {
+        key: label,
         style: {
           cursor: "pointer",
           textAlign: "center"
@@ -4321,14 +4351,15 @@ function Dashboard({
         onClick: () => setTab("Nutrition")
       }, /*#__PURE__*/React.createElement(SectionTitle, null, label), /*#__PURE__*/React.createElement("div", {
         style: {
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: 800,
           color: barColor,
-          letterSpacing: -0.3
+          letterSpacing: -0.3,
+          lineHeight: 1.1
         }
-      }, value, /*#__PURE__*/React.createElement("span", {
+      }, val, /*#__PURE__*/React.createElement("span", {
         style: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: 400,
           color: C.faint,
           marginLeft: 2
@@ -4337,13 +4368,13 @@ function Dashboard({
         style: {
           fontSize: 10,
           color: C.faint,
-          marginBottom: 6
+          margin: "3px 0 6px"
         }
       }, "of ", target, " ", unit), /*#__PURE__*/React.createElement("div", {
         style: {
           background: C.border,
           borderRadius: 3,
-          height: 4,
+          height: 5,
           overflow: "hidden"
         }
       }, /*#__PURE__*/React.createElement("div", {
@@ -4353,33 +4384,14 @@ function Dashboard({
           height: "100%",
           borderRadius: 3
         }
-      })));
-    }
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr 1fr",
-        gap: 10,
-        marginBottom: 14
-      }
-    }, /*#__PURE__*/React.createElement(NutriCard, {
-      label: "PROTEIN",
-      value: todayEntry.protein || 0,
-      target: goals?.protein || 166,
-      unit: "g",
-      bad: "low"
-    }), /*#__PURE__*/React.createElement(NutriCard, {
-      label: "SUGAR",
-      value: todayEntry.sugar || 0,
-      target: goals?.sugar || 25,
-      unit: "g",
-      bad: "high"
-    }), /*#__PURE__*/React.createElement(NutriCard, {
-      label: "WATER",
-      value: todayEntry.water || 0,
-      target: goals?.water || 120,
-      unit: "oz",
-      bad: "low"
+      })), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: barColor,
+          fontWeight: 600,
+          marginTop: 4
+        }
+      }, Math.round(pct), "%"));
     }));
   })(), (() => {
     if (!goals || !journal || !journal.length) return null;
