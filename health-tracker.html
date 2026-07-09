@@ -2472,6 +2472,7 @@ function MedsTab({
   setMedLogs
 }) {
   const [open, setOpen] = useState(false);
+  const [editMedId, setEditMedId] = useState(null);
   const [logOpen, setLogOpen] = useState(false);
   const [f, setF] = useState({
     name: "",
@@ -2496,10 +2497,18 @@ function MedsTab({
   const inactive = meds.filter(m => !m.active);
   function saveMed() {
     if (!f.name) return;
-    setMeds([...meds, {
-      id: Date.now(),
-      ...f
-    }]);
+    if (editMedId) {
+      setMeds(meds.map(m => m.id === editMedId ? {
+        ...m,
+        ...f
+      } : m));
+      setEditMedId(null);
+    } else {
+      setMeds([...meds, {
+        id: Date.now(),
+        ...f
+      }]);
+    }
     setF({
       name: "",
       dose: "",
@@ -2509,6 +2518,22 @@ function MedsTab({
       active: true
     });
     setOpen(false);
+  }
+  function startEditMed(m) {
+    setF({
+      name: m.name,
+      dose: m.dose || "",
+      frequency: m.frequency,
+      startDate: m.startDate,
+      notes: m.notes || "",
+      active: m.active
+    });
+    setEditMedId(m.id);
+    setOpen(true);
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   }
   function saveLog() {
     if (!lf.medId || !lf.date) return;
@@ -2616,10 +2641,22 @@ function MedsTab({
         alignItems: "center"
       }
     }, /*#__PURE__*/React.createElement("button", {
-      onClick: () => toggle(m.id),
+      onClick: () => startEditMed(m),
       style: {
         fontSize: 12,
         color: C.accent,
+        background: "none",
+        border: `1px solid ${C.border}`,
+        borderRadius: 6,
+        cursor: "pointer",
+        padding: "3px 8px",
+        fontWeight: 600
+      }
+    }, "Edit"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => toggle(m.id),
+      style: {
+        fontSize: 12,
+        color: C.muted,
         background: "none",
         border: `1px solid ${C.border}`,
         borderRadius: 6,
@@ -2767,8 +2804,21 @@ function MedsTab({
   }, fmtDate(l.date), l.time ? " @ " + l.time : "", l.notes ? " · " + l.notes : "")), /*#__PURE__*/React.createElement(DelBtn, {
     onClick: () => setMedLogs(medLogs.filter(x => x.id !== l.id))
   })))), /*#__PURE__*/React.createElement(AddBtn, {
-    onClick: () => setOpen(!open),
-    label: open ? "Cancel" : "+ Add Medication"
+    onClick: () => {
+      if (open) {
+        setOpen(false);
+        setEditMedId(null);
+        setF({
+          name: "",
+          dose: "",
+          frequency: "Daily",
+          startDate: today(),
+          notes: "",
+          active: true
+        });
+      } else setOpen(true);
+    },
+    label: open ? "Cancel" : editMedId ? "Editing Medication…" : "+ Add Medication"
   }), open && /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 14
@@ -2843,7 +2893,8 @@ function MedsTab({
       notes: e.target.value
     })
   })), /*#__PURE__*/React.createElement(SaveBtn, {
-    onClick: saveMed
+    onClick: saveMed,
+    label: editMedId ? "Update Medication" : "Save"
   })), active.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SectionTitle, null, "ACTIVE MEDICATIONS"), active.map(m => /*#__PURE__*/React.createElement(MedCard, {
     key: m.id,
     m: m
