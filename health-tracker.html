@@ -3551,81 +3551,121 @@ function Dashboard({
       }
     }, d > 0 ? "↑" : "↓");
   }
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 10,
-      marginBottom: 14
-    }
-  }, latestBP && (() => {
-    const isWrist = latestBP.cuffType === "wrist-home" || latestBP.cuffType === "wrist-office";
-    const dispSys = isWrist ? latestBP.systolic + WRIST_OFFSET.systolic : latestBP.systolic;
-    const dispDia = isWrist ? latestBP.diastolic + WRIST_OFFSET.diastolic : latestBP.diastolic;
-    const prevSys = prevBP ? prevBP.cuffType === "wrist-home" || prevBP.cuffType === "wrist-office" ? prevBP.systolic + WRIST_OFFSET.systolic : prevBP.systolic : null;
-    return /*#__PURE__*/React.createElement(Card, {
+  return /*#__PURE__*/React.createElement("div", null, (() => {
+    // Meds status — frequency-aware, respects start date
+    const todayStr = today();
+    const scheduledMeds = activeMeds.filter(m => m.frequency !== "As needed" && m.startDate <= todayStr);
+    const medColor = (() => {
+      if (!scheduledMeds.length) return "#9ca3af";
+      const statuses = scheduledMeds.map(m => {
+        if (m.frequency === "Weekly" || m.frequency === "weekly") {
+          const cutoff = new Date();
+          cutoff.setDate(cutoff.getDate() - 7);
+          const cutoffStr = cutoff.toISOString().slice(0, 10);
+          return sortedLogs.find(l => l.medId === m.id && l.date >= cutoffStr) ? "ok" : "overdue";
+        }
+        return sortedLogs.find(l => l.medId === m.id && l.date === todayStr) ? "ok" : "pending";
+      });
+      if (statuses.every(s => s === "ok")) return "#22c55e";
+      if (statuses.some(s => s === "overdue")) return "#ef4444";
+      return "#f97316";
+    })();
+    const medLabel = medColor === "#22c55e" ? "✓ Meds" : medColor === "#ef4444" ? "⚠ Overdue" : "! Check";
+    const medSub = medColor === "#22c55e" ? "All taken today" : medColor === "#ef4444" ? "Overdue" : "Pending";
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr 1fr",
+        gap: 10,
+        marginBottom: 14
+      }
+    }, latestBP && (() => {
+      const isWrist = latestBP.cuffType === "wrist-home" || latestBP.cuffType === "wrist-office";
+      const dispSys = isWrist ? latestBP.systolic + WRIST_OFFSET.systolic : latestBP.systolic;
+      const dispDia = isWrist ? latestBP.diastolic + WRIST_OFFSET.diastolic : latestBP.diastolic;
+      const prevSys = prevBP ? prevBP.cuffType === "wrist-home" || prevBP.cuffType === "wrist-office" ? prevBP.systolic + WRIST_OFFSET.systolic : prevBP.systolic : null;
+      return /*#__PURE__*/React.createElement(Card, {
+        style: {
+          cursor: "pointer"
+        },
+        onClick: () => setTab("Vitals")
+      }, /*#__PURE__*/React.createElement(SectionTitle, null, "BLOOD PRESSURE", isWrist ? " (est.)" : ""), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 20,
+          fontWeight: 800,
+          color: C.text,
+          letterSpacing: -0.5
+        }
+      }, dispSys, "/", dispDia, /*#__PURE__*/React.createElement(Arrow, {
+        curr: dispSys,
+        prev: prevSys
+      })), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: C.faint,
+          marginBottom: 6
+        }
+      }, fmtDate(latestBP.date)), /*#__PURE__*/React.createElement(Badge, {
+        label: bpCat(dispSys, dispDia).label,
+        color: bpCat(dispSys, dispDia).color,
+        small: true
+      }));
+    })(), latestW && (() => {
+      const isClothed = latestW.condition === "clinical" || latestW.condition === "clothed" || latestW.condition === "light";
+      const dispW = isClothed ? +(latestW.weight + CLOTHING_OFFSET).toFixed(1) : latestW.weight;
+      const prevDispW = prevW ? prevW.condition === "clinical" || prevW.condition === "clothed" || prevW.condition === "light" ? +(prevW.weight + CLOTHING_OFFSET).toFixed(1) : prevW.weight : null;
+      const b = parseFloat(bmi(dispW));
+      return /*#__PURE__*/React.createElement(Card, {
+        style: {
+          cursor: "pointer"
+        },
+        onClick: () => setTab("Weight")
+      }, /*#__PURE__*/React.createElement(SectionTitle, null, "WEIGHT", isClothed ? " (est. nude)" : ""), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 20,
+          fontWeight: 800,
+          color: C.text
+        }
+      }, dispW, " ", /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 400,
+          color: C.faint
+        }
+      }, "lb"), /*#__PURE__*/React.createElement(Arrow, {
+        curr: dispW,
+        prev: prevDispW
+      })), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: C.faint,
+          marginBottom: 6
+        }
+      }, fmtDate(latestW.date)), /*#__PURE__*/React.createElement(Badge, {
+        label: `BMI ${b}`,
+        color: bmiCat(b).color,
+        small: true
+      }));
+    })(), /*#__PURE__*/React.createElement(Card, {
       style: {
         cursor: "pointer"
       },
-      onClick: () => setTab("Vitals")
-    }, /*#__PURE__*/React.createElement(SectionTitle, null, "BLOOD PRESSURE", isWrist ? " (est.)" : ""), /*#__PURE__*/React.createElement("div", {
+      onClick: () => setTab("Meds")
+    }, /*#__PURE__*/React.createElement(SectionTitle, null, "MEDICATIONS"), /*#__PURE__*/React.createElement("div", {
       style: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: 800,
-        color: C.text,
-        letterSpacing: -0.5
+        color: medColor,
+        letterSpacing: -0.3
       }
-    }, dispSys, "/", dispDia, /*#__PURE__*/React.createElement(Arrow, {
-      curr: dispSys,
-      prev: prevSys
-    })), /*#__PURE__*/React.createElement("div", {
+    }, medLabel), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         color: C.faint,
-        marginBottom: 6
+        marginTop: 4
       }
-    }, fmtDate(latestBP.date)), /*#__PURE__*/React.createElement(Badge, {
-      label: bpCat(dispSys, dispDia).label,
-      color: bpCat(dispSys, dispDia).color,
-      small: true
-    }));
-  })(), latestW && (() => {
-    const isClothed = latestW.condition === "clinical" || latestW.condition === "clothed" || latestW.condition === "light";
-    const dispW = isClothed ? +(latestW.weight + CLOTHING_OFFSET).toFixed(1) : latestW.weight;
-    const prevDispW = prevW ? prevW.condition === "clinical" || prevW.condition === "clothed" || prevW.condition === "light" ? +(prevW.weight + CLOTHING_OFFSET).toFixed(1) : prevW.weight : null;
-    const b = parseFloat(bmi(dispW));
-    return /*#__PURE__*/React.createElement(Card, {
-      style: {
-        cursor: "pointer"
-      },
-      onClick: () => setTab("Weight")
-    }, /*#__PURE__*/React.createElement(SectionTitle, null, "WEIGHT", isClothed ? " (est. nude)" : ""), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 20,
-        fontWeight: 800,
-        color: C.text
-      }
-    }, dispW, " ", /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 12,
-        fontWeight: 400,
-        color: C.faint
-      }
-    }, "lb"), /*#__PURE__*/React.createElement(Arrow, {
-      curr: dispW,
-      prev: prevDispW
-    })), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: C.faint,
-        marginBottom: 6
-      }
-    }, fmtDate(latestW.date)), /*#__PURE__*/React.createElement(Badge, {
-      label: `BMI ${b}`,
-      color: bmiCat(b).color,
-      small: true
-    }));
-  })()), goals && (latestBP || latestW) && /*#__PURE__*/React.createElement(Card, {
+    }, medSub)));
+  })(), goals && (latestBP || latestW) && /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 14
     }
@@ -3656,68 +3696,6 @@ function Dashboard({
       bad: "low"
     }));
   })()), (() => {
-    const scheduledMeds = activeMeds.filter(m => m.frequency !== "As needed");
-    if (!scheduledMeds.length) return null;
-    const todayStr = today();
-    const statuses = scheduledMeds.map(m => {
-      if (m.frequency === "Weekly" || m.frequency === "weekly") {
-        // Check within last 7 days
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - 7);
-        const cutoffStr = cutoff.toISOString().slice(0, 10);
-        const lastLog = sortedLogs.find(l => l.medId === m.id && l.date >= cutoffStr);
-        if (!lastLog) return "overdue";
-        return "ok";
-      } else {
-        // Daily — check today
-        const takenToday = sortedLogs.find(l => l.medId === m.id && l.date === todayStr);
-        return takenToday ? "ok" : "pending";
-      }
-    });
-    const allOk = statuses.every(s => s === "ok");
-    const anyOverdue = statuses.some(s => "overdue");
-    const color = allOk ? "#22c55e" : anyOverdue ? "#ef4444" : "#f97316";
-    const icon = allOk ? "✓" : "!";
-    const label = allOk ? "All meds taken" : anyOverdue ? "Meds overdue" : "Check meds";
-    return /*#__PURE__*/React.createElement(Card, {
-      style: {
-        marginBottom: 14,
-        cursor: "pointer",
-        borderLeft: `4px solid ${color}`
-      },
-      onClick: () => setTab("Meds")
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 12
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        background: color + "20",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 18,
-        fontWeight: 800,
-        color
-      }
-    }, icon), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 15,
-        fontWeight: 700,
-        color
-      }
-    }, label), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: C.faint
-      }
-    }, scheduledMeds.length, " active scheduled medication", scheduledMeds.length !== 1 ? "s" : ""))));
-  })(), (() => {
     if (!goals || !journal || !journal.length) return null;
     const weekDates = getWeekBounds();
     const weekEntries = journal.filter(e => weekDates.includes(e.date));
@@ -3801,7 +3779,7 @@ function Dashboard({
         fontWeight: 400,
         fontSize: 10
       }
-    }, "(", dayCount, "/7 days logged)")), /*#__PURE__*/React.createElement("button", {
+    }, "(", dayCount, "/7 days · daily avg)")), /*#__PURE__*/React.createElement("button", {
       onClick: () => setExpanded(!expanded),
       style: {
         fontSize: 12,
@@ -3812,7 +3790,7 @@ function Dashboard({
         fontWeight: 600,
         padding: 0
       }
-    }, expanded ? "Less" : "More")), /*#__PURE__*/React.createElement(MacroBar, {
+    }, expanded ? "Less ↑" : "More ↓")), /*#__PURE__*/React.createElement(MacroBar, {
       mkey: "calories",
       label: "Calories",
       unit: "kcal",
