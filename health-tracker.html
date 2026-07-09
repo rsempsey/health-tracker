@@ -3577,7 +3577,8 @@ function Dashboard({
         display: "grid",
         gridTemplateColumns: "1fr 1fr 1fr",
         gap: 10,
-        marginBottom: 14
+        marginBottom: 14,
+        textAlign: "center"
       }
     }, latestBP && (() => {
       const isWrist = latestBP.cuffType === "wrist-home" || latestBP.cuffType === "wrist-office";
@@ -3594,7 +3595,8 @@ function Dashboard({
           fontSize: 20,
           fontWeight: 800,
           color: C.text,
-          letterSpacing: -0.5
+          letterSpacing: -0.5,
+          textAlign: "center"
         }
       }, dispSys, "/", dispDia, /*#__PURE__*/React.createElement(Arrow, {
         curr: dispSys,
@@ -3603,13 +3605,18 @@ function Dashboard({
         style: {
           fontSize: 11,
           color: C.faint,
-          marginBottom: 6
+          marginBottom: 6,
+          textAlign: "center"
         }
-      }, fmtDate(latestBP.date)), /*#__PURE__*/React.createElement(Badge, {
+      }, fmtDate(latestBP.date)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          textAlign: "center"
+        }
+      }, /*#__PURE__*/React.createElement(Badge, {
         label: bpCat(dispSys, dispDia).label,
         color: bpCat(dispSys, dispDia).color,
         small: true
-      }));
+      })));
     })(), latestW && (() => {
       const isClothed = latestW.condition === "clinical" || latestW.condition === "clothed" || latestW.condition === "light";
       const dispW = isClothed ? +(latestW.weight + CLOTHING_OFFSET).toFixed(1) : latestW.weight;
@@ -3624,7 +3631,8 @@ function Dashboard({
         style: {
           fontSize: 20,
           fontWeight: 800,
-          color: C.text
+          color: C.text,
+          textAlign: "center"
         }
       }, dispW, " ", /*#__PURE__*/React.createElement("span", {
         style: {
@@ -3639,13 +3647,18 @@ function Dashboard({
         style: {
           fontSize: 11,
           color: C.faint,
-          marginBottom: 6
+          marginBottom: 6,
+          textAlign: "center"
         }
-      }, fmtDate(latestW.date)), /*#__PURE__*/React.createElement(Badge, {
+      }, fmtDate(latestW.date)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          textAlign: "center"
+        }
+      }, /*#__PURE__*/React.createElement(Badge, {
         label: `BMI ${b}`,
         color: bmiCat(b).color,
         small: true
-      }));
+      })));
     })(), /*#__PURE__*/React.createElement(Card, {
       style: {
         cursor: "pointer"
@@ -3656,13 +3669,15 @@ function Dashboard({
         fontSize: 18,
         fontWeight: 800,
         color: medColor,
-        letterSpacing: -0.3
+        letterSpacing: -0.3,
+        textAlign: "center"
       }
     }, medLabel), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 11,
         color: C.faint,
-        marginTop: 4
+        marginTop: 4,
+        textAlign: "center"
       }
     }, medSub)));
   })(), goals && (latestBP || latestW) && /*#__PURE__*/React.createElement(Card, {
