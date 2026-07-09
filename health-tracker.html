@@ -4298,16 +4298,99 @@ function Dashboard({
       bad: "low"
     }));
   })()), (() => {
+    if (!journal || !journal.length) return null;
+    const todayStr = today();
+    const todayEntry = journal.find(e => e.date === todayStr);
+    if (!todayEntry) return null;
+    function NutriCard({
+      label,
+      value,
+      target,
+      unit,
+      bad = "high",
+      color
+    }) {
+      const met = bad === "high" ? value <= target : value >= target;
+      const pct = target > 0 ? Math.min(100, value / target * 100) : 0;
+      const barColor = met ? "#22c55e" : bad === "high" && value <= target * 1.1 ? "#eab308" : "#ef4444";
+      return /*#__PURE__*/React.createElement(Card, {
+        style: {
+          cursor: "pointer",
+          textAlign: "center"
+        },
+        onClick: () => setTab("Nutrition")
+      }, /*#__PURE__*/React.createElement(SectionTitle, null, label), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 20,
+          fontWeight: 800,
+          color: barColor,
+          letterSpacing: -0.3
+        }
+      }, value, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 400,
+          color: C.faint,
+          marginLeft: 2
+        }
+      }, unit)), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          color: C.faint,
+          marginBottom: 6
+        }
+      }, "of ", target, " ", unit), /*#__PURE__*/React.createElement("div", {
+        style: {
+          background: C.border,
+          borderRadius: 3,
+          height: 4,
+          overflow: "hidden"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          width: `${pct}%`,
+          background: barColor,
+          height: "100%",
+          borderRadius: 3
+        }
+      })));
+    }
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr 1fr",
+        gap: 10,
+        marginBottom: 14
+      }
+    }, /*#__PURE__*/React.createElement(NutriCard, {
+      label: "PROTEIN",
+      value: todayEntry.protein || 0,
+      target: goals?.protein || 166,
+      unit: "g",
+      bad: "low"
+    }), /*#__PURE__*/React.createElement(NutriCard, {
+      label: "SUGAR",
+      value: todayEntry.sugar || 0,
+      target: goals?.sugar || 25,
+      unit: "g",
+      bad: "high"
+    }), /*#__PURE__*/React.createElement(NutriCard, {
+      label: "WATER",
+      value: todayEntry.water || 0,
+      target: goals?.water || 120,
+      unit: "oz",
+      bad: "low"
+    }));
+  })(), (() => {
     if (!goals || !journal || !journal.length) return null;
     const weekDates = getWeekBounds();
     const weekEntries = journal.filter(e => weekDates.includes(e.date));
     if (!weekEntries.length) return null;
-    const [expanded, setExpanded] = useState(false);
+    const [expanded, setExpanded] = useState(true);
     const dayCount = weekEntries.length;
     const total = key => weekEntries.reduce((s, e) => s + (e[key] || 0), 0);
     const weekCalTarget = Math.round((goals.caloriesWeekday || 1785) * 5 + (goals.caloriesWeekend || 2053) * 2);
     const weekTarget = key => key === "calories" ? weekCalTarget : (goals[key] || 0) * 7;
-    const waterWeekTarget = (goals.water || 120) * 7;
     function MacroBar({
       mkey,
       label,
@@ -4432,49 +4515,7 @@ function Dashboard({
       label: "Water",
       unit: "oz",
       bad: "low"
-    }), /*#__PURE__*/React.createElement("div", {
-      style: {
-        marginTop: 10,
-        borderTop: `1px solid ${C.border}`,
-        paddingTop: 10
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: C.faint,
-        marginBottom: 6
-      }
-    }, "DAY BY DAY"), weekDates.map(d => {
-      const entry = weekEntries.find(e => e.date === d);
-      const dayLabel = new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'numeric',
-        day: 'numeric'
-      });
-      return /*#__PURE__*/React.createElement("div", {
-        key: d,
-        style: {
-          display: "flex",
-          justifyContent: "space-between",
-          padding: "4px 0",
-          borderBottom: `1px solid ${C.border}`,
-          fontSize: 12
-        }
-      }, /*#__PURE__*/React.createElement("span", {
-        style: {
-          color: C.muted
-        }
-      }, dayLabel), entry ? /*#__PURE__*/React.createElement("span", {
-        style: {
-          color: C.text
-        }
-      }, entry.calories, " kcal · ", entry.protein, "g protein · ", entry.sugar, "g sugar") : /*#__PURE__*/React.createElement("span", {
-        style: {
-          color: C.faint,
-          fontStyle: "italic"
-        }
-      }, "Not logged"));
-    }))));
+    })));
   })());
 }
 
