@@ -2871,101 +2871,146 @@ function PDFSummary({
   labs,
   goals,
   journal,
-  meds
+  meds,
+  medLogs,
+  sections
 }) {
-  const latestBP = [...bp].sort((a, b) => b.date.localeCompare(a.date))[0];
-  const latestW = [...weight].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const bpSorted = [...bp].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  const wSorted = [...weight].sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
+  const latestBP = bpSorted[0];
+  const latestW = wSorted[0];
   const latestLab = [...labs].sort((a, b) => b.date.localeCompare(a.date))[0];
-  const activeMeds = meds.filter(m => m.active);
+  const allMeds = [...meds].sort((a, b) => a.name.localeCompare(b.name));
+  const activeMeds = allMeds.filter(m => m.active);
   const watch = ['HbA1c', 'HDL', 'ALT', 'Glucose', 'Sodium', 'LDL', 'Triglycerides'];
   const todayStr = new Date().toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
     year: 'numeric'
   });
+
+  // Normalised values
+  function normBP(r) {
+    const isWrist = r.cuffType === 'wrist-home' || r.cuffType === 'wrist-office';
+    return {
+      sys: isWrist ? r.systolic + WRIST_OFFSET.systolic : r.systolic,
+      dia: isWrist ? r.diastolic + WRIST_OFFSET.diastolic : r.diastolic,
+      isEst: isWrist
+    };
+  }
+  function normW(e) {
+    const isCl = e.condition === 'clinical' || e.condition === 'clothed' || e.condition === 'light';
+    return {
+      w: isCl ? +(e.weight + CLOTHING_OFFSET).toFixed(1) : e.weight,
+      isEst: isCl
+    };
+  }
+  const latestNormBP = latestBP ? normBP(latestBP) : null;
+  const latestNormW = latestW ? normW(latestW) : null;
+  function refRange(m) {
+    const r = LAB_REFS[m];
+    if (!r) return '';
+    if (r.low != null && r.high != null) return r.low + '–' + r.high;
+    if (r.high != null) return '<' + r.high;
+    return '>' + r.low;
+  }
+
+  // Styles — clean, professional, letter-width
   const S = {
-    wrap: {
-      fontFamily: 'system-ui,sans-serif',
-      fontSize: 13,
-      color: '#111827',
+    page: {
+      fontFamily: "'Arial',system-ui,sans-serif",
+      fontSize: 11,
+      color: '#1a1a2e',
       background: '#fff',
-      padding: '24px 18px',
-      maxWidth: '100%'
+      padding: '0'
+    },
+    header: {
+      borderBottom: '3px solid #1d4ed8',
+      paddingBottom: 12,
+      marginBottom: 20
     },
     h1: {
       fontSize: 22,
-      fontWeight: 800,
-      margin: '0 0 4px'
-    },
-    sub: {
-      color: '#6b7280',
-      fontSize: 12,
-      marginBottom: 16
-    },
-    h2: {
-      fontSize: 14,
       fontWeight: 700,
-      margin: '24px 0 8px',
-      paddingBottom: 4,
-      borderBottom: '2px solid #e5e7eb',
-      color: '#1d4ed8'
-    },
-    h3: {
-      fontSize: 12,
-      fontWeight: 700,
-      margin: '10px 0 4px',
-      color: '#374151'
-    },
-    hero: {
-      display: 'flex',
-      gap: 12,
-      flexWrap: 'wrap',
-      marginBottom: 16
-    },
-    stat: {
-      background: '#f9fafb',
-      border: '1px solid #e5e7eb',
-      borderRadius: 8,
-      padding: '10px 14px',
-      minWidth: 120
-    },
-    statLbl: {
-      fontSize: 10,
-      color: '#6b7280',
-      fontWeight: 700,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-      marginBottom: 2
-    },
-    statVal: {
-      fontSize: 22,
-      fontWeight: 800,
+      color: '#1d4ed8',
+      margin: 0,
       letterSpacing: -0.5
     },
-    statSub: {
-      fontSize: 10,
-      color: '#9ca3af',
-      marginTop: 2
+    h1sub: {
+      fontSize: 13,
+      color: '#6b7280',
+      margin: '3px 0 0'
+    },
+    meta: {
+      fontSize: 11,
+      color: '#6b7280',
+      marginTop: 8,
+      display: 'flex',
+      gap: 24,
+      flexWrap: 'wrap'
+    },
+    metaItem: {
+      display: 'flex',
+      flexDirection: 'column'
+    },
+    metaLabel: {
+      fontSize: 9,
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      color: '#9ca3af'
+    },
+    metaVal: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: '#111827',
+      marginTop: 1
+    },
+    h2: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: '#fff',
+      background: '#1d4ed8',
+      padding: '5px 10px',
+      margin: '20px 0 0',
+      letterSpacing: 0.3
+    },
+    h3: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: '#374151',
+      margin: '12px 0 4px',
+      paddingBottom: 3,
+      borderBottom: '1px solid #e5e7eb'
     },
     table: {
       width: '100%',
       borderCollapse: 'collapse',
-      marginBottom: 8,
-      fontSize: 12
+      fontSize: 11
     },
     th: {
       textAlign: 'left',
-      fontSize: 10,
+      fontSize: 9,
       fontWeight: 700,
       color: '#6b7280',
       textTransform: 'uppercase',
-      padding: '4px 6px',
-      borderBottom: '2px solid #e5e7eb'
+      letterSpacing: 0.5,
+      padding: '6px 8px',
+      borderBottom: '2px solid #1d4ed8',
+      background: '#f8fafc'
     },
     td: {
-      padding: '5px 6px',
-      borderBottom: '1px solid #f3f4f6',
-      fontSize: 12
+      padding: '5px 8px',
+      borderBottom: '1px solid #f1f5f9',
+      fontSize: 11,
+      verticalAlign: 'top'
+    },
+    tdAlt: {
+      padding: '5px 8px',
+      borderBottom: '1px solid #f1f5f9',
+      fontSize: 11,
+      verticalAlign: 'top',
+      background: '#fafafa'
     },
     hi: {
       color: '#dc2626',
@@ -2975,107 +3020,287 @@ function PDFSummary({
       color: '#2563eb',
       fontWeight: 700
     },
+    est: {
+      color: '#7c3aed',
+      fontSize: 10,
+      fontStyle: 'italic'
+    },
+    hero: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(4,1fr)',
+      gap: 10,
+      margin: '16px 0'
+    },
+    statBox: {
+      background: '#f8fafc',
+      border: '1px solid #e5e7eb',
+      borderRadius: 6,
+      padding: '10px 12px'
+    },
+    statLbl: {
+      fontSize: 9,
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      color: '#6b7280',
+      marginBottom: 3
+    },
+    statVal: {
+      fontSize: 20,
+      fontWeight: 800,
+      letterSpacing: -0.5,
+      lineHeight: 1.1
+    },
+    statSub: {
+      fontSize: 9,
+      color: '#9ca3af',
+      marginTop: 3
+    },
     note: {
       marginTop: 24,
-      fontSize: 10,
-      color: '#9ca3af'
+      paddingTop: 12,
+      borderTop: '1px solid #e5e7eb',
+      fontSize: 9,
+      color: '#9ca3af',
+      textAlign: 'center'
+    },
+    twoCol: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: 16
+    },
+    badge: {
+      display: 'inline-block',
+      padding: '1px 7px',
+      borderRadius: 10,
+      fontSize: 9,
+      fontWeight: 700
+    },
+    metRow: {
+      padding: '5px 8px',
+      borderBottom: '1px solid #f1f5f9',
+      fontSize: 11,
+      display: 'flex',
+      justifyContent: 'space-between'
     }
   };
-  function Stat({
+  function StatBox({
     label,
     value,
     sub,
-    hi
+    color,
+    est
   }) {
     return /*#__PURE__*/React.createElement("div", {
-      className: "pdf-stat",
-      style: S.stat
+      style: S.statBox
     }, /*#__PURE__*/React.createElement("div", {
       style: S.statLbl
     }, label), /*#__PURE__*/React.createElement("div", {
-      className: "pdf-stat-val",
       style: {
         ...S.statVal,
-        color: hi ? '#dc2626' : '#111827'
+        color: color || '#111827'
       }
-    }, value), sub && /*#__PURE__*/React.createElement("div", {
+    }, value), est && /*#__PURE__*/React.createElement("div", {
+      style: S.est
+    }, est), sub && /*#__PURE__*/React.createElement("div", {
       style: S.statSub
     }, sub));
   }
-  function refRange(m) {
-    const r = LAB_REFS[m];
-    if (!r) return '';
-    if (r.low != null && r.high != null) return r.low + '–' + r.high;
-    if (r.high != null) return '<' + r.high;
-    return '>' + r.low;
+
+  // Medication adherence summary
+  function medAdherence(med) {
+    if (!medLogs || !medLogs.length) return {
+      total: 0,
+      pct: null
+    };
+    const start = med.startDate;
+    const todayISO = new Date().toISOString().slice(0, 10);
+    const logs = medLogs.filter(l => l.medId === med.id && l.date >= start && l.date <= todayISO);
+    if (med.frequency === 'Weekly' || med.frequency === 'weekly') {
+      const startD = new Date(start + 'T12:00:00');
+      const nowD = new Date();
+      const weeks = Math.max(1, Math.ceil((nowD - startD) / (7 * 86400000)));
+      return {
+        total: logs.length,
+        expected: weeks,
+        pct: Math.round(logs.length / weeks * 100)
+      };
+    }
+    const startD = new Date(start + 'T12:00:00');
+    const nowD = new Date();
+    const days = Math.max(1, Math.ceil((nowD - startD) / 86400000));
+    return {
+      total: logs.length,
+      expected: days,
+      pct: Math.round(logs.length / days * 100)
+    };
   }
   return /*#__PURE__*/React.createElement("div", {
-    className: "pdf-summary",
-    style: S.wrap
+    style: S.page
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.header
   }, /*#__PURE__*/React.createElement("div", {
     style: S.h1
   }, "Health Summary"), /*#__PURE__*/React.createElement("div", {
-    style: S.sub
-  }, "Bob Sempsey · Generated ", todayStr), /*#__PURE__*/React.createElement("div", {
-    className: "pdf-hero",
+    style: S.h1sub
+  }, "Robert Sempsey · Date of Birth: December 29, 1974"), /*#__PURE__*/React.createElement("div", {
+    style: S.meta
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.metaItem
+  }, /*#__PURE__*/React.createElement("span", {
+    style: S.metaLabel
+  }, "Provider"), /*#__PURE__*/React.createElement("span", {
+    style: S.metaVal
+  }, "Jessica Eager, CRNP")), /*#__PURE__*/React.createElement("div", {
+    style: S.metaItem
+  }, /*#__PURE__*/React.createElement("span", {
+    style: S.metaLabel
+  }, "Practice"), /*#__PURE__*/React.createElement("span", {
+    style: S.metaVal
+  }, "Penn State Health Millersville")), /*#__PURE__*/React.createElement("div", {
+    style: S.metaItem
+  }, /*#__PURE__*/React.createElement("span", {
+    style: S.metaLabel
+  }, "Next Appointment"), /*#__PURE__*/React.createElement("span", {
+    style: S.metaVal
+  }, "October 13, 2026")), /*#__PURE__*/React.createElement("div", {
+    style: S.metaItem
+  }, /*#__PURE__*/React.createElement("span", {
+    style: S.metaLabel
+  }, "Report Generated"), /*#__PURE__*/React.createElement("span", {
+    style: S.metaVal
+  }, todayStr)))), sections.hero && /*#__PURE__*/React.createElement("div", {
     style: S.hero
-  }, latestBP && /*#__PURE__*/React.createElement(Stat, {
+  }, latestNormBP && /*#__PURE__*/React.createElement(StatBox, {
     label: "Blood Pressure",
-    value: latestBP.systolic + '/' + latestBP.diastolic,
-    sub: fmtDate(latestBP.date) + ' · ' + bpCat(latestBP.systolic, latestBP.diastolic).label
-  }), latestW && /*#__PURE__*/React.createElement(Stat, {
+    value: latestNormBP.sys + '/' + latestNormBP.dia,
+    sub: fmtDate(latestBP.date) + ' · ' + bpCat(latestNormBP.sys, latestNormBP.dia).label,
+    est: latestNormBP.isEst ? 'Est. arm equivalent' : null,
+    color: bpCat(latestNormBP.sys, latestNormBP.dia).color
+  }), latestNormW && /*#__PURE__*/React.createElement(StatBox, {
     label: "Weight",
-    value: latestW.weight + ' lb',
-    sub: fmtDate(latestW.date) + ' · BMI ' + bmi(latestW.weight)
-  }), latestLab && latestLab.values['HbA1c'] != null && /*#__PURE__*/React.createElement(Stat, {
+    value: latestNormW.w + ' lb',
+    sub: fmtDate(latestW.date) + ' · BMI ' + bmi(latestNormW.w),
+    est: latestNormW.isEst ? 'Est. nude equivalent' : null
+  }), latestLab && latestLab.values['HbA1c'] != null && /*#__PURE__*/React.createElement(StatBox, {
     label: "HbA1c",
     value: firstNum(latestLab.values['HbA1c']) + '%',
-    sub: fmtDate(latestLab.date),
-    hi: true
-  }), latestLab && latestLab.values['HDL'] != null && /*#__PURE__*/React.createElement(Stat, {
-    label: "HDL",
+    sub: fmtDate(latestLab.date) + ' · Goal: 5.6%',
+    color: "#dc2626"
+  }), latestLab && latestLab.values['HDL'] != null && /*#__PURE__*/React.createElement(StatBox, {
+    label: "HDL Cholesterol",
     value: firstNum(latestLab.values['HDL']) + ' mg/dL',
-    sub: fmtDate(latestLab.date),
-    hi: true
-  })), /*#__PURE__*/React.createElement("div", {
+    sub: fmtDate(latestLab.date) + ' · Goal: 50+',
+    color: "#2563eb"
+  })), sections.bp && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
   }, "Blood Pressure History"), /*#__PURE__*/React.createElement("table", {
     style: S.table
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['Date', 'BP', 'HR', 'Category', 'Medication'].map(h => /*#__PURE__*/React.createElement("th", {
-    key: h,
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
     style: S.th
-  }, h)))), /*#__PURE__*/React.createElement("tbody", null, [...bp].sort((a, b) => b.date.localeCompare(a.date)).map(r => /*#__PURE__*/React.createElement("tr", {
-    key: r.id
-  }, /*#__PURE__*/React.createElement("td", {
-    style: S.td
-  }, fmtDate(r.date)), /*#__PURE__*/React.createElement("td", {
-    style: S.td
-  }, r.systolic, "/", r.diastolic), /*#__PURE__*/React.createElement("td", {
-    style: S.td
-  }, r.heartRate), /*#__PURE__*/React.createElement("td", {
-    style: S.td
-  }, bpCat(r.systolic, r.diastolic).label), /*#__PURE__*/React.createElement("td", {
-    style: S.td
-  }, r.medication || ''))))), /*#__PURE__*/React.createElement("div", {
+  }, "Date"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Time"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Reading"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Arm Equiv."), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "HR"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Cuff"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Category"))), /*#__PURE__*/React.createElement("tbody", null, bpSorted.map((r, i) => {
+    const n = normBP(r);
+    const cuffLabel = r.cuffType === 'wrist-home' ? 'Wrist/Home' : r.cuffType === 'arm-home' ? 'Arm/Home' : r.cuffType === 'arm-office' ? 'Arm/Office' : 'Wrist/Office';
+    return /*#__PURE__*/React.createElement("tr", {
+      key: r.id,
+      style: {
+        background: i % 2 === 0 ? '#fff' : '#fafafa'
+      }
+    }, /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, fmtDate(r.date)), /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, r.time || '—'), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        fontWeight: 600
+      }
+    }, r.systolic, "/", r.diastolic), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        ...(n.isEst ? {
+          color: '#7c3aed',
+          fontStyle: 'italic'
+        } : {
+          fontWeight: 600
+        })
+      }
+    }, n.isEst ? n.sys + '/' + n.dia + ' (est.)' : r.systolic + '/' + r.diastolic), /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, r.heartRate > 0 ? r.heartRate + ' bpm' : '—'), /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, cuffLabel), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        color: bpCat(n.sys, n.dia).color,
+        fontWeight: 600
+      }
+    }, bpCat(n.sys, n.dia).label));
+  })))), sections.weight && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
   }, "Weight History"), /*#__PURE__*/React.createElement("table", {
     style: S.table
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['Date', 'Weight', 'BMI', 'Category', 'Notes'].map(h => /*#__PURE__*/React.createElement("th", {
-    key: h,
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
     style: S.th
-  }, h)))), /*#__PURE__*/React.createElement("tbody", null, [...weight].sort((a, b) => b.date.localeCompare(a.date)).map(e => /*#__PURE__*/React.createElement("tr", {
-    key: e.id
-  }, /*#__PURE__*/React.createElement("td", {
-    style: S.td
-  }, fmtDate(e.date)), /*#__PURE__*/React.createElement("td", {
-    style: S.td
-  }, e.weight, " lb"), /*#__PURE__*/React.createElement("td", {
-    style: S.td
-  }, bmi(e.weight)), /*#__PURE__*/React.createElement("td", {
-    style: S.td
-  }, bmiCat(parseFloat(bmi(e.weight))).label), /*#__PURE__*/React.createElement("td", {
-    style: S.td
-  }, e.notes || ''))))), /*#__PURE__*/React.createElement("div", {
+  }, "Date"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Time"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Recorded"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Nude Equiv."), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "BMI"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Condition"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Notes"))), /*#__PURE__*/React.createElement("tbody", null, wSorted.map((e, i) => {
+    const n = normW(e);
+    const condLabel = e.condition === 'nude' ? 'Nude' : e.condition === 'light' ? 'Light clothing' : e.condition === 'clothed' ? 'Fully clothed' : 'Clinical/Office';
+    return /*#__PURE__*/React.createElement("tr", {
+      key: e.id,
+      style: {
+        background: i % 2 === 0 ? '#fff' : '#fafafa'
+      }
+    }, /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, fmtDate(e.date)), /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, e.time || '—'), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        fontWeight: 600
+      }
+    }, e.weight, " lb"), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        ...(n.isEst ? {
+          color: '#7c3aed',
+          fontStyle: 'italic'
+        } : {
+          fontWeight: 600
+        })
+      }
+    }, n.isEst ? n.w + ' lb (est.)' : e.weight + ' lb'), /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, bmi(n.w)), /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, condLabel), /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, e.notes || ''));
+  })))), sections.labs && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
   }, "Lab Results — Key Markers"), [...labs].sort((a, b) => b.date.localeCompare(a.date)).map(lab => /*#__PURE__*/React.createElement("div", {
     key: lab.id
@@ -3083,125 +3308,386 @@ function PDFSummary({
     style: S.h3
   }, fmtDate(lab.date), " — ", lab.lab), /*#__PURE__*/React.createElement("table", {
     style: S.table
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['Marker', 'Value', 'Unit', 'Range'].map(h => /*#__PURE__*/React.createElement("th", {
-    key: h,
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
     style: S.th
-  }, h)))), /*#__PURE__*/React.createElement("tbody", null, watch.filter(m => lab.values[m] != null).map(m => {
+  }, "Marker"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Result"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Unit"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Reference Range"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Status"))), /*#__PURE__*/React.createElement("tbody", null, watch.filter(m => lab.values[m] != null).map((m, i) => {
     const status = labStatus(m, firstNum(lab.values[m]));
     const ref = LAB_REFS[m];
     return /*#__PURE__*/React.createElement("tr", {
-      key: m
+      key: m,
+      style: {
+        background: i % 2 === 0 ? '#fff' : '#fafafa'
+      }
     }, /*#__PURE__*/React.createElement("td", {
-      style: S.td
+      style: {
+        ...S.td,
+        fontWeight: 500
+      }
     }, m), /*#__PURE__*/React.createElement("td", {
       style: {
         ...S.td,
-        ...(status === 'high' ? S.hi : status === 'low' ? S.lo : {})
+        ...(status === 'high' ? S.hi : status === 'low' ? S.lo : {
+          fontWeight: 600
+        })
       }
     }, String(lab.values[m])), /*#__PURE__*/React.createElement("td", {
       style: S.td
     }, ref && ref.unit || ''), /*#__PURE__*/React.createElement("td", {
       style: S.td
-    }, refRange(m)));
-  }))))), activeMeds.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    }, refRange(m)), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        color: status === 'normal' ? '#22c55e' : status === 'high' ? '#dc2626' : '#2563eb',
+        fontWeight: 600
+      }
+    }, status === 'normal' ? 'Normal' : status === 'high' ? 'High' : 'Low'));
+  })))))), sections.meds && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
-  }, "Active Medications"), /*#__PURE__*/React.createElement("table", {
+  }, "Medications"), /*#__PURE__*/React.createElement("table", {
     style: S.table
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['Medication', 'Dose', 'Frequency', 'Since'].map(h => /*#__PURE__*/React.createElement("th", {
-    key: h,
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
     style: S.th
-  }, h)))), /*#__PURE__*/React.createElement("tbody", null, activeMeds.map(m => /*#__PURE__*/React.createElement("tr", {
-    key: m.id
+  }, "Medication"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Dose"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Frequency"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Started"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Status"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Notes"))), /*#__PURE__*/React.createElement("tbody", null, allMeds.map((m, i) => /*#__PURE__*/React.createElement("tr", {
+    key: m.id,
+    style: {
+      background: i % 2 === 0 ? '#fff' : '#fafafa',
+      opacity: m.active ? 1 : 0.7
+    }
   }, /*#__PURE__*/React.createElement("td", {
-    style: S.td
+    style: {
+      ...S.td,
+      fontWeight: 600
+    }
   }, m.name), /*#__PURE__*/React.createElement("td", {
     style: S.td
   }, m.dose || ''), /*#__PURE__*/React.createElement("td", {
     style: S.td
   }, m.frequency), /*#__PURE__*/React.createElement("td", {
     style: S.td
-  }, fmtDate(m.startDate))))))), (() => {
+  }, fmtDate(m.startDate)), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      color: m.active ? '#22c55e' : '#9ca3af',
+      fontWeight: 600
+    }
+  }, m.active ? 'Active' : 'Inactive'), /*#__PURE__*/React.createElement("td", {
+    style: {
+      ...S.td,
+      fontSize: 10,
+      color: '#6b7280'
+    }
+  }, m.notes || '')))))), sections.adherence && medLogs && medLogs.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    style: S.h2
+  }, "Medication Adherence"), /*#__PURE__*/React.createElement("table", {
+    style: S.table
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Medication"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Doses Logged"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Expected"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Adherence"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
+  }, "Last Taken"))), /*#__PURE__*/React.createElement("tbody", null, allMeds.filter(m => m.frequency !== 'As needed').map((m, i) => {
+    const a = medAdherence(m);
+    const lastLog = [...medLogs].filter(l => l.medId === m.id).sort((a, b) => b.date.localeCompare(a.date))[0];
+    return /*#__PURE__*/React.createElement("tr", {
+      key: m.id,
+      style: {
+        background: i % 2 === 0 ? '#fff' : '#fafafa'
+      }
+    }, /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        fontWeight: 500
+      }
+    }, m.name, " ", m.dose), /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, a.total), /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, a.expected || '—'), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        fontWeight: 600,
+        color: a.pct >= 80 ? '#22c55e' : a.pct >= 60 ? '#f97316' : '#dc2626'
+      }
+    }, a.pct != null ? a.pct + '%' : '—'), /*#__PURE__*/React.createElement("td", {
+      style: S.td
+    }, lastLog ? fmtDate(lastLog.date) + (lastLog.time ? ' @ ' + lastLog.time : '') : 'Not yet logged'));
+  })))), sections.nutrition && journal && journal.length > 0 && (() => {
+    const sorted = [...journal].sort((a, b) => a.date.localeCompare(b.date));
+    const count = sorted.length;
+    const avg = key => +(sorted.reduce((s, e) => s + (e[key] || 0), 0) / count).toFixed(1);
+    const macros = [{
+      key: 'calories',
+      label: 'Calories',
+      unit: 'kcal',
+      target: null
+    }, {
+      key: 'protein',
+      label: 'Protein',
+      unit: 'g',
+      target: goals.protein || 166,
+      bad: 'low'
+    }, {
+      key: 'sugar',
+      label: 'Added Sugar',
+      unit: 'g',
+      target: goals.sugar || 25,
+      bad: 'high'
+    }, {
+      key: 'carbs',
+      label: 'Carbs',
+      unit: 'g',
+      target: goals.carbs || 163,
+      bad: 'high'
+    }, {
+      key: 'saturatedFat',
+      label: 'Saturated Fat',
+      unit: 'g',
+      target: goals.saturatedFat || 13,
+      bad: 'high'
+    }, {
+      key: 'fiber',
+      label: 'Fiber',
+      unit: 'g',
+      target: goals.fiber || 37,
+      bad: 'low'
+    }, {
+      key: 'sodium',
+      label: 'Sodium',
+      unit: 'mg',
+      target: goals.sodium || 1500,
+      bad: 'high'
+    }];
+    return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      style: S.h2
+    }, "Nutrition Summary (", count, " days logged · ", fmtDate(sorted[0].date), " – ", fmtDate(sorted[count - 1].date), ")"), /*#__PURE__*/React.createElement("table", {
+      style: S.table
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+      style: S.th
+    }, "Macro"), /*#__PURE__*/React.createElement("th", {
+      style: S.th
+    }, "Daily Average"), /*#__PURE__*/React.createElement("th", {
+      style: S.th
+    }, "Daily Target"), /*#__PURE__*/React.createElement("th", {
+      style: S.th
+    }, "vs Target"))), /*#__PURE__*/React.createElement("tbody", null, macros.map((m, i) => {
+      const val = avg(m.key);
+      const diff = m.target ? +(val - m.target).toFixed(1) : null;
+      const onTrack = m.target ? m.bad === 'high' ? val <= m.target : val >= m.target : null;
+      return /*#__PURE__*/React.createElement("tr", {
+        key: m.key,
+        style: {
+          background: i % 2 === 0 ? '#fff' : '#fafafa'
+        }
+      }, /*#__PURE__*/React.createElement("td", {
+        style: {
+          ...S.td,
+          fontWeight: 500
+        }
+      }, m.label), /*#__PURE__*/React.createElement("td", {
+        style: {
+          ...S.td,
+          fontWeight: 600
+        }
+      }, val, " ", m.unit), /*#__PURE__*/React.createElement("td", {
+        style: S.td
+      }, m.target ? m.target + ' ' + m.unit : '—'), /*#__PURE__*/React.createElement("td", {
+        style: {
+          ...S.td,
+          fontWeight: 600,
+          color: onTrack == null ? C.muted : onTrack ? '#22c55e' : '#dc2626'
+        }
+      }, diff == null ? '—' : onTrack ? 'On track' : 'Off by ' + Math.abs(diff) + ' ' + m.unit));
+    }))));
+  })(), sections.goals && (() => {
     const rows = [];
-    if (goals.weight && latestW) rows.push({
+    if (goals.weight && latestNormW) rows.push({
       label: 'Weight',
       target: goals.weight + ' lb',
-      current: latestW.weight + ' lb',
-      met: latestW.weight <= goals.weight
+      current: latestNormW.w + ' lb',
+      est: latestNormW.isEst,
+      met: latestNormW.w <= goals.weight
     });
-    if (goals.systolic && latestBP) rows.push({
+    if (goals.systolic && latestNormBP) rows.push({
       label: 'Systolic BP',
       target: goals.systolic + ' mmHg',
-      current: latestBP.systolic + ' mmHg',
-      met: latestBP.systolic <= goals.systolic
+      current: latestNormBP.sys + ' mmHg',
+      est: latestNormBP.isEst,
+      met: latestNormBP.sys <= goals.systolic
     });
     if (goals.HbA1c && latestLab && latestLab.values['HbA1c'] != null) rows.push({
       label: 'HbA1c',
       target: goals.HbA1c + '%',
       current: firstNum(latestLab.values['HbA1c']) + '%',
+      est: false,
       met: firstNum(latestLab.values['HbA1c']) <= goals.HbA1c
     });
     if (goals.HDL && latestLab && latestLab.values['HDL'] != null) rows.push({
       label: 'HDL',
       target: goals.HDL + ' mg/dL',
       current: firstNum(latestLab.values['HDL']) + ' mg/dL',
+      est: false,
       met: firstNum(latestLab.values['HDL']) >= goals.HDL
     });
     if (!rows.length) return null;
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: S.h2
-    }, "Goals"), /*#__PURE__*/React.createElement("table", {
+    }, "Goals Progress"), /*#__PURE__*/React.createElement("table", {
       style: S.table
-    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['Goal', 'Target', 'Current', 'Status'].map(h => /*#__PURE__*/React.createElement("th", {
-      key: h,
+    }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
       style: S.th
-    }, h)))), /*#__PURE__*/React.createElement("tbody", null, rows.map(r => /*#__PURE__*/React.createElement("tr", {
-      key: r.label
+    }, "Goal"), /*#__PURE__*/React.createElement("th", {
+      style: S.th
+    }, "Target"), /*#__PURE__*/React.createElement("th", {
+      style: S.th
+    }, "Current"), /*#__PURE__*/React.createElement("th", {
+      style: S.th
+    }, "Status"))), /*#__PURE__*/React.createElement("tbody", null, rows.map((r, i) => /*#__PURE__*/React.createElement("tr", {
+      key: r.label,
+      style: {
+        background: i % 2 === 0 ? '#fff' : '#fafafa'
+      }
     }, /*#__PURE__*/React.createElement("td", {
-      style: S.td
+      style: {
+        ...S.td,
+        fontWeight: 500
+      }
     }, r.label), /*#__PURE__*/React.createElement("td", {
       style: S.td
     }, r.target), /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, r.current), /*#__PURE__*/React.createElement("td", {
       style: {
         ...S.td,
-        color: r.met ? '#22c55e' : '#6b7280',
-        fontWeight: r.met ? 700 : 400
+        fontWeight: 600,
+        ...(r.est ? {
+          color: '#7c3aed',
+          fontStyle: 'italic'
+        } : {})
+      }
+    }, r.current, r.est ? ' (est.)' : ''), /*#__PURE__*/React.createElement("td", {
+      style: {
+        ...S.td,
+        fontWeight: 600,
+        color: r.met ? '#22c55e' : '#f97316'
       }
     }, r.met ? '✓ Met' : 'In progress'))))));
-  })(), journal.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: S.h2
-  }, "Journal (recent)"), /*#__PURE__*/React.createElement("table", {
-    style: S.table
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, ['Date', 'Tags', 'Note'].map(h => /*#__PURE__*/React.createElement("th", {
-    key: h,
-    style: S.th
-  }, h)))), /*#__PURE__*/React.createElement("tbody", null, [...journal].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15).map(e => /*#__PURE__*/React.createElement("tr", {
-    key: e.id
-  }, /*#__PURE__*/React.createElement("td", {
-    style: {
-      ...S.td,
-      whiteSpace: 'nowrap'
-    }
-  }, fmtDate(e.date)), /*#__PURE__*/React.createElement("td", {
-    style: S.td
-  }, (e.tags || []).join(', ')), /*#__PURE__*/React.createElement("td", {
-    style: S.td
-  }, e.text)))))), /*#__PURE__*/React.createElement("div", {
+  })(), /*#__PURE__*/React.createElement("div", {
     style: S.note
-  }, "For personal reference only. Consult your healthcare provider for medical advice."));
+  }, "For personal reference and provider communication only. Not a substitute for professional medical advice.", /*#__PURE__*/React.createElement("br", null), "Generated by Health Tracker · rsempsey.github.io/health-tracker/health-tracker.html"));
 }
 
 // ── EXPORT TAB ────────────────────────────────────────────────────────────────
+const SECTION_DEFS = [{
+  key: 'hero',
+  label: 'Summary Stats',
+  desc: 'Latest BP, weight, HbA1c, HDL'
+}, {
+  key: 'bp',
+  label: 'Blood Pressure History',
+  desc: 'All readings with cuff type and arm equivalent'
+}, {
+  key: 'weight',
+  label: 'Weight History',
+  desc: 'All entries with nude equivalent'
+}, {
+  key: 'labs',
+  label: 'Lab Results',
+  desc: 'Key markers across all panels'
+}, {
+  key: 'meds',
+  label: 'Medications',
+  desc: 'Full medication list with notes'
+}, {
+  key: 'adherence',
+  label: 'Medication Adherence',
+  desc: 'Dose log summary per medication'
+}, {
+  key: 'nutrition',
+  label: 'Nutrition Summary',
+  desc: 'Daily averages vs targets'
+}, {
+  key: 'goals',
+  label: 'Goals Progress',
+  desc: 'Current status vs each target'
+}];
+const PRESETS = {
+  'Doctor Visit': {
+    hero: true,
+    bp: true,
+    weight: true,
+    labs: false,
+    meds: true,
+    adherence: true,
+    nutrition: true,
+    goals: true
+  },
+  'Full Export': {
+    hero: true,
+    bp: true,
+    weight: true,
+    labs: true,
+    meds: true,
+    adherence: true,
+    nutrition: true,
+    goals: true
+  },
+  'Labs Only': {
+    hero: true,
+    bp: false,
+    weight: false,
+    labs: true,
+    meds: false,
+    adherence: false,
+    nutrition: false,
+    goals: false
+  }
+};
 function ExportTab({
   bp,
   weight,
   labs,
   goals,
   journal,
-  meds
+  meds,
+  medLogs
 }) {
-  const [view, setView] = useState(null); // null | {type:'csv',name,content} | {type:'pdf',html}
+  const [view, setView] = useState(null);
+  const [sections, setSections] = useState(PRESETS['Doctor Visit']);
+  const [activePreset, setActivePreset] = useState('Doctor Visit');
+  function toggleSection(key) {
+    setSections(s => ({
+      ...s,
+      [key]: !s[key]
+    }));
+    setActivePreset(null);
+  }
+  function applyPreset(name) {
+    setSections({
+      ...PRESETS[name]
+    });
+    setActivePreset(name);
+  }
 
   // ── CSV ──────────────────────────────────────────────────────────────────────
   function makeCSV(rows) {
@@ -3214,16 +3700,23 @@ function ExportTab({
     label: 'Blood Pressure & Heart Rate',
     count: bp.length,
     build: () => {
-      const rows = [['Date', 'Time', 'Systolic', 'Diastolic', 'Heart Rate', 'Category', 'Medication', 'Notes']];
-      [...bp].sort((a, b) => a.date.localeCompare(b.date)).forEach(r => rows.push([r.date, r.time || '', r.systolic, r.diastolic, r.heartRate, bpCat(r.systolic, r.diastolic).label, r.medication || '', r.notes || '']));
+      const rows = [['Date', 'Time', 'Systolic', 'Diastolic', 'Heart Rate', 'Cuff Type', 'Category']];
+      [...bp].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).forEach(r => {
+        const n = r.cuffType === 'wrist-home' || r.cuffType === 'wrist-office';
+        rows.push([r.date, r.time || '', r.systolic, r.diastolic, r.heartRate, r.cuffType || '', bpCat(n ? r.systolic + WRIST_OFFSET.systolic : r.systolic, n ? r.diastolic + WRIST_OFFSET.diastolic : r.diastolic).label]);
+      });
       return makeCSV(rows);
     }
   }, {
     label: 'Weight',
     count: weight.length,
     build: () => {
-      const rows = [['Date', 'Weight (lb)', 'BMI', 'Notes']];
-      [...weight].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => rows.push([e.date, e.weight, bmi(e.weight), e.notes || '']));
+      const rows = [['Date', 'Time', 'Weight (lb)', 'Condition', 'Est. Nude (lb)', 'BMI', 'Notes']];
+      [...weight].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).forEach(e => {
+        const isCl = e.condition === 'clinical' || e.condition === 'clothed' || e.condition === 'light';
+        const nude = isCl ? +(e.weight + CLOTHING_OFFSET).toFixed(1) : e.weight;
+        rows.push([e.date, e.time || '', e.weight, e.condition || 'nude', nude, bmi(nude), e.notes || '']);
+      });
       return makeCSV(rows);
     }
   }, {
@@ -3236,11 +3729,11 @@ function ExportTab({
       return makeCSV(rows);
     }
   }, {
-    label: 'Journal',
+    label: 'Nutrition Log',
     count: journal.length,
     build: () => {
-      const rows = [['Date', 'Tags', 'Note']];
-      [...journal].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => rows.push([e.date, (e.tags || []).join('; '), e.text]));
+      const rows = [['Date', 'Calories', 'Protein (g)', 'Sugar (g)', 'Carbs (g)', 'Sat Fat (g)', 'Fiber (g)', 'Sodium (mg)']];
+      [...journal].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => rows.push([e.date, e.calories || 0, e.protein || 0, e.sugar || 0, e.carbs || 0, e.saturatedFat || 0, e.fiber || 0, e.sodium || 0]));
       return makeCSV(rows);
     }
   }, {
@@ -3251,12 +3744,35 @@ function ExportTab({
       meds.forEach(m => rows.push([m.name, m.dose || '', m.frequency, m.startDate, m.active ? 'Active' : 'Inactive', m.notes || '']));
       return makeCSV(rows);
     }
+  }, {
+    label: 'Medication Logs',
+    count: (medLogs || []).length,
+    build: () => {
+      const rows = [['Date', 'Time', 'Medication', 'Dose', 'Notes']];
+      [...(medLogs || [])].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)).forEach(l => rows.push([l.date, l.time || '', l.medName, l.dose || '', l.notes || '']));
+      return makeCSV(rows);
+    }
   }];
 
-  // ── UI ────────────────────────────────────────────────────────────────────────
+  // ── Copied state for text ──────────────────────────────────────────────────
+  const [copied, setCopied] = useState(false);
+  function copyText() {
+    const ta = document.createElement('textarea');
+    ta.value = 'Health Summary — Bob Sempsey\nGenerated ' + new Date().toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    });
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  }
   const btnSt = {
     width: '100%',
-    padding: '12px',
+    padding: '11px',
     borderRadius: 9,
     border: '1px solid ' + C.border,
     background: '#fff',
@@ -3270,79 +3786,6 @@ function ExportTab({
     alignItems: 'center',
     marginBottom: 10
   };
-  function buildTextSummary() {
-    const latestBP = [...bp].sort((a, b) => b.date.localeCompare(a.date))[0];
-    const latestW = [...weight].sort((a, b) => b.date.localeCompare(a.date))[0];
-    const latestLab = [...labs].sort((a, b) => b.date.localeCompare(a.date))[0];
-    const watch = ['HbA1c', 'HDL', 'ALT', 'Glucose', 'Sodium', 'LDL', 'Triglycerides'];
-    const lines = [];
-    const hr = s => lines.push(s, '─'.repeat(40));
-    lines.push('HEALTH SUMMARY — BOB SEMPSEY');
-    lines.push('Generated ' + new Date().toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    }));
-    lines.push('');
-    if (latestBP) {
-      lines.push('BLOOD PRESSURE: ' + latestBP.systolic + '/' + latestBP.diastolic + ' mmHg (' + bpCat(latestBP.systolic, latestBP.diastolic).label + ')');
-      lines.push('  As of: ' + fmtDate(latestBP.date));
-    }
-    if (latestW) {
-      lines.push('WEIGHT: ' + latestW.weight + ' lb  |  BMI: ' + bmi(latestW.weight));
-      lines.push('  As of: ' + fmtDate(latestW.date));
-    }
-    lines.push('');
-    hr('BP HISTORY');
-    [...bp].sort((a, b) => b.date.localeCompare(a.date)).forEach(r => {
-      lines.push(fmtDate(r.date) + '  ' + r.systolic + '/' + r.diastolic + ' mmHg  ' + r.heartRate + ' bpm  ' + bpCat(r.systolic, r.diastolic).label);
-      if (r.medication) lines.push('  Medication: ' + r.medication);
-    });
-    lines.push('');
-    hr('WEIGHT HISTORY');
-    [...weight].sort((a, b) => b.date.localeCompare(a.date)).forEach(e => {
-      lines.push(fmtDate(e.date) + '  ' + e.weight + ' lb  BMI ' + bmi(e.weight) + '  ' + bmiCat(parseFloat(bmi(e.weight))).label);
-    });
-    lines.push('');
-    hr('LAB RESULTS — KEY MARKERS');
-    [...labs].sort((a, b) => b.date.localeCompare(a.date)).forEach(lab => {
-      lines.push(fmtDate(lab.date) + ' — ' + lab.lab);
-      watch.filter(m => lab.values[m] != null).forEach(m => {
-        const ref = LAB_REFS[m];
-        const s = labStatus(m, firstNum(lab.values[m]));
-        const flag = s === 'high' ? ' [HIGH]' : s === 'low' ? ' [LOW]' : '';
-        const range = ref ? ref.low != null && ref.high != null ? ' (' + ref.low + '-' + ref.high + ')' : ref.high != null ? ' (<' + ref.high + ')' : ' (>' + ref.low + ')' : '';
-        lines.push('  ' + m + ': ' + lab.values[m] + (ref ? ' ' + ref.unit : '') + range + flag);
-      });
-    });
-    const activeMeds = meds.filter(m => m.active);
-    if (activeMeds.length > 0) {
-      lines.push('');
-      hr('ACTIVE MEDICATIONS');
-      activeMeds.forEach(m => lines.push('  ' + m.name + ' ' + m.dose + '  ' + m.frequency + '  (since ' + fmtDate(m.startDate) + ')'));
-    }
-    lines.push('');
-    lines.push('For personal reference only. Consult your healthcare provider for medical advice.');
-    return lines.join('\n');
-  }
-  const [copied, setCopied] = useState(false);
-  function copyText() {
-    const text = buildTextSummary();
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    }).catch(() => {
-      // fallback
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    });
-  }
   if (view && view.type === 'csv') return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("button", {
     onClick: () => setView(null),
     style: {
@@ -3443,13 +3886,15 @@ function ExportTab({
       fontSize: 13,
       color: '#0369a1'
     }
-  }, "Click ", /*#__PURE__*/React.createElement("strong", null, "Print / Save as PDF"), " above → choose ", /*#__PURE__*/React.createElement("strong", null, "Save as PDF"), " as the destination. On iPhone: Share → Print."), /*#__PURE__*/React.createElement(PDFSummary, {
+  }, "Click ", /*#__PURE__*/React.createElement("strong", null, "Print / Save as PDF"), " above → choose ", /*#__PURE__*/React.createElement("strong", null, "Save as PDF"), ". On iPhone: Share → Print."), /*#__PURE__*/React.createElement(PDFSummary, {
     bp: bp,
     weight: weight,
     labs: labs,
     goals: goals,
     journal: journal,
-    meds: meds
+    meds: meds,
+    medLogs: medLogs,
+    sections: sections
   }));
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Card, {
     style: {
@@ -3457,25 +3902,99 @@ function ExportTab({
     }
   }, /*#__PURE__*/React.createElement(SectionTitle, null, "PDF SUMMARY"), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 13,
-      color: C.muted,
       marginBottom: 12
     }
-  }, "Print-ready summary formatted for your doctor."), /*#__PURE__*/React.createElement("button", {
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.muted,
+      fontWeight: 600,
+      marginBottom: 8
+    }
+  }, "Presets"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      flexWrap: 'wrap'
+    }
+  }, Object.keys(PRESETS).map(name => /*#__PURE__*/React.createElement("button", {
+    key: name,
+    onClick: () => applyPreset(name),
+    style: {
+      padding: '6px 14px',
+      borderRadius: 20,
+      border: '1px solid ' + (activePreset === name ? C.accent : C.border),
+      background: activePreset === name ? C.accent + '18' : '#fff',
+      color: activePreset === name ? C.accent : C.muted,
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: 'pointer'
+    }
+  }, name)))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.muted,
+      fontWeight: 600,
+      marginBottom: 8
+    }
+  }, "Include Sections"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: 6,
+      marginBottom: 14
+    }
+  }, SECTION_DEFS.map(s => /*#__PURE__*/React.createElement("button", {
+    key: s.key,
+    onClick: () => toggleSection(s.key),
+    style: {
+      padding: '8px 10px',
+      borderRadius: 8,
+      border: '1px solid ' + (sections[s.key] ? C.accent : C.border),
+      background: sections[s.key] ? C.accent + '12' : '#fafafa',
+      color: sections[s.key] ? C.accent : C.muted,
+      fontSize: 12,
+      cursor: 'pointer',
+      textAlign: 'left',
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      lineHeight: 1,
+      marginTop: 1
+    }
+  }, sections[s.key] ? '☑' : '☐'), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontWeight: 600,
+      display: 'block'
+    }
+  }, s.label), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: C.faint
+    }
+  }, s.desc))))), /*#__PURE__*/React.createElement("button", {
     onClick: () => setView({
       type: 'pdf'
     }),
     style: {
-      ...btnSt,
+      width: '100%',
+      padding: '12px',
       background: C.accent,
       color: '#fff',
-      border: 'none'
+      border: 'none',
+      borderRadius: 9,
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: 'pointer',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
     }
-  }, /*#__PURE__*/React.createElement("span", null, "View PDF Summary"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 16
-    }
-  }, '↗'))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "CSV DATA EXPORT"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", null, "Generate Summary"), /*#__PURE__*/React.createElement("span", null, "↗"))), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement(SectionTitle, null, "CSV DATA EXPORT"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       color: C.muted,
@@ -4014,7 +4533,10 @@ function App() {
     style: {
       display: tab === "Export" ? "block" : "none"
     }
-  }, /*#__PURE__*/React.createElement(ExportTab, shared))));
+  }, /*#__PURE__*/React.createElement(ExportTab, {
+    ...shared,
+    medLogs: medLogs
+  }))));
 }
 ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
   </script>
