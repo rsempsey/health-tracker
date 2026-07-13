@@ -7,6 +7,8 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❤️</text></svg>">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #f4f6f8; font-family: system-ui, sans-serif; }
@@ -34,15 +36,32 @@
   <div id="root"></div>
   <script>
 const { useState, useEffect, useRef } = React;
+// ── FIREBASE AUTH INIT ────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyAOOAw1TVluE2At2rRXbxxmmU6iDBhUO-c",
+  authDomain: "health-tracker-fedf5.firebaseapp.com",
+  projectId: "health-tracker-fedf5",
+};
+firebase.initializeApp(firebaseConfig);
+const fbAuth = firebase.auth();
+
+async function getAuthToken() {
+  const user = fbAuth.currentUser;
+  if (!user) throw new Error("Not signed in");
+  return user.getIdToken();
+}
+
 // ── FIRESTORE REST CONFIG ─────────────────────────────────────────────────────
 const FS_PROJECT = "health-tracker-fedf5";
-const FS_KEY = "AIzaSyAOOAw1TVluE2At2rRXbxxmmU6iDBhUO-c";
 const FS_COL = "health-tracker";
 const FS_USER = "bob";
 const FS_BASE = "https://firestore.googleapis.com/v1/projects/" + FS_PROJECT + "/databases/(default)/documents/" + FS_COL + "/";
 async function fsGet(key) {
   try {
-    const res = await fetch(FS_BASE + FS_USER + "-" + key + "?key=" + FS_KEY);
+    const token = await getAuthToken();
+    const res = await fetch(FS_BASE + FS_USER + "-" + key, {
+      headers: { "Authorization": "Bearer " + token }
+    });
     if (res.status === 404) return null;
     if (!res.ok) throw new Error("GET " + res.status);
     const json = await res.json();
@@ -54,7 +73,8 @@ async function fsGet(key) {
 }
 async function fsSet(key, data) {
   try {
-    const url = FS_BASE + FS_USER + "-" + key + "?key=" + FS_KEY;
+    const token = await getAuthToken();
+    const url = FS_BASE + FS_USER + "-" + key;
     const body = {
       fields: {
         value: {
@@ -65,7 +85,8 @@ async function fsSet(key, data) {
     const res = await fetch(url, {
       method: "PATCH",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
       },
       body: JSON.stringify(body)
     });
@@ -799,81 +820,21 @@ function MiniChart({
   }, arrow, " ", Math.abs(delta).toFixed(1), " ", unit)));
 }
 
-// ── STREAK CALCULATOR ─────────────────────────────────────────────────────────
-// readings: array of { date: "YYYY-MM-DD", value: number }
-// Returns { startDate: "YYYY-MM-DD", days: number } if the most recent reading
-// meets the goal and an unbroken streak exists back to startDate; else null.
-function calcStreak(readings, goal, bad) {
-  if (!readings || !readings.length || goal == null) return null;
-  const meetsGoal = v => bad === "high" ? v <= goal : v >= goal;
-
-  // Sort by date descending (most recent first)
-  const sorted = [...readings]
-    .filter(r => r.date && r.value != null)
-    .sort((a, b) => b.date.localeCompare(a.date));
-
-  if (!sorted.length) return null;
-
-  // Most recent reading must meet the goal for a streak to exist
-  if (!meetsGoal(sorted[0].value)) return null;
-
-  // Walk backwards — find the earliest reading that is still on-goal
-  // Any miss breaks the streak
-  let streakStart = sorted[0].date;
-  for (let i = 1; i < sorted.length; i++) {
-    if (!meetsGoal(sorted[i].value)) break;
-    streakStart = sorted[i].date;
-  }
-
-  // Days = from streakStart to today (inclusive), so today - streakStart + 1
-  const msPerDay = 86400000;
-  const startMs = new Date(streakStart + "T00:00:00").getTime();
-  const todayMs = new Date(today() + "T00:00:00").getTime();
-  const days = Math.max(1, Math.round((todayMs - startMs) / msPerDay) + 1);
-
-  return { startDate: streakStart, days };
-}
-
-function fmtStreak(streak) {
-  if (!streak) return null;
-  const { startDate, days } = streak;
-  let duration;
-  if (days < 7) {
-    duration = days === 1 ? "1 day" : `${days} days`;
-  } else if (days < 30) {
-    const weeks = Math.floor(days / 7);
-    const rem = days % 7;
-    duration = weeks === 1 ? "1 week" : `${weeks} weeks`;
-    if (rem > 0) duration += rem === 1 ? " 1 day" : ` ${rem} days`;
-  } else {
-    const months = Math.floor(days / 30);
-    const remDays = days % 30;
-    duration = months === 1 ? "1 month" : `${months} months`;
-    if (remDays >= 7) {
-      const weeks = Math.floor(remDays / 7);
-      duration += weeks === 1 ? " 1 week" : ` ${weeks} weeks`;
-    }
-  }
-  return `Goal met since ${fmtDate(startDate)} · Sustained ${duration}`;
-}
-
 // ── GOAL PROGRESS BAR ─────────────────────────────────────────────────────────
 function GoalBar({
   label,
   current,
   goal,
   unit,
-  bad = "high",
-  streak
+  bad = "high"
 }) {
   if (current == null || goal == null) return null;
   const met = bad === "high" ? current <= goal : current >= goal;
   const pct = bad === "high" ? Math.max(0, Math.min(100, 100 - (current - goal) / Math.max(goal, 1) * 50)) : Math.max(0, Math.min(100, current / goal * 100));
   const barColor = met ? "#22c55e" : current === goal ? "#22c55e" : "#f97316";
-  const streakText = streak ? fmtStreak(streak) : null;
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: streakText ? 16 : 12
+      marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -923,14 +884,7 @@ function GoalBar({
       borderRadius: 4,
       transition: "width 0.4s"
     }
-  })), streakText && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: "#22c55e",
-      marginTop: 4,
-      fontStyle: "italic"
-    }
-  }, "🏆 ", streakText));
+  })));
 }
 
 // ── VITALS TAB ────────────────────────────────────────────────────────────────
@@ -3657,61 +3611,39 @@ function PDFSummary({
       }, diff == null ? '—' : onTrack ? 'On track' : 'Off by ' + Math.abs(diff) + ' ' + m.unit));
     }))));
   })(), sections.goals && (() => {
-    // Build per-metric streak data for the PDF
-    const weightReadings = weight.map(e => ({
-      date: e.date,
-      value: e.condition === 'clinical' || e.condition === 'clothed' || e.condition === 'light'
-        ? +(e.weight + CLOTHING_OFFSET).toFixed(1)
-        : e.weight
-    }));
-    const bpReadings = bp.map(r => ({
-      date: r.date,
-      value: r.cuffType === 'wrist-home' || r.cuffType === 'wrist-office'
-        ? r.systolic + WRIST_OFFSET.systolic
-        : r.systolic
-    }));
-    const hba1cReadings = labs.filter(l => l.values['HbA1c'] != null)
-      .map(l => ({ date: l.date, value: firstNum(l.values['HbA1c']) }));
-    const hdlReadings = labs.filter(l => l.values['HDL'] != null)
-      .map(l => ({ date: l.date, value: firstNum(l.values['HDL']) }));
-
     const rows = [];
     if (goals.weight && latestNormW) rows.push({
       label: 'Weight',
       target: goals.weight + ' lb',
       current: latestNormW.w + ' lb',
       est: latestNormW.isEst,
-      met: latestNormW.w <= goals.weight,
-      streak: calcStreak(weightReadings, goals.weight, 'high')
+      met: latestNormW.w <= goals.weight
     });
     if (goals.systolic && latestNormBP) rows.push({
       label: 'Systolic BP',
       target: goals.systolic + ' mmHg',
       current: latestNormBP.sys + ' mmHg',
       est: latestNormBP.isEst,
-      met: latestNormBP.sys <= goals.systolic,
-      streak: calcStreak(bpReadings, goals.systolic, 'high')
+      met: latestNormBP.sys <= goals.systolic
     });
     if (goals.HbA1c && latestLab && latestLab.values['HbA1c'] != null) rows.push({
       label: 'HbA1c',
       target: goals.HbA1c + '%',
       current: firstNum(latestLab.values['HbA1c']) + '%',
       est: false,
-      met: firstNum(latestLab.values['HbA1c']) <= goals.HbA1c,
-      streak: calcStreak(hba1cReadings, goals.HbA1c, 'high')
+      met: firstNum(latestLab.values['HbA1c']) <= goals.HbA1c
     });
     if (goals.HDL && latestLab && latestLab.values['HDL'] != null) rows.push({
       label: 'HDL',
       target: goals.HDL + ' mg/dL',
       current: firstNum(latestLab.values['HDL']) + ' mg/dL',
       est: false,
-      met: firstNum(latestLab.values['HDL']) >= goals.HDL,
-      streak: calcStreak(hdlReadings, goals.HDL, 'low')
+      met: firstNum(latestLab.values['HDL']) >= goals.HDL
     });
     if (!rows.length) return null;
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: S.h2
-    }, "Goal Progress"), /*#__PURE__*/React.createElement("table", {
+    }, "Goals Progress"), /*#__PURE__*/React.createElement("table", {
       style: S.table
     }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
       style: S.th
@@ -3721,9 +3653,7 @@ function PDFSummary({
       style: S.th
     }, "Current"), /*#__PURE__*/React.createElement("th", {
       style: S.th
-    }, "Status"), /*#__PURE__*/React.createElement("th", {
-      style: S.th
-    }, "Streak"))), /*#__PURE__*/React.createElement("tbody", null, rows.map((r, i) => /*#__PURE__*/React.createElement("tr", {
+    }, "Status"))), /*#__PURE__*/React.createElement("tbody", null, rows.map((r, i) => /*#__PURE__*/React.createElement("tr", {
       key: r.label,
       style: {
         background: i % 2 === 0 ? '#fff' : '#fafafa'
@@ -3750,21 +3680,7 @@ function PDFSummary({
         fontWeight: 600,
         color: r.met ? '#22c55e' : '#f97316'
       }
-    }, r.met ? '✓ Met' : 'In progress'), /*#__PURE__*/React.createElement("td", {
-      style: {
-        ...S.td,
-        fontSize: 10,
-        color: r.streak ? '#15803d' : '#9ca3af',
-        fontStyle: r.streak ? 'normal' : 'italic'
-      }
-    }, r.streak ? (() => {
-      const { startDate, days } = r.streak;
-      let dur;
-      if (days < 7) dur = days === 1 ? '1 day' : `${days} days`;
-      else if (days < 30) { const w = Math.floor(days/7), rem = days%7; dur = `${w}w${rem ? ' '+rem+'d' : ''}`; }
-      else { const mo = Math.floor(days/30), remD = days%30, w = Math.floor(remD/7); dur = `${mo}mo${w ? ' '+w+'w' : ''}`; }
-      return `Since ${fmtDate(startDate)} (${dur})`;
-    })() : '—'))))));
+    }, r.met ? '✓ Met' : 'In progress'))))));
   })(), /*#__PURE__*/React.createElement("div", {
     style: S.note
   }, "For personal reference and provider communication only. Not a substitute for professional medical advice.", /*#__PURE__*/React.createElement("br", null), "Generated by Health Tracker · rsempsey.github.io/health-tracker/health-tracker.html"));
@@ -4472,64 +4388,31 @@ function Dashboard({
     style: {
       marginBottom: 14
     }
-  }, /*#__PURE__*/React.createElement(SectionTitle, null, "PROGRESS TOWARD GOALS"), (() => {
-    // Weight streak: each weight entry normalized to nude equivalent
-    const weightReadings = (wData || []).map(e => ({
-      date: e.date,
-      value: e.condition === "clinical" || e.condition === "clothed" || e.condition === "light"
-        ? +(e.weight + CLOTHING_OFFSET).toFixed(1)
-        : e.weight
-    }));
-    const weightStreak = calcStreak(weightReadings, goals.weight, "high");
-    return latestW && goals.weight && goalWeight != null && /*#__PURE__*/React.createElement(GoalBar, {
-      label: latestW.condition !== "nude" ? "Weight (est. nude)" : "Weight",
-      current: goalWeight,
-      goal: goals.weight,
-      unit: "lb",
-      streak: weightStreak
-    });
-  })(), (() => {
-    // Systolic BP streak: normalize wrist readings to arm equivalent
-    const bpReadings = (bpData || []).map(r => ({
-      date: r.date,
-      value: r.cuffType === "wrist-home" || r.cuffType === "wrist-office"
-        ? r.systolic + WRIST_OFFSET.systolic
-        : r.systolic
-    }));
-    const sysStreak = calcStreak(bpReadings, goals.systolic, "high");
-    return latestBP && goals.systolic && goalBPSystolic != null && /*#__PURE__*/React.createElement(GoalBar, {
-      label: latestBP.cuffType === "wrist-home" || latestBP.cuffType === "wrist-office" ? "Systolic BP (est. arm)" : "Systolic BP",
-      current: goalBPSystolic,
-      goal: goals.systolic,
-      unit: "mmHg",
-      streak: sysStreak
-    });
-  })(), (() => {
+  }, /*#__PURE__*/React.createElement(SectionTitle, null, "PROGRESS TOWARD GOALS"), latestW && goals.weight && goalWeight != null && /*#__PURE__*/React.createElement(GoalBar, {
+    label: latestW.condition !== "nude" ? "Weight (est. nude)" : "Weight",
+    current: goalWeight,
+    goal: goals.weight,
+    unit: "lb"
+  }), latestBP && goals.systolic && goalBPSystolic != null && /*#__PURE__*/React.createElement(GoalBar, {
+    label: latestBP.cuffType === "wrist-home" || latestBP.cuffType === "wrist-office" ? "Systolic BP (est. arm)" : "Systolic BP",
+    current: goalBPSystolic,
+    goal: goals.systolic,
+    unit: "mmHg"
+  }), (() => {
     const labsSorted = [...(labData || [])].sort((a, b) => b.date.localeCompare(a.date));
     const latest = labsSorted[0];
     if (!latest) return null;
-    // Labs: each lab entry has a single date — build per-marker reading arrays
-    const hba1cReadings = (labData || [])
-      .filter(l => l.values["HbA1c"] != null)
-      .map(l => ({ date: l.date, value: firstNum(l.values["HbA1c"]) }));
-    const hdlReadings = (labData || [])
-      .filter(l => l.values["HDL"] != null)
-      .map(l => ({ date: l.date, value: firstNum(l.values["HDL"]) }));
-    const hba1cStreak = calcStreak(hba1cReadings, goals.HbA1c, "high");
-    const hdlStreak = calcStreak(hdlReadings, goals.HDL, "low");
     return /*#__PURE__*/React.createElement(React.Fragment, null, goals.HbA1c && latest.values["HbA1c"] != null && /*#__PURE__*/React.createElement(GoalBar, {
       label: "HbA1c",
       current: firstNum(latest.values["HbA1c"]),
       goal: goals.HbA1c,
-      unit: "%",
-      streak: hba1cStreak
+      unit: "%"
     }), goals.HDL && latest.values["HDL"] != null && /*#__PURE__*/React.createElement(GoalBar, {
       label: "HDL",
       current: firstNum(latest.values["HDL"]),
       goal: goals.HDL,
       unit: "mg/dL",
-      bad: "low",
-      streak: hdlStreak
+      bad: "low"
     }));
   })()), (() => {
     if (!goals || !journal || !journal.length) return null;
@@ -4803,7 +4686,51 @@ function App() {
     medLogs: medLogs
   }))));
 }
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+// ── AUTH GATE ─────────────────────────────────────────────────────────────────
+const root = ReactDOM.createRoot(document.getElementById('root'));
+
+function SigningIn() {
+  return React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: "100vh",
+      fontFamily: "'Inter',system-ui,sans-serif",
+      background: "#f4f6f8",
+      color: "#555",
+      gap: 16
+    }
+  },
+    React.createElement("div", { style: { fontSize: 40 } }, "❤️"),
+    React.createElement("div", { style: { fontSize: 18, fontWeight: 600, color: "#333" } }, "Health Tracker"),
+    React.createElement("div", { style: { fontSize: 14 } }, "Signing in…")
+  );
+}
+
+fbAuth.onAuthStateChanged(async (user) => {
+  if (user) {
+    // Signed in — render the app
+    root.render(React.createElement(App));
+  } else {
+    // Not signed in — show splash and trigger Google sign-in popup
+    root.render(React.createElement(SigningIn));
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await fbAuth.signInWithPopup(provider);
+      // onAuthStateChanged will fire again with the user
+    } catch (e) {
+      console.error("Sign-in failed", e);
+      root.render(React.createElement("div", {
+        style: {
+          display: "flex", alignItems: "center", justifyContent: "center",
+          minHeight: "100vh", fontFamily: "system-ui", color: "#c00", padding: 24, textAlign: "center"
+        }
+      }, "Sign-in failed. Please reload and try again. (" + (e.message || e) + ")"));
+    }
+  }
+});
   </script>
 </body>
 </html>
