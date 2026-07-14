@@ -597,6 +597,9 @@ function firstNum(v) {
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
+function nowTime() {
+  return new Date().toTimeString().slice(0, 5);
+}
 
 // ── STYLE TOKENS ──────────────────────────────────────────────────────────────
 const C = {
@@ -2042,7 +2045,8 @@ function LabsTab({
       marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement(SectionTitle, null, "GOALS"), goalMarkers.map(m => {
-    if (current.values[m] == null || goals[m] == null) return null;
+    const goalKey = m;
+    if (current.values[m] == null || goals[goalKey] == null) return null;
     const ref = LAB_REFS[m];
     return /*#__PURE__*/React.createElement(GoalBar, {
       key: m,
