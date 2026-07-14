@@ -1813,7 +1813,7 @@ function GlucoseTab({
           )
         )
       ),
-      f.readingType === "Post-meal" && /*#__PURE__*/React.createElement("div", { style: { marginBottom: 10 } },
+      f.readingType !== "Fasting" && /*#__PURE__*/React.createElement("div", { style: { marginBottom: 10 } },
         /*#__PURE__*/React.createElement("label", { style: labelSt }, "Last Meal Time"),
         /*#__PURE__*/React.createElement("input", { style: inputSt, type: "time", value: f.lastMealTime, onChange: e => setF({ ...f, lastMealTime: e.target.value }) })
       ),
