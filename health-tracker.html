@@ -431,6 +431,7 @@ const SEED_GOALS = {
   HbA1c: 5.6,
   HDL: 50,
   LDL: 80,
+  glucose: 120,
   // Nutrition targets
   caloriesWeekday: 1785,
   caloriesWeekend: 2053,
@@ -1690,7 +1691,7 @@ function LabsTab({
     setLabs(next);
     if (activeId === id) setSelected(null);
   }
-  const goalMarkers = ["HbA1c", "HDL", "LDL"];
+  const goalMarkers = ["HbA1c", "HDL", "LDL", "Glucose"];
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -1860,13 +1861,14 @@ function LabsTab({
       marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement(SectionTitle, null, "GOALS"), goalMarkers.map(m => {
-    if (current.values[m] == null || goals[m] == null) return null;
+    const goalKey = m === "Glucose" ? "glucose" : m;
+    if (current.values[m] == null || goals[goalKey] == null) return null;
     const ref = LAB_REFS[m];
     return /*#__PURE__*/React.createElement(GoalBar, {
       key: m,
       label: m,
       current: firstNum(current.values[m]),
-      goal: goals[m],
+      goal: goals[goalKey],
       unit: ref?.unit || "",
       bad: m === "HDL" ? "low" : "high"
     });
@@ -2043,6 +2045,11 @@ function GoalsTab({
   }, {
     key: "LDL",
     label: "LDL Cholesterol",
+    unit: "mg/dL",
+    bad: "high"
+  }, {
+    key: "glucose",
+    label: "Glucose",
     unit: "mg/dL",
     bad: "high"
   }];
@@ -2876,7 +2883,24 @@ function MedsTab({
       fontWeight: 600,
       cursor: "pointer"
     }
-  }, "+ Log Dose Taken")), recentLogs.length > 0 && /*#__PURE__*/React.createElement(Card, {
+  }, "+ Log Dose Taken")), active.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SectionTitle, null, "ACTIVE MEDICATIONS"), active.map(m => /*#__PURE__*/React.createElement(MedCard, {
+    key: m.id,
+    m: m
+  }))), inactive.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SectionTitle, {
+    style: {
+      marginTop: 8
+    }
+  }, "INACTIVE"), inactive.map(m => /*#__PURE__*/React.createElement(MedCard, {
+    key: m.id,
+    m: m
+  }))), meds.length === 0 && !open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      color: C.faint,
+      fontSize: 14,
+      padding: "40px 0"
+    }
+  }, "No medications added yet."), recentLogs.length > 0 && /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 14
     }
@@ -2994,24 +3018,7 @@ function MedsTab({
   })), /*#__PURE__*/React.createElement(SaveBtn, {
     onClick: saveMed,
     label: editMedId ? "Update Medication" : "Save"
-  })), active.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SectionTitle, null, "ACTIVE MEDICATIONS"), active.map(m => /*#__PURE__*/React.createElement(MedCard, {
-    key: m.id,
-    m: m
-  }))), inactive.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SectionTitle, {
-    style: {
-      marginTop: 8
-    }
-  }, "INACTIVE"), inactive.map(m => /*#__PURE__*/React.createElement(MedCard, {
-    key: m.id,
-    m: m
-  }))), meds.length === 0 && !open && /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      color: C.faint,
-      fontSize: 14,
-      padding: "40px 0"
-    }
-  }, "No medications added yet."));
+  })));
 }
 
 // ── PDF SUMMARY COMPONENT ────────────────────────────────────────────────────
@@ -3729,6 +3736,16 @@ function PDFSummary({
       met: firstNum(latestLab.values['HDL']) >= goals.HDL,
       streak: calcStreak(hdlReadings, goals.HDL, 'low')
     });
+    const glucoseReadingsExport = labs.filter(l => l.values['Glucose'] != null)
+      .map(l => ({ date: l.date, value: firstNum(l.values['Glucose']) }));
+    if (goals.glucose && latestLab && latestLab.values['Glucose'] != null) rows.push({
+      label: 'Glucose',
+      target: goals.glucose + ' mg/dL',
+      current: firstNum(latestLab.values['Glucose']) + ' mg/dL',
+      est: false,
+      met: firstNum(latestLab.values['Glucose']) <= goals.glucose,
+      streak: calcStreak(glucoseReadingsExport, goals.glucose, 'high')
+    });
     if (!rows.length) return null;
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
       style: S.h2
@@ -4298,114 +4315,75 @@ function Dashboard({
     })();
     const medLabel = medColor === "#22c55e" ? "✓ Meds" : medColor === "#ef4444" ? "⚠ Overdue" : "! Check";
     const medSub = medColor === "#22c55e" ? "All taken today" : medColor === "#ef4444" ? "Overdue" : "Pending";
-    return /*#__PURE__*/React.createElement("div", {
-      style: {
-        display: "grid",
-        gridTemplateColumns: "1fr 1fr 1fr",
-        gap: 10,
-        marginBottom: 14,
-        textAlign: "center"
-      }
-    }, latestBP && (() => {
-      const isWrist = latestBP.cuffType === "wrist-home" || latestBP.cuffType === "wrist-office";
-      const dispSys = isWrist ? latestBP.systolic + WRIST_OFFSET.systolic : latestBP.systolic;
-      const dispDia = isWrist ? latestBP.diastolic + WRIST_OFFSET.diastolic : latestBP.diastolic;
-      const prevSys = prevBP ? prevBP.cuffType === "wrist-home" || prevBP.cuffType === "wrist-office" ? prevBP.systolic + WRIST_OFFSET.systolic : prevBP.systolic : null;
-      return /*#__PURE__*/React.createElement(Card, {
-        style: {
-          cursor: "pointer"
-        },
-        onClick: () => setTab("Vitals")
-      }, /*#__PURE__*/React.createElement(SectionTitle, null, "BLOOD PRESSURE", isWrist ? " (est.)" : ""), /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 20,
-          fontWeight: 800,
-          color: C.text,
-          letterSpacing: -0.5,
-          textAlign: "center"
-        }
-      }, dispSys, "/", dispDia, /*#__PURE__*/React.createElement(Arrow, {
-        curr: dispSys,
-        prev: prevSys
-      })), /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 11,
-          color: C.faint,
-          marginBottom: 6,
-          textAlign: "center"
-        }
-      }, fmtDate(latestBP.date)), /*#__PURE__*/React.createElement("div", {
-        style: {
-          textAlign: "center"
-        }
-      }, /*#__PURE__*/React.createElement(Badge, {
-        label: bpCat(dispSys, dispDia).label,
-        color: bpCat(dispSys, dispDia).color,
-        small: true
-      })));
-    })(), latestW && (() => {
-      const isClothed = latestW.condition === "clinical" || latestW.condition === "clothed" || latestW.condition === "light";
-      const dispW = isClothed ? +(latestW.weight + CLOTHING_OFFSET).toFixed(1) : latestW.weight;
-      const prevDispW = prevW ? prevW.condition === "clinical" || prevW.condition === "clothed" || prevW.condition === "light" ? +(prevW.weight + CLOTHING_OFFSET).toFixed(1) : prevW.weight : null;
-      const b = parseFloat(bmi(dispW));
-      return /*#__PURE__*/React.createElement(Card, {
-        style: {
-          cursor: "pointer"
-        },
-        onClick: () => setTab("Weight")
-      }, /*#__PURE__*/React.createElement(SectionTitle, null, "WEIGHT", isClothed ? " (est. nude)" : ""), /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 20,
-          fontWeight: 800,
-          color: C.text,
-          textAlign: "center"
-        }
-      }, dispW, " ", /*#__PURE__*/React.createElement("span", {
-        style: {
-          fontSize: 12,
-          fontWeight: 400,
-          color: C.faint
-        }
-      }, "lb"), /*#__PURE__*/React.createElement(Arrow, {
-        curr: dispW,
-        prev: prevDispW
-      })), /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 11,
-          color: C.faint,
-          marginBottom: 6,
-          textAlign: "center"
-        }
-      }, fmtDate(latestW.date)), /*#__PURE__*/React.createElement("div", {
-        style: {
-          textAlign: "center"
-        }
-      }, /*#__PURE__*/React.createElement(Badge, {
-        label: `BMI ${b}`,
-        color: bmiCat(b).color,
-        small: true
-      })));
-    })(), /*#__PURE__*/React.createElement(Card, {
-      style: {
-        cursor: "pointer"
+    // Get latest glucose reading for hero card
+    const latestGlucose = (() => {
+      const glucoseLabs = (labData || [])
+        .filter(l => l.values["Glucose"] != null)
+        .sort((a, b) => b.date.localeCompare(a.date));
+      return glucoseLabs.length ? { date: glucoseLabs[0].date, value: firstNum(glucoseLabs[0].values["Glucose"]) } : null;
+    })();
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10, textAlign: "center" }
       },
-      onClick: () => setTab("Meds")
-    }, /*#__PURE__*/React.createElement(SectionTitle, null, "MEDICATIONS"), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 18,
-        fontWeight: 800,
-        color: medColor,
-        letterSpacing: -0.3,
-        textAlign: "center"
-      }
-    }, medLabel), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: C.faint,
-        marginTop: 4,
-        textAlign: "center"
-      }
-    }, medSub)));
+        latestBP && (() => {
+          const isWrist = latestBP.cuffType === "wrist-home" || latestBP.cuffType === "wrist-office";
+          const dispSys = isWrist ? latestBP.systolic + WRIST_OFFSET.systolic : latestBP.systolic;
+          const dispDia = isWrist ? latestBP.diastolic + WRIST_OFFSET.diastolic : latestBP.diastolic;
+          const prevSys = prevBP ? (prevBP.cuffType === "wrist-home" || prevBP.cuffType === "wrist-office" ? prevBP.systolic + WRIST_OFFSET.systolic : prevBP.systolic) : null;
+          return /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Vitals") },
+            /*#__PURE__*/React.createElement(SectionTitle, null, "BLOOD PRESSURE", isWrist ? " (est.)" : ""),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, letterSpacing: -0.5, textAlign: "center" } },
+              dispSys, "/", dispDia, /*#__PURE__*/React.createElement(Arrow, { curr: dispSys, prev: prevSys })
+            ),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6, textAlign: "center" } }, fmtDate(latestBP.date)),
+            /*#__PURE__*/React.createElement("div", { style: { textAlign: "center" } },
+              /*#__PURE__*/React.createElement(Badge, { label: bpCat(dispSys, dispDia).label, color: bpCat(dispSys, dispDia).color, small: true })
+            )
+          );
+        })(),
+        latestW && (() => {
+          const isClothed = latestW.condition === "clinical" || latestW.condition === "clothed" || latestW.condition === "light";
+          const dispW = isClothed ? +(latestW.weight + CLOTHING_OFFSET).toFixed(1) : latestW.weight;
+          const prevDispW = prevW ? (prevW.condition === "clinical" || prevW.condition === "clothed" || prevW.condition === "light" ? +(prevW.weight + CLOTHING_OFFSET).toFixed(1) : prevW.weight) : null;
+          const b = parseFloat(bmi(dispW));
+          return /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Weight") },
+            /*#__PURE__*/React.createElement(SectionTitle, null, "WEIGHT", isClothed ? " (est. nude)" : ""),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
+              dispW, " ", /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 400, color: C.faint } }, "lb"),
+              /*#__PURE__*/React.createElement(Arrow, { curr: dispW, prev: prevDispW })
+            ),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6, textAlign: "center" } }, fmtDate(latestW.date)),
+            /*#__PURE__*/React.createElement("div", { style: { textAlign: "center" } },
+              /*#__PURE__*/React.createElement(Badge, { label: `BMI ${b}`, color: bmiCat(b).color, small: true })
+            )
+          );
+        })()
+      ),
+      /*#__PURE__*/React.createElement("div", {
+        style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14, textAlign: "center" }
+      },
+        /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Meds") },
+          /*#__PURE__*/React.createElement(SectionTitle, null, "MEDICATIONS"),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: medColor, letterSpacing: -0.3, textAlign: "center" } }, medLabel),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 4, textAlign: "center" } }, medSub)
+        ),
+        latestGlucose && /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Labs") },
+          /*#__PURE__*/React.createElement(SectionTitle, null, "GLUCOSE"),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
+            latestGlucose.value, " ", /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 400, color: C.faint } }, "mg/dL")
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6, textAlign: "center" } }, fmtDate(latestGlucose.date)),
+          goals && goals.glucose && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center" } },
+            /*#__PURE__*/React.createElement(Badge, {
+              label: latestGlucose.value <= goals.glucose ? "At Goal" : "Above Goal",
+              color: latestGlucose.value <= goals.glucose ? "#22c55e" : "#f97316",
+              small: true
+            })
+          )
+        )
+      )
+    );
   })(), (() => {
     if (!goals || !journal || !journal.length) return null;
     const weekDates = getWeekBounds();
@@ -4546,8 +4524,12 @@ function Dashboard({
     const hdlReadings = (labData || [])
       .filter(l => l.values["HDL"] != null)
       .map(l => ({ date: l.date, value: firstNum(l.values["HDL"]) }));
+    const glucoseReadings = (labData || [])
+      .filter(l => l.values["Glucose"] != null)
+      .map(l => ({ date: l.date, value: firstNum(l.values["Glucose"]) }));
     const hba1cStreak = calcStreak(hba1cReadings, goals.HbA1c, "high");
     const hdlStreak = calcStreak(hdlReadings, goals.HDL, "low");
+    const glucoseStreak = calcStreak(glucoseReadings, goals.glucose, "high");
     return /*#__PURE__*/React.createElement(React.Fragment, null, goals.HbA1c && latest.values["HbA1c"] != null && /*#__PURE__*/React.createElement(GoalBar, {
       label: "HbA1c",
       current: firstNum(latest.values["HbA1c"]),
@@ -4561,6 +4543,12 @@ function Dashboard({
       unit: "mg/dL",
       bad: "low",
       streak: hdlStreak
+    }), goals.glucose && latest.values["Glucose"] != null && /*#__PURE__*/React.createElement(GoalBar, {
+      label: "Glucose",
+      current: firstNum(latest.values["Glucose"]),
+      goal: goals.glucose,
+      unit: "mg/dL",
+      streak: glucoseStreak
     }));
   })()), (() => {
     if (!goals || !journal || !journal.length) return null;
