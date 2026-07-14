@@ -4527,25 +4527,29 @@ function Dashboard({
     const glucoseReadings = (labData || [])
       .filter(l => l.values["Glucose"] != null)
       .map(l => ({ date: l.date, value: firstNum(l.values["Glucose"]) }));
+    // Find most recent lab entry that has each marker — not just the single latest panel
+    const latestGlucoseLab = glucoseReadings.sort((a, b) => b.date.localeCompare(a.date))[0];
+    const latestHbA1cLab = hba1cReadings.sort((a, b) => b.date.localeCompare(a.date))[0];
+    const latestHDLLab = hdlReadings.sort((a, b) => b.date.localeCompare(a.date))[0];
     const hba1cStreak = calcStreak(hba1cReadings, goals.HbA1c, "high");
     const hdlStreak = calcStreak(hdlReadings, goals.HDL, "low");
     const glucoseStreak = calcStreak(glucoseReadings, goals.glucose, "high");
-    return /*#__PURE__*/React.createElement(React.Fragment, null, goals.HbA1c && latest.values["HbA1c"] != null && /*#__PURE__*/React.createElement(GoalBar, {
+    return /*#__PURE__*/React.createElement(React.Fragment, null, goals.HbA1c && latestHbA1cLab && /*#__PURE__*/React.createElement(GoalBar, {
       label: "HbA1c",
-      current: firstNum(latest.values["HbA1c"]),
+      current: latestHbA1cLab.value,
       goal: goals.HbA1c,
       unit: "%",
       streak: hba1cStreak
-    }), goals.HDL && latest.values["HDL"] != null && /*#__PURE__*/React.createElement(GoalBar, {
+    }), goals.HDL && latestHDLLab && /*#__PURE__*/React.createElement(GoalBar, {
       label: "HDL",
-      current: firstNum(latest.values["HDL"]),
+      current: latestHDLLab.value,
       goal: goals.HDL,
       unit: "mg/dL",
       bad: "low",
       streak: hdlStreak
-    }), goals.glucose && latest.values["Glucose"] != null && /*#__PURE__*/React.createElement(GoalBar, {
+    }), goals.glucose && latestGlucoseLab && /*#__PURE__*/React.createElement(GoalBar, {
       label: "Glucose",
-      current: firstNum(latest.values["Glucose"]),
+      current: latestGlucoseLab.value,
       goal: goals.glucose,
       unit: "mg/dL",
       streak: glucoseStreak
