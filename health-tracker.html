@@ -4547,10 +4547,10 @@ function Dashboard({
       unit: "mg/dL",
       bad: "low",
       streak: hdlStreak
-    }), goals.glucose && latestGlucoseLab && /*#__PURE__*/React.createElement(GoalBar, {
+    }), latestGlucoseLab && (goals.glucose || SEED_GOALS.glucose) && /*#__PURE__*/React.createElement(GoalBar, {
       label: "Glucose",
       current: latestGlucoseLab.value,
-      goal: goals.glucose,
+      goal: goals.glucose || SEED_GOALS.glucose,
       unit: "mg/dL",
       streak: glucoseStreak
     }));
