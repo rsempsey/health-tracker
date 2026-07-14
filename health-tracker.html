@@ -652,9 +652,11 @@ function Badge({
 }
 function Card({
   children,
-  style
+  style,
+  onClick
 }) {
   return /*#__PURE__*/React.createElement("div", {
+    onClick: onClick,
     style: {
       background: C.card,
       border: `1px solid ${C.border}`,
