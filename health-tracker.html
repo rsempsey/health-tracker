@@ -2703,15 +2703,15 @@ function MedsTab({
         color: C.muted
       }
     }, m.dose), /*#__PURE__*/React.createElement(Badge, {
-      label: m.active ? "Active" : "Inactive",
-      color: m.active ? "#22c55e" : "#9ca3af",
+      label: m.active ? (m.startDate > today() ? "Pending" : "Active") : "Inactive",
+      color: m.active ? (m.startDate > today() ? "#f97316" : "#22c55e") : "#9ca3af",
       small: true
     })), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         color: C.faint
       }
-    }, m.frequency, " · Started ", fmtDate(m.startDate)), m.notes && /*#__PURE__*/React.createElement("div", {
+    }, m.frequency, " · ", m.active && m.startDate > today() ? "Starts " : "Started ", fmtDate(m.startDate)), m.notes && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         color: C.faint,
@@ -3031,7 +3031,7 @@ function PDFSummary({
   const latestW = wSorted[0];
   const latestLab = [...labs].sort((a, b) => b.date.localeCompare(a.date))[0];
   const allMeds = [...meds].sort((a, b) => a.name.localeCompare(b.name));
-  const activeMeds = allMeds.filter(m => m.active);
+  const activeMeds = allMeds.filter(m => m.active && m.startDate <= new Date().toISOString().slice(0,10));
   const watch = ['HbA1c', 'HDL', 'ALT', 'Glucose', 'Sodium', 'LDL', 'Triglycerides'];
   const todayStr = new Date().toLocaleDateString('en-US', {
     month: 'long',
@@ -3535,10 +3535,10 @@ function PDFSummary({
   }, fmtDate(m.startDate)), /*#__PURE__*/React.createElement("td", {
     style: {
       ...S.td,
-      color: m.active ? '#22c55e' : '#9ca3af',
+      color: m.active ? (m.startDate > today() ? '#f97316' : '#22c55e') : '#9ca3af',
       fontWeight: 600
     }
-  }, m.active ? 'Active' : 'Inactive'), /*#__PURE__*/React.createElement("td", {
+  }, m.active ? (m.startDate > today() ? 'Pending' : 'Active') : 'Inactive'), /*#__PURE__*/React.createElement("td", {
     style: {
       ...S.td,
       fontSize: 10,
@@ -3855,6 +3855,16 @@ const PRESETS = {
     adherence: false,
     nutrition: false,
     goals: false
+  },
+  'Goal Progress': {
+    hero: false,
+    bp: false,
+    weight: false,
+    labs: false,
+    meds: false,
+    adherence: false,
+    nutrition: false,
+    goals: true
   }
 };
 function ExportTab({
@@ -3935,7 +3945,7 @@ function ExportTab({
     count: meds.length,
     build: () => {
       const rows = [['Name', 'Dose', 'Frequency', 'Start Date', 'Status', 'Notes']];
-      meds.forEach(m => rows.push([m.name, m.dose || '', m.frequency, m.startDate, m.active ? 'Active' : 'Inactive', m.notes || '']));
+      meds.forEach(m => rows.push([m.name, m.dose || '', m.frequency, m.startDate, m.active ? (m.startDate > today() ? 'Pending' : 'Active') : 'Inactive', m.notes || '']));
       return makeCSV(rows);
     }
   }, {
