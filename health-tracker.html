@@ -1641,6 +1641,160 @@ function WeightTab({
   }));
 }
 
+
+// ── GLUCOSE TAB ───────────────────────────────────────────────────────────────
+function GlucoseTab({
+  glucoseLog,
+  setGlucoseLog,
+  goals
+}) {
+  const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [f, setF] = useState({ date: today(), time: nowTime(), value: "", note: "" });
+  const sorted = [...glucoseLog].sort((a, b) => (b.date + (b.time||"")).localeCompare(a.date + (a.time||"")));
+  const latest = sorted[0];
+  const prev = sorted[1];
+  const goal = goals?.glucose || SEED_GOALS.glucose;
+
+  function save() {
+    if (!f.date || f.value === "") return;
+    const entry = { ...f, value: +f.value };
+    if (editId) {
+      setGlucoseLog(glucoseLog.map(r => r.id === editId ? { ...r, ...entry } : r));
+      setEditId(null);
+    } else {
+      setGlucoseLog([...glucoseLog, { id: Date.now(), ...entry }]);
+    }
+    setF({ date: today(), time: nowTime(), value: "", note: "" });
+    setOpen(false);
+  }
+
+  function startEdit(r) {
+    setF({ date: r.date, time: r.time || "", value: String(r.value), note: r.note || "" });
+    setEditId(r.id);
+    setOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function del(id) {
+    setGlucoseLog(glucoseLog.filter(r => r.id !== id));
+  }
+
+  function glucoseColor(v) {
+    if (v <= 100) return "#22c55e";
+    if (v <= goal) return "#eab308";
+    return "#ef4444";
+  }
+
+  const chartPts = [...glucoseLog]
+    .sort((a, b) => (a.date + (a.time||"")).localeCompare(b.date + (b.time||"")))
+    .map(r => ({ date: r.date, y: r.value }));
+
+  const glucoseReadings = sorted.map(r => ({ date: r.date, value: r.value }));
+  const streak = calcStreak(glucoseReadings, goal, "high");
+
+  return /*#__PURE__*/React.createElement("div", null,
+    // Latest card
+    latest && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST · ", fmtDate(latest.date), latest.time ? " @ " + latest.time : ""),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 24, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12 } },
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 34, fontWeight: 800, color: glucoseColor(latest.value), letterSpacing: -1 } }, latest.value),
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 14, color: C.faint, marginLeft: 4 } }, "mg/dL"),
+          prev && /*#__PURE__*/React.createElement("span", {
+            style: { fontSize: 13, fontWeight: 700, color: latest.value < prev.value ? "#22c55e" : "#ef4444", marginLeft: 8 }
+          }, latest.value < prev.value ? "↓" : "↑")
+        ),
+        latest.note && /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.muted, fontStyle: "italic" } }, "📝 ", latest.note)
+      ),
+      goal && /*#__PURE__*/React.createElement(GoalBar, {
+        label: "Glucose Goal",
+        current: latest.value,
+        goal: goal,
+        unit: "mg/dL",
+        streak: streak
+      })
+    ),
+    // Trend chart
+    chartPts.length > 1 && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement(SectionTitle, null, "TREND"),
+      /*#__PURE__*/React.createElement(MiniChart, {
+        points: chartPts,
+        color: "#3b82f6",
+        goal: goal,
+        bad: "high"
+      })
+    ),
+    // Add form
+    open && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement(SectionTitle, null, editId ? "EDIT READING" : "ADD READING"),
+      /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", { style: labelSt }, "Date"),
+          /*#__PURE__*/React.createElement("input", { style: inputSt, type: "date", value: f.date, onChange: e => setF({ ...f, date: e.target.value }) })
+        ),
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", { style: labelSt }, "Time"),
+          /*#__PURE__*/React.createElement("input", { style: inputSt, type: "time", value: f.time, onChange: e => setF({ ...f, time: e.target.value }) })
+        )
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("label", { style: labelSt }, "Glucose (mg/dL)"),
+        /*#__PURE__*/React.createElement("input", { style: inputSt, type: "number", placeholder: "e.g. 112", value: f.value, onChange: e => setF({ ...f, value: e.target.value }) })
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { marginBottom: 14 } },
+        /*#__PURE__*/React.createElement("label", { style: labelSt }, "Note (optional)"),
+        /*#__PURE__*/React.createElement("input", { style: inputSt, type: "text", placeholder: "e.g. Fasting, Post-meal, Ate ice cream", value: f.note, onChange: e => setF({ ...f, note: e.target.value }) })
+      ),
+      /*#__PURE__*/React.createElement(SaveBtn, { onClick: save, label: editId ? "Update" : "Save" }),
+      editId && /*#__PURE__*/React.createElement("button", {
+        onClick: () => { setEditId(null); setF({ date: today(), time: nowTime(), value: "", note: "" }); setOpen(false); },
+        style: { marginTop: 8, width: "100%", padding: "10px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, cursor: "pointer", color: C.muted }
+      }, "Cancel")
+    ),
+    // Add / Cancel button
+    !open && /*#__PURE__*/React.createElement("button", {
+      onClick: () => { setOpen(true); setEditId(null); setF({ date: today(), time: nowTime(), value: "", note: "" }); },
+      style: { width: "100%", padding: "11px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 14 }
+    }, "+ Log Glucose Reading"),
+    open && !editId && /*#__PURE__*/React.createElement("button", {
+      onClick: () => setOpen(false),
+      style: { width: "100%", padding: "10px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, cursor: "pointer", color: C.muted, marginBottom: 14 }
+    }, "Cancel"),
+    // Readings list
+    sorted.length > 0 && /*#__PURE__*/React.createElement(Card, null,
+      /*#__PURE__*/React.createElement(SectionTitle, null, "ALL READINGS"),
+      sorted.map((r, i) => /*#__PURE__*/React.createElement("div", {
+        key: r.id,
+        style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < sorted.length - 1 ? `1px solid ${C.border}` : "none" }
+      },
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 16, fontWeight: 700, color: glucoseColor(r.value) } }, r.value, " mg/dL"),
+            r.value <= goal
+              ? /*#__PURE__*/React.createElement(Badge, { label: "At Goal", color: "#22c55e", small: true })
+              : /*#__PURE__*/React.createElement(Badge, { label: "Above Goal", color: "#f97316", small: true })
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 2 } },
+            fmtDate(r.date), r.time ? " @ " + r.time : "",
+            r.note ? /*#__PURE__*/React.createElement("span", { style: { fontStyle: "italic" } }, " · ", r.note) : null
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6 } },
+          /*#__PURE__*/React.createElement("button", {
+            onClick: () => startEdit(r),
+            style: { fontSize: 12, color: C.accent, background: "none", border: "none", cursor: "pointer", padding: "4px 6px" }
+          }, "Edit"),
+          /*#__PURE__*/React.createElement(DelBtn, { onClick: () => del(r.id) })
+        )
+      ))
+    ),
+    glucoseLog.length === 0 && !open && /*#__PURE__*/React.createElement("div", {
+      style: { textAlign: "center", color: C.faint, fontSize: 14, padding: "40px 0" }
+    }, "No glucose readings yet.")
+  );
+}
+
 // ── LABS TAB ──────────────────────────────────────────────────────────────────
 function LabsTab({
   labs,
@@ -1651,9 +1805,15 @@ function LabsTab({
   const [view, setView] = useState("panel");
   const [trendMarker, setTrendMarker] = useState("HbA1c");
   const [open, setOpen] = useState(false);
+  const [addMode, setAddMode] = useState("panel");
   const [fDate, setFDate] = useState("");
   const [fLab, setFLab] = useState("");
   const [fVals, setFVals] = useState(BLANK_VALS());
+  const [sDate, setSDate] = useState(today());
+  const [sMarker, setSMarker] = useState("HbA1c");
+  const [sValue, setSValue] = useState("");
+  const [sSource, setSSource] = useState("");
+  const ALL_MARKERS = Object.values(LAB_PANELS).flat().filter(m => m !== "Glucose");
   const sorted = [...labs].sort((a, b) => b.date.localeCompare(a.date));
   const activeId = selected ?? sorted[0]?.id;
   const current = labs.find(l => l.id === activeId) || sorted[0];
@@ -1688,12 +1848,31 @@ function LabsTab({
     setOpen(false);
     setView("panel");
   }
+  function saveSingle() {
+    if (!sDate || !sMarker || sValue === "") return;
+    const val = isNaN(+sValue) ? sValue : +sValue;
+    const nl = {
+      id: Date.now(),
+      date: sDate,
+      lab: sSource || "Home Monitor",
+      single: true,
+      values: { [sMarker]: val }
+    };
+    const next = [...labs, nl];
+    setLabs(next);
+    setSelected(nl.id);
+    setSDate(today());
+    setSValue("");
+    setSSource("Home Monitor");
+    setOpen(false);
+    setView("panel");
+  }
   function delLab(id) {
     const next = labs.filter(l => l.id !== id);
     setLabs(next);
     if (activeId === id) setSelected(null);
   }
-  const goalMarkers = ["HbA1c", "HDL", "LDL", "Glucose"];
+  const goalMarkers = ["HbA1c", "HDL", "LDL"];
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -1863,8 +2042,7 @@ function LabsTab({
       marginBottom: 12
     }
   }, /*#__PURE__*/React.createElement(SectionTitle, null, "GOALS"), goalMarkers.map(m => {
-    const goalKey = m === "Glucose" ? "glucose" : m;
-    if (current.values[m] == null || goals[goalKey] == null) return null;
+    if (current.values[m] == null || goals[m] == null) return null;
     const ref = LAB_REFS[m];
     return /*#__PURE__*/React.createElement(GoalBar, {
       key: m,
@@ -3029,6 +3207,7 @@ function PDFSummary({
   weight,
   labs,
   goals,
+  glucoseLog,
   journal,
   meds,
   medLogs,
@@ -3738,15 +3917,15 @@ function PDFSummary({
       met: firstNum(latestLab.values['HDL']) >= goals.HDL,
       streak: calcStreak(hdlReadings, goals.HDL, 'low')
     });
-    const glucoseReadingsExport = labs.filter(l => l.values['Glucose'] != null)
-      .map(l => ({ date: l.date, value: firstNum(l.values['Glucose']) }));
-    if (goals.glucose && latestLab && latestLab.values['Glucose'] != null) rows.push({
+    const glucoseReadingsExport = [...(glucoseLog || [])].map(r => ({ date: r.date, value: r.value }));
+    const latestGlucoseReading = [...glucoseReadingsExport].sort((a, b) => b.date.localeCompare(a.date))[0];
+    if ((goals.glucose || SEED_GOALS.glucose) && latestGlucoseReading) rows.push({
       label: 'Glucose',
-      target: goals.glucose + ' mg/dL',
-      current: firstNum(latestLab.values['Glucose']) + ' mg/dL',
+      target: (goals.glucose || SEED_GOALS.glucose) + ' mg/dL',
+      current: latestGlucoseReading.value + ' mg/dL',
       est: false,
-      met: firstNum(latestLab.values['Glucose']) <= goals.glucose,
-      streak: calcStreak(glucoseReadingsExport, goals.glucose, 'high')
+      met: latestGlucoseReading.value <= (goals.glucose || SEED_GOALS.glucose),
+      streak: calcStreak(glucoseReadingsExport, goals.glucose || SEED_GOALS.glucose, 'high')
     });
     if (!rows.length) return null;
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
@@ -4114,6 +4293,7 @@ function ExportTab({
     weight: weight,
     labs: labs,
     goals: goals,
+    glucoseLog: glucoseLog,
     journal: journal,
     meds: meds,
     medLogs: medLogs,
@@ -4258,7 +4438,8 @@ function Dashboard({
   goals,
   journal,
   meds,
-  medLogs
+  medLogs,
+  glucoseLog
 }) {
   const bpSorted = [...(bpData || [])].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const latestBP = bpSorted[0];
@@ -4317,12 +4498,10 @@ function Dashboard({
     })();
     const medLabel = medColor === "#22c55e" ? "✓ Meds" : medColor === "#ef4444" ? "⚠ Overdue" : "! Check";
     const medSub = medColor === "#22c55e" ? "All taken today" : medColor === "#ef4444" ? "Overdue" : "Pending";
-    // Get latest glucose reading for hero card
+    // Get latest glucose reading for hero card (from glucoseLog)
     const latestGlucose = (() => {
-      const glucoseLabs = (labData || [])
-        .filter(l => l.values["Glucose"] != null)
-        .sort((a, b) => b.date.localeCompare(a.date));
-      return glucoseLabs.length ? { date: glucoseLabs[0].date, value: firstNum(glucoseLabs[0].values["Glucose"]) } : null;
+      const sorted = [...(glucoseLog || [])].sort((a, b) => (b.date + (b.time||"")).localeCompare(a.date + (a.time||"")));
+      return sorted.length ? sorted[0] : null;
     })();
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {
@@ -4526,11 +4705,9 @@ function Dashboard({
     const hdlReadings = (labData || [])
       .filter(l => l.values["HDL"] != null)
       .map(l => ({ date: l.date, value: firstNum(l.values["HDL"]) }));
-    const glucoseReadings = (labData || [])
-      .filter(l => l.values["Glucose"] != null)
-      .map(l => ({ date: l.date, value: firstNum(l.values["Glucose"]) }));
-    // Find most recent lab entry that has each marker — not just the single latest panel
-    const latestGlucoseLab = glucoseReadings.sort((a, b) => b.date.localeCompare(a.date))[0];
+    const glucoseReadings = [...(glucoseLog || [])].map(r => ({ date: r.date, value: r.value }));
+    // Find most recent reading per marker independently
+    const latestGlucoseLab = [...glucoseReadings].sort((a, b) => b.date.localeCompare(a.date))[0];
     const latestHbA1cLab = hba1cReadings.sort((a, b) => b.date.localeCompare(a.date))[0];
     const latestHDLLab = hdlReadings.sort((a, b) => b.date.localeCompare(a.date))[0];
     const hba1cStreak = calcStreak(hba1cReadings, goals.HbA1c, "high");
@@ -4695,10 +4872,11 @@ function Dashboard({
 }
 
 // ── ROOT ──────────────────────────────────────────────────────────────────────
-const TABS = ["Dashboard", "Vitals", "Weight", "Labs", "Goals", "Nutrition", "Meds", "Export"];
+const TABS = ["Dashboard", "Vitals", "Glucose", "Weight", "Labs", "Goals", "Nutrition", "Meds", "Export"];
 const TAB_LABELS = {
   "Dashboard": "Home",
   "Vitals": "BP",
+  "Glucose": "Glucose",
   "Weight": "Wt",
   "Labs": "Labs",
   "Goals": "Goals",
@@ -4715,7 +4893,8 @@ function App() {
   const [journal, setJournal, jLoaded] = usePersistedState("nutrition-log", []);
   const [meds, setMeds, mLoaded] = usePersistedState("medications", SEED_MEDS);
   const [medLogs, setMedLogs, mlLoaded] = usePersistedState("med-logs", []);
-  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded;
+  const [glucoseLog, setGlucoseLog, glLoaded] = usePersistedState("glucose-log", []);
+  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded;
   const shared = {
     bp,
     setBp,
@@ -4730,7 +4909,9 @@ function App() {
     meds,
     setMeds,
     medLogs,
-    setMedLogs
+    setMedLogs,
+    glucoseLog,
+    setGlucoseLog
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "app-root",
@@ -4800,6 +4981,10 @@ function App() {
       display: tab === "Vitals" ? "block" : "none"
     }
   }, /*#__PURE__*/React.createElement(VitalsTab, shared)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: tab === "Glucose" ? "block" : "none"
+    }
+  }, /*#__PURE__*/React.createElement(GlucoseTab, shared)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: tab === "Weight" ? "block" : "none"
     }
