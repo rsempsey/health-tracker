@@ -3679,7 +3679,40 @@ function PDFSummary({
         fontWeight: 600
       }
     }, bpCat(n.sys, n.dia).label));
-  })))), sections.weight && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  })))), sections.glucose && glucoseLog && glucoseLog.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Glucose Readings"),
+    /*#__PURE__*/React.createElement("table", { style: S.table },
+      /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
+        /*#__PURE__*/React.createElement("th", { style: S.th }, "Date"),
+        /*#__PURE__*/React.createElement("th", { style: S.th }, "Time"),
+        /*#__PURE__*/React.createElement("th", { style: S.th }, "Value"),
+        /*#__PURE__*/React.createElement("th", { style: S.th }, "Type"),
+        /*#__PURE__*/React.createElement("th", { style: S.th }, "Elapsed"),
+        /*#__PURE__*/React.createElement("th", { style: S.th }, "Meal Note")
+      )),
+      /*#__PURE__*/React.createElement("tbody", null, [...glucoseLog].sort((a, b) => (b.date + (b.time||'')).localeCompare(a.date + (a.time||''))).map((r, i) => {
+        let elapsed = '—';
+        if (r.time && r.lastMealTime) {
+          const [rh, rm] = r.time.split(':').map(Number);
+          const [mh, mm] = r.lastMealTime.split(':').map(Number);
+          const diff = (rh * 60 + rm) - (mh * 60 + mm);
+          if (diff > 0) {
+            const h = Math.floor(diff / 60), m = diff % 60;
+            elapsed = m > 0 ? `${h}hr ${m}min` : `${h}hr`;
+          }
+        }
+        const glColor = r.value <= 99 ? '#16a34a' : r.value <= (goals?.glucose || 120) ? '#d97706' : '#dc2626';
+        return /*#__PURE__*/React.createElement("tr", { key: r.id, style: { background: i % 2 === 0 ? '#fff' : '#fafafa' } },
+          /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(r.date)),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, r.time || '—'),
+          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600, color: glColor } }, r.value, " mg/dL"),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, r.readingType || 'Random'),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, elapsed),
+          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, r.mealNote || r.note || '—')
+        );
+      }))
+    )
+  ), sections.weight && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
   }, "Weight History"), /*#__PURE__*/React.createElement("table", {
     style: S.table
@@ -4092,6 +4125,10 @@ const SECTION_DEFS = [{
   label: 'Blood Pressure History',
   desc: 'All readings with cuff type and arm equivalent'
 }, {
+  key: 'glucose',
+  label: 'Glucose Readings',
+  desc: 'All home monitor readings with type and meal context'
+}, {
   key: 'weight',
   label: 'Weight History',
   desc: 'All entries with nude equivalent'
@@ -4120,6 +4157,7 @@ const PRESETS = {
   'Doctor Visit': {
     hero: true,
     bp: true,
+    glucose: true,
     weight: true,
     labs: false,
     meds: true,
@@ -4130,6 +4168,7 @@ const PRESETS = {
   'Full Export': {
     hero: true,
     bp: true,
+    glucose: true,
     weight: true,
     labs: true,
     meds: true,
@@ -4140,6 +4179,7 @@ const PRESETS = {
   'Labs Only': {
     hero: true,
     bp: false,
+    glucose: false,
     weight: false,
     labs: true,
     meds: false,
@@ -4150,12 +4190,24 @@ const PRESETS = {
   'Goal Progress': {
     hero: false,
     bp: false,
+    glucose: false,
     weight: false,
     labs: false,
     meds: false,
     adherence: false,
     nutrition: false,
     goals: true
+  },
+  'Vitals': {
+    hero: false,
+    bp: true,
+    glucose: true,
+    weight: true,
+    labs: false,
+    meds: false,
+    adherence: false,
+    nutrition: false,
+    goals: false
   }
 };
 function ExportTab({
@@ -4163,6 +4215,7 @@ function ExportTab({
   weight,
   labs,
   goals,
+  glucoseLog,
   journal,
   meds,
   medLogs
@@ -4199,6 +4252,23 @@ function ExportTab({
       [...bp].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).forEach(r => {
         const n = r.cuffType === 'wrist-home' || r.cuffType === 'wrist-office';
         rows.push([r.date, r.time || '', r.systolic, r.diastolic, r.heartRate, r.cuffType || '', bpCat(n ? r.systolic + WRIST_OFFSET.systolic : r.systolic, n ? r.diastolic + WRIST_OFFSET.diastolic : r.diastolic).label]);
+      });
+      return makeCSV(rows);
+    }
+  }, {
+    label: 'Glucose Readings',
+    count: (glucoseLog || []).length,
+    build: () => {
+      const rows = [['Date', 'Time', 'Value (mg/dL)', 'Reading Type', 'Last Meal Time', 'Elapsed (min)', 'Meal Note']];
+      [...(glucoseLog || [])].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).forEach(r => {
+        let elapsed = '';
+        if (r.time && r.lastMealTime) {
+          const [rh, rm] = r.time.split(':').map(Number);
+          const [mh, mm] = r.lastMealTime.split(':').map(Number);
+          const diff = (rh * 60 + rm) - (mh * 60 + mm);
+          if (diff > 0) elapsed = String(diff);
+        }
+        rows.push([r.date, r.time || '', r.value, r.readingType || 'Random', r.lastMealTime || '', elapsed, r.mealNote || r.note || '']);
       });
       return makeCSV(rows);
     }
