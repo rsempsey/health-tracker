@@ -4709,17 +4709,34 @@ function SigningIn() {
   );
 }
 
+// Detect mobile browsers (iOS Chrome, iOS Safari, Android) — use redirect, not popup
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+// On page load, check if we're returning from a redirect sign-in
+fbAuth.getRedirectResult().then((result) => {
+  // result.user will be set if returning from redirect; onAuthStateChanged handles rendering
+}).catch((e) => {
+  console.error("Redirect result error", e);
+});
+
 fbAuth.onAuthStateChanged(async (user) => {
   if (user) {
     // Signed in — render the app
     root.render(React.createElement(App));
   } else {
-    // Not signed in — show splash and trigger Google sign-in popup
+    // Not signed in — show splash and trigger sign-in
     root.render(React.createElement(SigningIn));
     try {
       const provider = new firebase.auth.GoogleAuthProvider();
-      await fbAuth.signInWithPopup(provider);
-      // onAuthStateChanged will fire again with the user
+      if (isMobile) {
+        // Mobile: use redirect (popup is blocked by iOS/Android browsers)
+        await fbAuth.signInWithRedirect(provider);
+        // Page will reload; onAuthStateChanged fires after redirect completes
+      } else {
+        // Desktop: use popup
+        await fbAuth.signInWithPopup(provider);
+        // onAuthStateChanged will fire again with the user
+      }
     } catch (e) {
       console.error("Sign-in failed", e);
       root.render(React.createElement("div", {
