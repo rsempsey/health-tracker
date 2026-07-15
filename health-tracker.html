@@ -926,7 +926,8 @@ function GoalBar({
   goal,
   unit,
   bad = "high",
-  streak
+  streak,
+  note
 }) {
   if (current == null || goal == null) return null;
   const met = bad === "high" ? current <= goal : current >= goal;
@@ -992,7 +993,14 @@ function GoalBar({
       marginTop: 4,
       fontStyle: "italic"
     }
-  }, "🏆 ", streakText));
+  }, "🏆 ", streakText), note && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#6366f1",
+      marginTop: 4,
+      fontStyle: "italic"
+    }
+  }, note));
 }
 
 // ── VITALS TAB ────────────────────────────────────────────────────────────────
@@ -1144,14 +1152,16 @@ function VitalsTab({
     }
   }, /*#__PURE__*/React.createElement(SectionTitle, null, "GOALS"), /*#__PURE__*/React.createElement(GoalBar, {
     label: "Systolic BP",
-    current: latest?.systolic,
+    current: latest ? (latest.cuffType === "wrist-home" || latest.cuffType === "wrist-office" ? latest.systolic + WRIST_OFFSET.systolic : latest.systolic) : undefined,
     goal: goals.systolic,
-    unit: "mmHg"
+    unit: "mmHg",
+    note: latest && (latest.cuffType === "wrist-home" || latest.cuffType === "wrist-office") ? "Based on est. arm equivalent" : null
   }), /*#__PURE__*/React.createElement(GoalBar, {
     label: "Diastolic BP",
-    current: latest?.diastolic,
+    current: latest ? (latest.cuffType === "wrist-home" || latest.cuffType === "wrist-office" ? latest.diastolic + WRIST_OFFSET.diastolic : latest.diastolic) : undefined,
     goal: goals.diastolic,
-    unit: "mmHg"
+    unit: "mmHg",
+    note: latest && (latest.cuffType === "wrist-home" || latest.cuffType === "wrist-office") ? "Based on est. arm equivalent" : null
   })), /*#__PURE__*/React.createElement(AddBtn, {
     onClick: () => {
       if (open) {
@@ -1759,7 +1769,7 @@ function GlucoseTab({
   const streak = calcStreak(glucoseReadings, goal, "high");
 
   return /*#__PURE__*/React.createElement("div", null,
-    // Latest card
+    // Latest card (chart embedded, matching BP/Weight tabs)
     latest && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
       /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST · ", fmtDate(latest.date)),
       /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 24, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 8 } },
@@ -1788,17 +1798,28 @@ function GlucoseTab({
           elapsed && mealNote ? " · " : null,
           mealNote ? "📝 " + mealNote : null
         );
-      })()
-    ),
-    // Chart
-    chartPts.length > 1 && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
-      /*#__PURE__*/React.createElement(MiniChart, { points: chartPts, color: "#3b82f6", goal: goal, bad: "high" })
+      })(),
+      chartPts.length > 1 && /*#__PURE__*/React.createElement(MiniChart, { points: chartPts, color: "#3b82f6", goal: goal, bad: "high" })
     ),
     // Goal card
     latest && goal && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
       /*#__PURE__*/React.createElement(SectionTitle, null, "GOAL"),
       /*#__PURE__*/React.createElement(GoalBar, { label: "Glucose", current: latest.value, goal: goal, unit: "mg/dL", streak: streak })
     ),
+    // Log/Cancel toggle button
+    /*#__PURE__*/React.createElement(AddBtn, {
+      onClick: () => {
+        if (open) {
+          setOpen(false);
+          setEditId(null);
+          setF(EMPTY_F);
+        } else {
+          setF({ ...EMPTY_F, date: today(), time: nowTime() });
+          setOpen(true);
+        }
+      },
+      label: open ? "Cancel" : editId ? "Editing Reading…" : "+ Log Reading"
+    }),
     // Add / Edit form
     open && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
       /*#__PURE__*/React.createElement(SectionTitle, null, editId ? "EDIT READING" : "ADD READING"),
@@ -1834,17 +1855,8 @@ function GlucoseTab({
         /*#__PURE__*/React.createElement("label", { style: labelSt }, "Meal Note (optional)"),
         /*#__PURE__*/React.createElement("input", { style: inputSt, type: "text", placeholder: "e.g. 2hrs after burrito bowl, pre-workout", value: f.mealNote, onChange: e => setF({ ...f, mealNote: e.target.value }) })
       ),
-      /*#__PURE__*/React.createElement(SaveBtn, { onClick: save, label: editId ? "Update" : "Save" }),
-      /*#__PURE__*/React.createElement("button", {
-        onClick: () => { setEditId(null); setF(EMPTY_F); setOpen(false); },
-        style: { marginTop: 8, width: "100%", padding: "10px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 14, cursor: "pointer", color: C.muted }
-      }, "Cancel")
+      /*#__PURE__*/React.createElement(SaveBtn, { onClick: save, label: editId ? "Update" : "Save" })
     ),
-    // Log button
-    !open && /*#__PURE__*/React.createElement("button", {
-      onClick: () => { setOpen(true); setEditId(null); setF({ ...EMPTY_F, date: today(), time: nowTime() }); },
-      style: { width: "100%", padding: "11px", background: C.accent, color: "#fff", border: "none", borderRadius: 9, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 14 }
-    }, "+ Log Reading"),
     // Readings list
     sorted.length > 0 && /*#__PURE__*/React.createElement("div", null,
       /*#__PURE__*/React.createElement(SectionTitle, null, "ALL READINGS"),
@@ -3060,159 +3072,7 @@ function MedsTab({
       onClick: () => setMeds(meds.filter(x => x.id !== m.id))
     }))));
   }
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 14
-    }
-  }, /*#__PURE__*/React.createElement(SectionTitle, null, "LOG A DOSE"), active.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      color: C.faint
-    }
-  }, "Add a medication below before logging doses.") : logOpen ? /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: labelSt
-  }, "Medication"), /*#__PURE__*/React.createElement("select", {
-    style: inputSt,
-    value: lf.medId,
-    onChange: e => setLf({
-      ...lf,
-      medId: e.target.value
-    })
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "Select…"), active.map(m => /*#__PURE__*/React.createElement("option", {
-    key: m.id,
-    value: m.id
-  }, m.name, m.dose ? " " + m.dose : "")))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 10,
-      marginBottom: 10
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: labelSt
-  }, "Date"), /*#__PURE__*/React.createElement("input", {
-    style: inputSt,
-    type: "date",
-    value: lf.date,
-    onChange: e => setLf({
-      ...lf,
-      date: e.target.value
-    })
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: labelSt
-  }, "Time"), /*#__PURE__*/React.createElement("input", {
-    style: inputSt,
-    type: "time",
-    value: lf.time,
-    onChange: e => setLf({
-      ...lf,
-      time: e.target.value
-    })
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 12
-    }
-  }, /*#__PURE__*/React.createElement("label", {
-    style: labelSt
-  }, "Notes (optional)"), /*#__PURE__*/React.createElement("input", {
-    style: inputSt,
-    type: "text",
-    placeholder: "e.g. taken with food",
-    value: lf.notes,
-    onChange: e => setLf({
-      ...lf,
-      notes: e.target.value
-    })
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement(SaveBtn, {
-    onClick: saveLog
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setLogOpen(false),
-    style: {
-      flex: 1,
-      padding: "10px",
-      background: "none",
-      border: `1px solid ${C.border}`,
-      borderRadius: 8,
-      fontSize: 14,
-      cursor: "pointer",
-      color: C.muted
-    }
-  }, "Cancel"))) : /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      setLf({
-        medId: active.length === 1 ? String(active[0].id) : "",
-        date: today(),
-        time: nowTime(),
-        notes: ""
-      });
-      setLogOpen(true);
-    },
-    style: {
-      width: "100%",
-      padding: "11px",
-      background: "#22c55e",
-      color: "#fff",
-      border: "none",
-      borderRadius: 9,
-      fontSize: 14,
-      fontWeight: 600,
-      cursor: "pointer"
-    }
-  }, "+ Log Dose Taken")), active.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SectionTitle, null, "ACTIVE MEDICATIONS"), active.map(m => /*#__PURE__*/React.createElement(MedCard, {
-    key: m.id,
-    m: m
-  }))), inactive.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SectionTitle, {
-    style: {
-      marginTop: 8
-    }
-  }, "INACTIVE"), inactive.map(m => /*#__PURE__*/React.createElement(MedCard, {
-    key: m.id,
-    m: m
-  }))), meds.length === 0 && !open && /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      color: C.faint,
-      fontSize: 14,
-      padding: "40px 0"
-    }
-  }, "No medications added yet."), recentLogs.length > 0 && /*#__PURE__*/React.createElement(Card, {
-    style: {
-      marginBottom: 14
-    }
-  }, /*#__PURE__*/React.createElement(SectionTitle, null, "RECENT DOSES"), recentLogs.map(l => /*#__PURE__*/React.createElement("div", {
-    key: l.id,
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      padding: "7px 0",
-      borderBottom: `1px solid ${C.border}`
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 14,
-      fontWeight: 600,
-      color: C.text
-    }
-  }, "💊 ", l.medName, l.dose ? " " + l.dose : ""), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
-      color: C.faint
-    }
-  }, fmtDate(l.date), l.time ? " @ " + l.time : "", l.notes ? " · " + l.notes : "")), /*#__PURE__*/React.createElement(DelBtn, {
-    onClick: () => setMedLogs(medLogs.filter(x => x.id !== l.id))
-  })))), /*#__PURE__*/React.createElement(AddBtn, {
+  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(AddBtn, {
     onClick: () => {
       if (open) {
         setOpen(false);
@@ -3304,7 +3164,136 @@ function MedsTab({
   })), /*#__PURE__*/React.createElement(SaveBtn, {
     onClick: saveMed,
     label: editMedId ? "Update Medication" : "Save"
-  })));
+  })), /*#__PURE__*/React.createElement(Card, {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(SectionTitle, null, "LOG A DOSE"), active.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: C.faint
+    }
+  }, "Add a medication above before logging doses.") : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(AddBtn, {
+    onClick: () => {
+      if (logOpen) {
+        setLogOpen(false);
+      } else {
+        setLf({
+          medId: active.length === 1 ? String(active[0].id) : "",
+          date: today(),
+          time: nowTime(),
+          notes: ""
+        });
+        setLogOpen(true);
+      }
+    },
+    label: logOpen ? "Cancel" : "+ Log Dose Taken"
+  }), logOpen && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: labelSt
+  }, "Medication"), /*#__PURE__*/React.createElement("select", {
+    style: inputSt,
+    value: lf.medId,
+    onChange: e => setLf({
+      ...lf,
+      medId: e.target.value
+    })
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "Select…"), active.map(m => /*#__PURE__*/React.createElement("option", {
+    key: m.id,
+    value: m.id
+  }, m.name, m.dose ? " " + m.dose : "")))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 10,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: labelSt
+  }, "Date"), /*#__PURE__*/React.createElement("input", {
+    style: inputSt,
+    type: "date",
+    value: lf.date,
+    onChange: e => setLf({
+      ...lf,
+      date: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: labelSt
+  }, "Time"), /*#__PURE__*/React.createElement("input", {
+    style: inputSt,
+    type: "time",
+    value: lf.time,
+    onChange: e => setLf({
+      ...lf,
+      time: e.target.value
+    })
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: labelSt
+  }, "Notes (optional)"), /*#__PURE__*/React.createElement("input", {
+    style: inputSt,
+    type: "text",
+    placeholder: "e.g. taken with food",
+    value: lf.notes,
+    onChange: e => setLf({
+      ...lf,
+      notes: e.target.value
+    })
+  })), /*#__PURE__*/React.createElement(SaveBtn, {
+    onClick: saveLog
+  })))), active.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SectionTitle, null, "ACTIVE MEDICATIONS"), active.map(m => /*#__PURE__*/React.createElement(MedCard, {
+    key: m.id,
+    m: m
+  }))), inactive.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(SectionTitle, {
+    style: {
+      marginTop: 8
+    }
+  }, "INACTIVE"), inactive.map(m => /*#__PURE__*/React.createElement(MedCard, {
+    key: m.id,
+    m: m
+  }))), meds.length === 0 && !open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      color: C.faint,
+      fontSize: 14,
+      padding: "40px 0"
+    }
+  }, "No medications added yet."), recentLogs.length > 0 && /*#__PURE__*/React.createElement(Card, {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(SectionTitle, null, "RECENT DOSES"), recentLogs.map(l => /*#__PURE__*/React.createElement("div", {
+    key: l.id,
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "7px 0",
+      borderBottom: `1px solid ${C.border}`
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 600,
+      color: C.text
+    }
+  }, "💊 ", l.medName, l.dose ? " " + l.dose : ""), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.faint
+    }
+  }, fmtDate(l.date), l.time ? " @ " + l.time : "", l.notes ? " · " + l.notes : "")), /*#__PURE__*/React.createElement(DelBtn, {
+    onClick: () => setMedLogs(medLogs.filter(x => x.id !== l.id))
+  })))));
 }
 
 // ── PDF SUMMARY COMPONENT ────────────────────────────────────────────────────
@@ -4227,6 +4216,17 @@ const PRESETS = {
     goals: false
   }
 };
+const EMPTY_SECTIONS = {
+  hero: false,
+  bp: false,
+  glucose: false,
+  weight: false,
+  labs: false,
+  meds: false,
+  adherence: false,
+  nutrition: false,
+  goals: false
+};
 function ExportTab({
   bp,
   weight,
@@ -4238,8 +4238,8 @@ function ExportTab({
   medLogs
 }) {
   const [view, setView] = useState(null);
-  const [sections, setSections] = useState(PRESETS['Doctor Visit']);
-  const [activePreset, setActivePreset] = useState('Doctor Visit');
+  const [sections, setSections] = useState(EMPTY_SECTIONS);
+  const [activePreset, setActivePreset] = useState(null);
   function toggleSection(key) {
     setSections(s => ({
       ...s,
@@ -4729,7 +4729,7 @@ function Dashboard({
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: medColor, letterSpacing: -0.3, textAlign: "center" } }, medLabel),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 4, textAlign: "center" } }, medSub)
         ),
-        latestGlucose && /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Labs") },
+        latestGlucose && /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Glucose") },
           /*#__PURE__*/React.createElement(SectionTitle, null, "GLUCOSE"),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
             latestGlucose.value, " ", /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 400, color: C.faint } }, "mg/dL")
