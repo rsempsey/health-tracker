@@ -5211,35 +5211,100 @@ function SigningIn() {
   );
 }
 
+// ── MANUAL SIGN-IN (fallback shown if an auto redirect already failed once) ──
+function ManualSignIn({ onSignIn, error }) {
+  return React.createElement("div", {
+    style: {
+      display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "center", minHeight: "100vh", textAlign: "center",
+      fontFamily: "'Inter',system-ui,sans-serif",
+      background: "#f4f6f8",
+      color: "#555",
+      gap: 16,
+      padding: 24
+    }
+  },
+    React.createElement("div", { style: { fontSize: 40 } }, "❤️"),
+    React.createElement("div", { style: { fontSize: 18, fontWeight: 600, color: "#333" } }, "Health Tracker"),
+    error && React.createElement("div", { style: { fontSize: 13, color: "#c00", maxWidth: 320 } }, error),
+    React.createElement("button", {
+      onClick: onSignIn,
+      style: {
+        padding: "12px 28px", background: "#3b82f6", color: "#fff", border: "none",
+        borderRadius: 9, fontSize: 15, fontWeight: 600, cursor: "pointer"
+      }
+    }, "Sign In")
+  );
+}
+
 // ── AUTH BOOTSTRAP ────────────────────────────────────────────────────────────
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 const root = ReactDOM.createRoot(document.getElementById('root'));
+// Guards against the known iOS "Add to Home Screen" issue where Firebase's
+// pending-redirect state doesn't survive the round-trip to Google's sign-in
+// page, so onAuthStateChanged fires with no user again and (without this
+// guard) the app would immediately fire off another redirect — producing an
+// infinite flash-to-Google-and-back loop. This flag records "we already
+// tried a redirect this session"; if we land back signed-out anyway, we stop
+// auto-retrying and show a manual Sign In button instead.
+const SIGNIN_ATTEMPTED_KEY = 'ht_signin_attempted';
+
+function renderManualSignIn(error) {
+  root.render(React.createElement(ManualSignIn, {
+    error: error || null,
+    onSignIn: async () => {
+      // A real tap is a genuine user gesture, giving signInWithPopup its best
+      // chance of not being blocked (unlike the earlier auto-triggered
+      // attempt on page load, which browsers treat as non-interactive).
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await fbAuth.signInWithPopup(provider);
+      } catch (e) {
+        console.error("Manual popup sign-in failed, falling back to redirect", e);
+        try {
+          sessionStorage.setItem(SIGNIN_ATTEMPTED_KEY, '1');
+          const provider = new firebase.auth.GoogleAuthProvider();
+          await fbAuth.signInWithRedirect(provider);
+        } catch (e2) {
+          console.error("Fallback redirect sign-in failed", e2);
+          renderManualSignIn("Sign-in failed. Please try again. (" + (e2.message || e2) + ")");
+        }
+      }
+    }
+  }));
+}
 
 // Check for returning redirect result on page load
-fbAuth.getRedirectResult().catch((e) => {
+fbAuth.getRedirectResult().then((result) => {
+  if (result && result.user) {
+    sessionStorage.removeItem(SIGNIN_ATTEMPTED_KEY);
+  }
+}).catch((e) => {
   console.error("Redirect result error", e);
 });
 
 fbAuth.onAuthStateChanged(async (user) => {
   if (user) {
+    sessionStorage.removeItem(SIGNIN_ATTEMPTED_KEY);
     root.render(React.createElement(App));
   } else {
+    const alreadyAttempted = sessionStorage.getItem(SIGNIN_ATTEMPTED_KEY) === '1';
+    if (alreadyAttempted) {
+      renderManualSignIn(null);
+      return;
+    }
     root.render(React.createElement(SigningIn));
     try {
       const provider = new firebase.auth.GoogleAuthProvider();
       if (isMobile) {
+        sessionStorage.setItem(SIGNIN_ATTEMPTED_KEY, '1');
         await fbAuth.signInWithRedirect(provider);
       } else {
         await fbAuth.signInWithPopup(provider);
       }
     } catch (e) {
       console.error("Sign-in failed", e);
-      root.render(React.createElement("div", {
-        style: {
-          display: "flex", alignItems: "center", justifyContent: "center",
-          minHeight: "100vh", fontFamily: "system-ui", color: "#c00", padding: 24, textAlign: "center"
-        }
-      }, "Sign-in failed. Please reload and try again. (" + (e.message || e) + ")"));
+      renderManualSignIn("Sign-in failed. Please try again. (" + (e.message || e) + ")");
     }
   }
 });
