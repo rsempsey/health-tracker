@@ -3547,19 +3547,23 @@ function PDFSummary({
     const start = med.startDate;
     const todayISO = new Date().toISOString().slice(0, 10);
     const logs = medLogs.filter(l => l.medId === med.id && l.date >= start && l.date <= todayISO);
+    // Calendar-date based day count (midnight-anchored, inclusive of start day and today).
+    // Using a raw ms-difference with Math.ceil (the old approach) is sensitive to what time
+    // of day it happens to be, and inflates the "expected" count by an extra day before
+    // today's dose has even come due. Anchoring both dates at midnight and counting whole
+    // calendar days removes that time-of-day sensitivity.
+    const startD = new Date(start + 'T00:00:00');
+    const todayD = new Date(todayISO + 'T00:00:00');
+    const daysElapsed = Math.round((todayD - startD) / 86400000) + 1;
     if (med.frequency === 'Weekly' || med.frequency === 'weekly') {
-      const startD = new Date(start + 'T12:00:00');
-      const nowD = new Date();
-      const weeks = Math.max(1, Math.ceil((nowD - startD) / (7 * 86400000)));
+      const weeks = Math.max(1, Math.ceil(daysElapsed / 7));
       return {
         total: logs.length,
         expected: weeks,
         pct: Math.round(logs.length / weeks * 100)
       };
     }
-    const startD = new Date(start + 'T12:00:00');
-    const nowD = new Date();
-    const days = Math.max(1, Math.ceil((nowD - startD) / 86400000));
+    const days = Math.max(1, daysElapsed);
     return {
       total: logs.length,
       expected: days,
