@@ -1694,12 +1694,74 @@ function WeightTab({
 function GlucoseTab({
   glucoseLog,
   setGlucoseLog,
+  cgmSummaryLog,
+  setCgmSummaryLog,
   goals
 }) {
+  const [view, setView] = useState("meter");
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const EMPTY_F = { date: "", time: "", value: "", readingType: "Fasting", mealNote: "", lastMealTime: "" };
   const [f, setF] = useState(EMPTY_F);
+  const [cgmOpen, setCgmOpen] = useState(false);
+  const [cgmEditId, setCgmEditId] = useState(null);
+  const EMPTY_CGM = { date: "", tir: "", avgGlucose: "", gmi: "", tar: "", tbr: "", sd: "", note: "" };
+  const [cf, setCf] = useState(EMPTY_CGM);
+  const cgmSorted = [...(cgmSummaryLog || [])].sort((a, b) => b.date.localeCompare(a.date));
+  const latestCgm = cgmSorted[0];
+  const prevCgm = cgmSorted[1];
+
+  function tirColor(tir) {
+    if (tir >= 70) return "#22c55e";
+    if (tir >= 50) return "#eab308";
+    return "#ef4444";
+  }
+
+  function saveCgm() {
+    if (!cf.date || cf.tir === "") return;
+    const entry = {
+      date: cf.date,
+      tir: +cf.tir,
+      avgGlucose: cf.avgGlucose === "" ? null : +cf.avgGlucose,
+      gmi: cf.gmi === "" ? null : +cf.gmi,
+      tar: cf.tar === "" ? null : +cf.tar,
+      tbr: cf.tbr === "" ? null : +cf.tbr,
+      sd: cf.sd === "" ? null : +cf.sd,
+      note: cf.note
+    };
+    if (cgmEditId) {
+      setCgmSummaryLog(cgmSummaryLog.map(r => r.id === cgmEditId ? { ...r, ...entry } : r));
+      setCgmEditId(null);
+    } else {
+      setCgmSummaryLog([...(cgmSummaryLog || []), { id: Date.now(), ...entry }]);
+    }
+    setCf(EMPTY_CGM);
+    setCgmOpen(false);
+  }
+
+  function startEditCgm(r) {
+    setCf({
+      date: r.date,
+      tir: String(r.tir),
+      avgGlucose: r.avgGlucose != null ? String(r.avgGlucose) : "",
+      gmi: r.gmi != null ? String(r.gmi) : "",
+      tar: r.tar != null ? String(r.tar) : "",
+      tbr: r.tbr != null ? String(r.tbr) : "",
+      sd: r.sd != null ? String(r.sd) : "",
+      note: r.note || ""
+    });
+    setCgmEditId(r.id);
+    setCgmOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function delCgm(id) {
+    setCgmSummaryLog(cgmSummaryLog.filter(r => r.id !== id));
+  }
+
+  const cgmChartPts = [...(cgmSummaryLog || [])]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(r => ({ date: r.date, y: r.tir }));
   const sorted = [...glucoseLog].sort((a, b) => (b.date + (b.time||"")).localeCompare(a.date + (a.time||"")));
   const latest = sorted[0];
   const prev = sorted[1];
@@ -1769,6 +1831,20 @@ function GlucoseTab({
   const streak = calcStreak(glucoseReadings, goal, "high");
 
   return /*#__PURE__*/React.createElement("div", null,
+    // Sub-view toggle
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", gap: 6, marginBottom: 14, background: "#e9ecef", borderRadius: 10, padding: 3 }
+    },
+      /*#__PURE__*/React.createElement("button", {
+        onClick: () => setView("meter"),
+        style: { flex: 1, padding: "7px 10px", borderRadius: 7, border: "none", background: view === "meter" ? "#fff" : "transparent", color: view === "meter" ? C.text : C.muted, fontSize: 12, fontWeight: view === "meter" ? 700 : 500, cursor: "pointer", boxShadow: view === "meter" ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }
+      }, "Manual Readings"),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: () => setView("cgm"),
+        style: { flex: 1, padding: "7px 10px", borderRadius: 7, border: "none", background: view === "cgm" ? "#fff" : "transparent", color: view === "cgm" ? C.text : C.muted, fontSize: 12, fontWeight: view === "cgm" ? 700 : 500, cursor: "pointer", boxShadow: view === "cgm" ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }
+      }, "CGM Summary")
+    ),
+    view === "meter" && /*#__PURE__*/React.createElement(React.Fragment, null,
     // Latest card (chart embedded, matching BP/Weight tabs)
     latest && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
       /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST · ", fmtDate(latest.date)),
@@ -1897,6 +1973,118 @@ function GlucoseTab({
     glucoseLog.length === 0 && !open && /*#__PURE__*/React.createElement("div", {
       style: { textAlign: "center", color: C.faint, fontSize: 14, padding: "40px 0" }
     }, "No glucose readings yet.")
+    ),
+    view === "cgm" && /*#__PURE__*/React.createElement(React.Fragment, null,
+      latestCgm && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+        /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST · ", fmtDate(latestCgm.date)),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 24, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 8 } },
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 34, fontWeight: 800, color: C.text, letterSpacing: -1 } }, latestCgm.tir),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 14, color: C.faint, marginLeft: 4 } }, "% TIR"),
+            prevCgm && /*#__PURE__*/React.createElement("span", {
+              style: { fontSize: 13, fontWeight: 700, color: latestCgm.tir > prevCgm.tir ? "#22c55e" : "#ef4444", marginLeft: 8 }
+            }, latestCgm.tir > prevCgm.tir ? "↑" : "↓")
+          ),
+          /*#__PURE__*/React.createElement(Badge, { label: latestCgm.tir >= 70 ? "On Target" : latestCgm.tir >= 50 ? "Below Target" : "Well Below Target", color: tirColor(latestCgm.tir), small: true })
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: C.faint, marginBottom: 8 } },
+          latestCgm.avgGlucose != null && /*#__PURE__*/React.createElement("span", null, "Avg ", latestCgm.avgGlucose, " mg/dL"),
+          latestCgm.gmi != null && /*#__PURE__*/React.createElement("span", null, "GMI ", latestCgm.gmi, "%"),
+          latestCgm.tar != null && /*#__PURE__*/React.createElement("span", null, "TAR ", latestCgm.tar, "%"),
+          latestCgm.tbr != null && /*#__PURE__*/React.createElement("span", null, "TBR ", latestCgm.tbr, "%"),
+          latestCgm.sd != null && /*#__PURE__*/React.createElement("span", null, "SD ", latestCgm.sd)
+        ),
+        latestCgm.note && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.muted, fontStyle: "italic", marginBottom: 8 } }, "📝 ", latestCgm.note),
+        cgmChartPts.length > 1 && /*#__PURE__*/React.createElement(MiniChart, { points: cgmChartPts, color: "#3b82f6", goal: 70, bad: "low" })
+      ),
+      /*#__PURE__*/React.createElement(AddBtn, {
+        onClick: () => {
+          if (cgmOpen) {
+            setCgmOpen(false);
+            setCgmEditId(null);
+            setCf(EMPTY_CGM);
+          } else {
+            setCf({ ...EMPTY_CGM, date: today() });
+            setCgmOpen(true);
+          }
+        },
+        label: cgmOpen ? "Cancel" : cgmEditId ? "Editing Summary…" : "+ Log CGM Summary"
+      }),
+      cgmOpen && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+        /*#__PURE__*/React.createElement(SectionTitle, null, cgmEditId ? "EDIT CGM SUMMARY" : "ADD CGM SUMMARY"),
+        /*#__PURE__*/React.createElement("div", { style: { marginBottom: 10 } },
+          /*#__PURE__*/React.createElement("label", { style: labelSt }, "Date"),
+          /*#__PURE__*/React.createElement("input", { style: inputSt, type: "date", value: cf.date, onChange: e => setCf({ ...cf, date: e.target.value }) })
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 } },
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("label", { style: labelSt }, "Time in Range (%)"),
+            /*#__PURE__*/React.createElement("input", { style: inputSt, type: "number", placeholder: "e.g. 78", value: cf.tir, onChange: e => setCf({ ...cf, tir: e.target.value }) })
+          ),
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("label", { style: labelSt }, "Avg Glucose (mg/dL)"),
+            /*#__PURE__*/React.createElement("input", { style: inputSt, type: "number", placeholder: "e.g. 118", value: cf.avgGlucose, onChange: e => setCf({ ...cf, avgGlucose: e.target.value }) })
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 } },
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("label", { style: labelSt }, "GMI (%, optional)"),
+            /*#__PURE__*/React.createElement("input", { style: inputSt, type: "number", step: "0.1", placeholder: "e.g. 5.9", value: cf.gmi, onChange: e => setCf({ ...cf, gmi: e.target.value }) })
+          ),
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("label", { style: labelSt }, "Std Deviation (optional)"),
+            /*#__PURE__*/React.createElement("input", { style: inputSt, type: "number", placeholder: "e.g. 22", value: cf.sd, onChange: e => setCf({ ...cf, sd: e.target.value }) })
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 } },
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("label", { style: labelSt }, "Time Above Range (%, optional)"),
+            /*#__PURE__*/React.createElement("input", { style: inputSt, type: "number", placeholder: "e.g. 18", value: cf.tar, onChange: e => setCf({ ...cf, tar: e.target.value }) })
+          ),
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("label", { style: labelSt }, "Time Below Range (%, optional)"),
+            /*#__PURE__*/React.createElement("input", { style: inputSt, type: "number", placeholder: "e.g. 4", value: cf.tbr, onChange: e => setCf({ ...cf, tbr: e.target.value }) })
+          )
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { marginBottom: 14 } },
+          /*#__PURE__*/React.createElement("label", { style: labelSt }, "Note (optional)"),
+          /*#__PURE__*/React.createElement("input", { style: inputSt, type: "text", placeholder: "e.g. sensor day 3, high carb week", value: cf.note, onChange: e => setCf({ ...cf, note: e.target.value }) })
+        ),
+        /*#__PURE__*/React.createElement(SaveBtn, { onClick: saveCgm, label: cgmEditId ? "Update" : "Save" })
+      ),
+      cgmSorted.length > 0 && /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement(SectionTitle, null, "ALL SUMMARIES"),
+        cgmSorted.map(r => /*#__PURE__*/React.createElement("div", {
+          key: r.id,
+          style: { background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", marginBottom: 8 }
+        },
+          /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } },
+            /*#__PURE__*/React.createElement("div", null,
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 4 } }, fmtDate(r.date)),
+              /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 4 } },
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: C.text } }, r.tir, "% TIR"),
+                /*#__PURE__*/React.createElement(Badge, { label: r.tir >= 70 ? "On Target" : r.tir >= 50 ? "Below Target" : "Well Below Target", color: tirColor(r.tir), small: true })
+              ),
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint } },
+                r.avgGlucose != null ? "Avg " + r.avgGlucose + " mg/dL" : null,
+                r.gmi != null ? " · GMI " + r.gmi + "%" : null
+              ),
+              r.note && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, fontStyle: "italic" } }, r.note)
+            ),
+            /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" } },
+              /*#__PURE__*/React.createElement("button", {
+                onClick: () => startEditCgm(r),
+                style: { fontSize: 11, color: C.accent, background: "none", border: `1px solid ${C.border}`, borderRadius: 6, cursor: "pointer", padding: "2px 8px", fontWeight: 600 }
+              }, "Edit"),
+              /*#__PURE__*/React.createElement(DelBtn, { onClick: () => delCgm(r.id) })
+            )
+          )
+        ))
+      ),
+      (!cgmSummaryLog || cgmSummaryLog.length === 0) && !cgmOpen && /*#__PURE__*/React.createElement("div", {
+        style: { textAlign: "center", color: C.faint, fontSize: 14, padding: "40px 0" }
+      }, "No CGM summaries yet.")
+    )
   );
 }
 
@@ -4619,7 +4807,8 @@ function Dashboard({
   journal,
   meds,
   medLogs,
-  glucoseLog
+  glucoseLog,
+  cgmSummaryLog
 }) {
   const bpSorted = [...(bpData || [])].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const latestBP = bpSorted[0];
@@ -4683,7 +4872,26 @@ function Dashboard({
       const sorted = [...(glucoseLog || [])].sort((a, b) => (b.date + (b.time||"")).localeCompare(a.date + (a.time||"")));
       return sorted.length ? sorted[0] : null;
     })();
+    // Get latest CGM summary for hero card
+    const latestCgmSummary = (() => {
+      const sorted = [...(cgmSummaryLog || [])].sort((a, b) => b.date.localeCompare(a.date));
+      return sorted.length ? sorted[0] : null;
+    })();
+    function tirHeroColor(tir) {
+      if (tir >= 70) return "#22c55e";
+      if (tir >= 50) return "#eab308";
+      return "#ef4444";
+    }
     return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", {
+        style: { marginBottom: 10, textAlign: "center" }
+      },
+        /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Meds") },
+          /*#__PURE__*/React.createElement(SectionTitle, null, "MEDICATIONS"),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: medColor, letterSpacing: -0.3, textAlign: "center" } }, medLabel),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 4, textAlign: "center" } }, medSub)
+        )
+      ),
       /*#__PURE__*/React.createElement("div", {
         style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10, textAlign: "center" }
       },
@@ -4724,10 +4932,19 @@ function Dashboard({
       /*#__PURE__*/React.createElement("div", {
         style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14, textAlign: "center" }
       },
-        /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Meds") },
-          /*#__PURE__*/React.createElement(SectionTitle, null, "MEDICATIONS"),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: medColor, letterSpacing: -0.3, textAlign: "center" } }, medLabel),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 4, textAlign: "center" } }, medSub)
+        latestCgmSummary && /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Glucose") },
+          /*#__PURE__*/React.createElement(SectionTitle, null, "CGM · TIME IN RANGE"),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
+            latestCgmSummary.tir, " ", /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 400, color: C.faint } }, "%")
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6, textAlign: "center" } }, fmtDate(latestCgmSummary.date)),
+          /*#__PURE__*/React.createElement("div", { style: { textAlign: "center" } },
+            /*#__PURE__*/React.createElement(Badge, {
+              label: latestCgmSummary.tir >= 70 ? "On Target" : latestCgmSummary.tir >= 50 ? "Below Target" : "Well Below Target",
+              color: tirHeroColor(latestCgmSummary.tir),
+              small: true
+            })
+          )
         ),
         latestGlucose && /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Glucose") },
           /*#__PURE__*/React.createElement(SectionTitle, null, "GLUCOSE"),
@@ -5074,7 +5291,8 @@ function App() {
   const [meds, setMeds, mLoaded] = usePersistedState("medications", SEED_MEDS);
   const [medLogs, setMedLogs, mlLoaded] = usePersistedState("med-logs", []);
   const [glucoseLog, setGlucoseLog, glLoaded] = usePersistedState("glucose-log", []);
-  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded;
+  const [cgmSummaryLog, setCgmSummaryLog, cgmLoaded] = usePersistedState("cgm-summary-log", []);
+  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded && cgmLoaded;
   const shared = {
     bp,
     setBp,
@@ -5091,7 +5309,9 @@ function App() {
     medLogs,
     setMedLogs,
     glucoseLog,
-    setGlucoseLog
+    setGlucoseLog,
+    cgmSummaryLog,
+    setCgmSummaryLog
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "app-root",
