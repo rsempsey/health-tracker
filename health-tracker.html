@@ -3491,6 +3491,7 @@ function PDFSummary({
   labs,
   goals,
   glucoseLog,
+  cgmSummaryLog,
   journal,
   meds,
   medLogs,
@@ -3501,6 +3502,19 @@ function PDFSummary({
   const latestBP = bpSorted[0];
   const latestW = wSorted[0];
   const latestLab = [...labs].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const latestGlucose = (() => {
+    const sorted = [...(glucoseLog || [])].sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
+    return sorted.length ? sorted[0] : null;
+  })();
+  const latestCgmSummary = (() => {
+    const sorted = [...(cgmSummaryLog || [])].sort((a, b) => b.date.localeCompare(a.date));
+    return sorted.length ? sorted[0] : null;
+  })();
+  function tirHeroColor(tir) {
+    if (tir >= 70) return "#22c55e";
+    if (tir >= 50) return "#eab308";
+    return "#ef4444";
+  }
   const allMeds = [...meds].sort((a, b) => a.name.localeCompare(b.name));
   const activeMeds = allMeds.filter(m => m.active && m.startDate <= today());
   const watch = ['HbA1c', 'HDL', 'ALT', 'Glucose', 'Sodium', 'LDL', 'Triglycerides'];
@@ -3653,29 +3667,32 @@ function PDFSummary({
       margin: '16px 0'
     },
     statBox: {
-      background: '#f8fafc',
+      background: '#fff',
       border: '1px solid #e5e7eb',
-      borderRadius: 6,
-      padding: '10px 12px'
+      borderRadius: 12,
+      padding: '16px 18px',
+      textAlign: 'center'
     },
     statLbl: {
-      fontSize: 9,
+      fontSize: 11,
       fontWeight: 700,
       textTransform: 'uppercase',
       letterSpacing: 0.8,
-      color: '#6b7280',
-      marginBottom: 3
+      color: '#9ca3af',
+      marginBottom: 10
     },
     statVal: {
       fontSize: 20,
       fontWeight: 800,
       letterSpacing: -0.5,
-      lineHeight: 1.1
+      lineHeight: 1.1,
+      color: '#111827'
     },
     statSub: {
-      fontSize: 9,
+      fontSize: 11,
       color: '#9ca3af',
-      marginTop: 3
+      marginTop: 3,
+      marginBottom: 6
     },
     note: {
       marginTop: 24,
@@ -3708,24 +3725,26 @@ function PDFSummary({
   function StatBox({
     label,
     value,
-    sub,
-    color,
-    est
+    date,
+    est,
+    badgeLabel,
+    badgeColor
   }) {
     return /*#__PURE__*/React.createElement("div", {
       style: S.statBox
     }, /*#__PURE__*/React.createElement("div", {
       style: S.statLbl
     }, label), /*#__PURE__*/React.createElement("div", {
-      style: {
-        ...S.statVal,
-        color: color || '#111827'
-      }
+      style: S.statVal
     }, value), est && /*#__PURE__*/React.createElement("div", {
       style: S.est
-    }, est), sub && /*#__PURE__*/React.createElement("div", {
+    }, est), date && /*#__PURE__*/React.createElement("div", {
       style: S.statSub
-    }, sub));
+    }, date), badgeLabel && /*#__PURE__*/React.createElement(Badge, {
+      label: badgeLabel,
+      color: badgeColor,
+      small: true
+    }));
   }
 
   // Medication adherence summary
@@ -3797,26 +3816,31 @@ function PDFSummary({
   }, todayStr)))), sections.hero && /*#__PURE__*/React.createElement("div", {
     style: S.hero
   }, latestNormBP && /*#__PURE__*/React.createElement(StatBox, {
-    label: "Blood Pressure",
+    label: "Blood Pressure" + (latestNormBP.isEst ? " (est.)" : ""),
     value: latestNormBP.sys + '/' + latestNormBP.dia,
-    sub: fmtDate(latestBP.date) + ' · ' + bpCat(latestNormBP.sys, latestNormBP.dia).label,
+    date: fmtDate(latestBP.date),
     est: latestNormBP.isEst ? 'Est. arm equivalent' : null,
-    color: bpCat(latestNormBP.sys, latestNormBP.dia).color
+    badgeLabel: bpCat(latestNormBP.sys, latestNormBP.dia).label,
+    badgeColor: bpCat(latestNormBP.sys, latestNormBP.dia).color
   }), latestNormW && /*#__PURE__*/React.createElement(StatBox, {
-    label: "Weight",
+    label: "Weight" + (latestNormW.isEst ? " (est. nude)" : ""),
     value: latestNormW.w + ' lb',
-    sub: fmtDate(latestW.date) + ' · BMI ' + bmi(latestNormW.w),
-    est: latestNormW.isEst ? 'Est. nude equivalent' : null
-  }), latestLab && latestLab.values['HbA1c'] != null && /*#__PURE__*/React.createElement(StatBox, {
-    label: "HbA1c",
-    value: firstNum(latestLab.values['HbA1c']) + '%',
-    sub: fmtDate(latestLab.date) + ' · Goal: 5.6%',
-    color: "#dc2626"
-  }), latestLab && latestLab.values['HDL'] != null && /*#__PURE__*/React.createElement(StatBox, {
-    label: "HDL Cholesterol",
-    value: firstNum(latestLab.values['HDL']) + ' mg/dL',
-    sub: fmtDate(latestLab.date) + ' · Goal: 50+',
-    color: "#2563eb"
+    date: fmtDate(latestW.date),
+    est: latestNormW.isEst ? 'Est. nude equivalent' : null,
+    badgeLabel: 'BMI ' + bmi(latestNormW.w),
+    badgeColor: bmiCat(parseFloat(bmi(latestNormW.w))).color
+  }), latestCgmSummary && /*#__PURE__*/React.createElement(StatBox, {
+    label: "CGM · Time in Range",
+    value: latestCgmSummary.tir + '%',
+    date: fmtDate(latestCgmSummary.date),
+    badgeLabel: latestCgmSummary.tir >= 70 ? "On Target" : latestCgmSummary.tir >= 50 ? "Below Target" : "Well Below Target",
+    badgeColor: tirHeroColor(latestCgmSummary.tir)
+  }), latestGlucose && /*#__PURE__*/React.createElement(StatBox, {
+    label: "Glucose",
+    value: latestGlucose.value + ' mg/dL',
+    date: fmtDate(latestGlucose.date),
+    badgeLabel: goals && goals.glucose ? (latestGlucose.value <= goals.glucose ? "At Goal" : "Above Goal") : null,
+    badgeColor: goals && goals.glucose ? (latestGlucose.value <= goals.glucose ? "#22c55e" : "#f97316") : null
   })), sections.bp && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
   }, "Blood Pressure History"), /*#__PURE__*/React.createElement("table", {
@@ -4313,7 +4337,7 @@ function PDFSummary({
 const SECTION_DEFS = [{
   key: 'hero',
   label: 'Summary Stats',
-  desc: 'Latest BP, weight, HbA1c, HDL'
+  desc: 'Latest BP, weight, CGM time in range, glucose'
 }, {
   key: 'bp',
   label: 'Blood Pressure History',
@@ -4402,6 +4426,17 @@ const PRESETS = {
     adherence: false,
     nutrition: false,
     goals: false
+  },
+  'Current Snapshot': {
+    hero: true,
+    bp: false,
+    glucose: false,
+    weight: false,
+    labs: false,
+    meds: false,
+    adherence: false,
+    nutrition: false,
+    goals: false
   }
 };
 const EMPTY_SECTIONS = {
@@ -4421,6 +4456,7 @@ function ExportTab({
   labs,
   goals,
   glucoseLog,
+  cgmSummaryLog,
   journal,
   meds,
   medLogs
@@ -4662,6 +4698,7 @@ function ExportTab({
     labs: labs,
     goals: goals,
     glucoseLog: glucoseLog,
+    cgmSummaryLog: cgmSummaryLog,
     journal: journal,
     meds: meds,
     medLogs: medLogs,
