@@ -610,6 +610,11 @@ function localDateStr(d) {
 function today() {
   return localDateStr(new Date());
 }
+function yesterday() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return localDateStr(d);
+}
 function nowTime() {
   return new Date().toTimeString().slice(0, 5);
 }
@@ -1007,7 +1012,8 @@ function GoalBar({
 function VitalsTab({
   bp: readings,
   setBp: setReadings,
-  goals
+  goals,
+  healthkitDailyLog
 }) {
   const [open, setOpen] = useState(false);
   const [f, setF] = useState({
@@ -1073,6 +1079,8 @@ function VitalsTab({
     y: r.cuffType === "wrist-home" || r.cuffType === "wrist-office" ? r.systolic + WRIST_OFFSET.systolic : r.systolic
   }));
   const bp = latest ? bpCat(latest.systolic, latest.diastolic) : null;
+  const hkSorted = [...(healthkitDailyLog || [])].sort((a, b) => b.date.localeCompare(a.date));
+  const latestHR = hkSorted.find(d => d.restingHeartRate != null);
   return /*#__PURE__*/React.createElement("div", null, latest && /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 14
@@ -1146,7 +1154,15 @@ function VitalsTab({
     color: bp.color,
     goal: goals?.systolic,
     unit: "mmHg"
-  })), goals && (latest || prev) && /*#__PURE__*/React.createElement(Card, {
+  })), latestHR && /*#__PURE__*/React.createElement(Card, {
+    style: { marginBottom: 14 }
+  }, /*#__PURE__*/React.createElement(SectionTitle, null, "RESTING HEART RATE"),
+    /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 6 } },
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 28, fontWeight: 800, color: C.text } }, Math.round(latestHR.restingHeartRate)),
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, color: C.faint } }, "bpm"),
+      /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: C.faint, marginLeft: 6 } }, fmtDate(latestHR.date))
+    )
+  ), goals && (latest || prev) && /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 14
     }
@@ -1696,6 +1712,7 @@ function GlucoseTab({
   setGlucoseLog,
   cgmSummaryLog,
   setCgmSummaryLog,
+  cgmSummaryDraft,
   goals
 }) {
   const [view, setView] = useState("meter");
@@ -2004,7 +2021,23 @@ function GlucoseTab({
             setCgmEditId(null);
             setCf(EMPTY_CGM);
           } else {
-            setCf({ ...EMPTY_CGM, date: today() });
+            const yd = yesterday();
+            const draft = (cgmSummaryDraft || []).find(d => d.date === yd);
+            if (draft) {
+              setCf({
+                ...EMPTY_CGM,
+                date: yd,
+                tir: draft.tir != null ? String(Math.round(draft.tir)) : "",
+                avgGlucose: draft.avgGlucose != null ? String(Math.round(draft.avgGlucose)) : "",
+                gmi: draft.gmi != null ? String(draft.gmi.toFixed(1)) : "",
+                tar: draft.tar != null ? String(Math.round(draft.tar)) : "",
+                tbr: draft.tbr != null ? String(Math.round(draft.tbr)) : "",
+                sd: draft.sd != null ? String(Math.round(draft.sd)) : "",
+                note: "Pre-filled from HealthKit — please confirm before saving"
+              });
+            } else {
+              setCf({ ...EMPTY_CGM, date: yd });
+            }
             setCgmOpen(true);
           }
         },
@@ -5305,13 +5338,103 @@ function Dashboard({
   })());
 }
 
+
+// ── ACTIVITY TAB (Sleep, Steps, Active Energy — display-only, from HealthKitBridge) ──
+function ActivityTab({ healthkitDailyLog }) {
+  const sorted = [...(healthkitDailyLog || [])].sort((a, b) => b.date.localeCompare(a.date));
+  const latest = sorted[0];
+  const recent = sorted.slice(0, 14);
+  return /*#__PURE__*/React.createElement("div", null,
+    !latest && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.faint } },
+        "No Activity data yet — this fills in automatically when you tap \"Push to Web App\" in HealthTrackerBridge.")
+    ),
+    latest && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST · ", fmtDate(latest.date)),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 24, flexWrap: "wrap" } },
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 26, fontWeight: 800, color: C.text } },
+            latest.sleepMinutes != null ? `${Math.floor(latest.sleepMinutes / 60)}h ${latest.sleepMinutes % 60}m` : "—"),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "Sleep")
+        ),
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 26, fontWeight: 800, color: C.text } },
+            latest.steps != null ? latest.steps.toLocaleString() : "—"),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "Steps")
+        ),
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 26, fontWeight: 800, color: C.text } },
+            latest.activeEnergyKcal != null ? Math.round(latest.activeEnergyKcal) : "—"),
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "Active kcal")
+        )
+      )
+    ),
+    recent.length > 0 && /*#__PURE__*/React.createElement(Card, null,
+      /*#__PURE__*/React.createElement(SectionTitle, null, "RECENT DAYS"),
+      recent.map(d => /*#__PURE__*/React.createElement("div", {
+        key: d.date,
+        style: { display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${C.border}`, fontSize: 13 }
+      },
+        /*#__PURE__*/React.createElement("span", { style: { color: C.muted } }, fmtDate(d.date)),
+        /*#__PURE__*/React.createElement("span", { style: { color: C.text } },
+          (d.sleepMinutes != null ? `${Math.floor(d.sleepMinutes / 60)}h ${d.sleepMinutes % 60}m` : "—"),
+          "  ·  ",
+          (d.steps != null ? d.steps.toLocaleString() : "—"), " steps",
+          "  ·  ",
+          (d.activeEnergyKcal != null ? Math.round(d.activeEnergyKcal) : "—"), " kcal"
+        )
+      ))
+    )
+  );
+}
+
+// ── WATER TAB (display-only, from HealthKitBridge) ──
+function WaterTab({ healthkitDailyLog, goals }) {
+  const sorted = [...(healthkitDailyLog || [])].sort((a, b) => b.date.localeCompare(a.date));
+  const latest = sorted[0];
+  const recent = sorted.slice(0, 14);
+  const goal = goals?.water;
+  const chartPts = [...(healthkitDailyLog || [])]
+    .filter(d => d.waterOz != null)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(d => ({ date: d.date, y: d.waterOz }));
+  return /*#__PURE__*/React.createElement("div", null,
+    !latest && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.faint } },
+        "No Water data yet — this fills in automatically when you tap \"Push to Web App\" in HealthTrackerBridge.")
+    ),
+    latest && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST · ", fmtDate(latest.date)),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 34, fontWeight: 800, color: C.text, letterSpacing: -1 } },
+          latest.waterOz != null ? Math.round(latest.waterOz) : "—"),
+        /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, color: C.faint } }, "oz"),
+        goal && /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: C.faint } }, "of ", goal, " oz goal")
+      ),
+      chartPts.length >= 2 && /*#__PURE__*/React.createElement(MiniChart, { points: chartPts, color: "#06b6d4", goal: goal, unit: "oz" })
+    ),
+    recent.length > 0 && /*#__PURE__*/React.createElement(Card, null,
+      /*#__PURE__*/React.createElement(SectionTitle, null, "RECENT DAYS"),
+      recent.map(d => /*#__PURE__*/React.createElement("div", {
+        key: d.date,
+        style: { display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${C.border}`, fontSize: 13 }
+      },
+        /*#__PURE__*/React.createElement("span", { style: { color: C.muted } }, fmtDate(d.date)),
+        /*#__PURE__*/React.createElement("span", { style: { color: C.text } }, d.waterOz != null ? `${Math.round(d.waterOz)} oz` : "—")
+      ))
+    )
+  );
+}
+
 // ── ROOT ──────────────────────────────────────────────────────────────────────
-const TABS = ["Dashboard", "Vitals", "Glucose", "Weight", "Labs", "Goals", "Nutrition", "Meds", "Export"];
+const TABS = ["Dashboard", "Vitals", "Glucose", "Weight", "Activity", "Water", "Labs", "Goals", "Meds", "Export"];
 const TAB_LABELS = {
   "Dashboard": "Home",
   "Vitals": "BP",
   "Glucose": "Glucose",
   "Weight": "Wt",
+  "Activity": "Activity",
+  "Water": "Water",
   "Labs": "Labs",
   "Goals": "Goals",
   "Nutrition": "Nutrition",
@@ -5329,7 +5452,9 @@ function App() {
   const [medLogs, setMedLogs, mlLoaded] = usePersistedState("med-logs", []);
   const [glucoseLog, setGlucoseLog, glLoaded] = usePersistedState("glucose-log", []);
   const [cgmSummaryLog, setCgmSummaryLog, cgmLoaded] = usePersistedState("cgm-summary-log", []);
-  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded && cgmLoaded;
+  const [healthkitDailyLog, setHealthkitDailyLog, hkdlLoaded] = usePersistedState("healthkit-daily-log", []);
+  const [cgmSummaryDraft, setCgmSummaryDraft, cgmDraftLoaded] = usePersistedState("cgm-summary-draft", []);
+  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded && cgmLoaded && hkdlLoaded && cgmDraftLoaded;
   const shared = {
     bp,
     setBp,
@@ -5348,7 +5473,11 @@ function App() {
     glucoseLog,
     setGlucoseLog,
     cgmSummaryLog,
-    setCgmSummaryLog
+    setCgmSummaryLog,
+    healthkitDailyLog,
+    setHealthkitDailyLog,
+    cgmSummaryDraft,
+    setCgmSummaryDraft
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "app-root",
@@ -5426,6 +5555,14 @@ function App() {
       display: tab === "Weight" ? "block" : "none"
     }
   }, /*#__PURE__*/React.createElement(WeightTab, shared)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: tab === "Activity" ? "block" : "none"
+    }
+  }, /*#__PURE__*/React.createElement(ActivityTab, shared)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: tab === "Water" ? "block" : "none"
+    }
+  }, /*#__PURE__*/React.createElement(WaterTab, shared)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: tab === "Labs" ? "block" : "none"
     }
