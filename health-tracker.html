@@ -5236,11 +5236,11 @@ function Dashboard({
           /*#__PURE__*/React.createElement("div", {
             style: {
               fontSize: 18, fontWeight: 800, letterSpacing: -0.3, textAlign: "center",
-              color: (goals?.water && latestDaily.waterOz >= goals.water) ? "#22c55e" : C.text
+              color: goals?.water ? (latestDaily.waterOz >= goals.water ? "#22c55e" : "#ef4444") : C.text
             }
-          }, Math.round(latestDaily.waterOz), " oz"),
+          }, goals?.water ? (latestDaily.waterOz >= goals.water ? "✓ Goal Met" : "✗ Not Yet") : `${Math.round(latestDaily.waterOz)} oz`),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 4, textAlign: "center" } },
-            goals?.water ? `of ${goals.water} oz goal` : fmtDate(latestDaily.date)
+            goals?.water ? `${Math.round(latestDaily.waterOz)} of ${goals.water} oz` : fmtDate(latestDaily.date)
           )
         )
       )
