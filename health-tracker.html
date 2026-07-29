@@ -5349,24 +5349,29 @@ function ActivityTab({ healthkitDailyLog }) {
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.faint } },
         "No Activity data yet — this fills in automatically when you tap \"Push to Web App\" in HealthTrackerBridge.")
     ),
-    latest && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
-      /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST · ", fmtDate(latest.date)),
-      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 24, flexWrap: "wrap" } },
-        /*#__PURE__*/React.createElement("div", null,
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 26, fontWeight: 800, color: C.text } },
-            latest.sleepMinutes != null ? `${Math.floor(latest.sleepMinutes / 60)}h ${latest.sleepMinutes % 60}m` : "—"),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "Sleep")
+    latest && /*#__PURE__*/React.createElement("div", {
+      style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14, textAlign: "center" }
+    },
+      /*#__PURE__*/React.createElement(Card, null,
+        /*#__PURE__*/React.createElement(SectionTitle, null, "SLEEP"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
+          latest.sleepMinutes != null ? `${Math.floor(latest.sleepMinutes / 60)}h ${latest.sleepMinutes % 60}m` : "—"
         ),
-        /*#__PURE__*/React.createElement("div", null,
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 26, fontWeight: 800, color: C.text } },
-            latest.steps != null ? latest.steps.toLocaleString() : "—"),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "Steps")
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, textAlign: "center" } }, fmtDate(latest.date))
+      ),
+      /*#__PURE__*/React.createElement(Card, null,
+        /*#__PURE__*/React.createElement(SectionTitle, null, "STEPS"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
+          latest.steps != null ? latest.steps.toLocaleString() : "—"
         ),
-        /*#__PURE__*/React.createElement("div", null,
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 26, fontWeight: 800, color: C.text } },
-            latest.activeEnergyKcal != null ? Math.round(latest.activeEnergyKcal) : "—"),
-          /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "Active kcal")
-        )
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, textAlign: "center" } }, fmtDate(latest.date))
+      ),
+      /*#__PURE__*/React.createElement(Card, null,
+        /*#__PURE__*/React.createElement(SectionTitle, null, "ACTIVE KCAL"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
+          latest.activeEnergyKcal != null ? Math.round(latest.activeEnergyKcal) : "—"
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, textAlign: "center" } }, fmtDate(latest.date))
       )
     ),
     recent.length > 0 && /*#__PURE__*/React.createElement(Card, null,
