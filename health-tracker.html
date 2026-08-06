@@ -269,6 +269,12 @@ const WRIST_OFFSET = {
 };
 // Clothing offset: office clothed 308.21 vs home nude 304.4 → -3.81 lbs
 const CLOTHING_OFFSET = -3.81;
+// Health Summary export trend charts (BP/Glucose/Weight) plot from this date
+// forward rather than true full history. Legacy one-off readings from before
+// active daily tracking began (ER visit, old office weigh-ins, etc.) would
+// otherwise dominate the chart's time axis and crush the actually-relevant
+// recent trend + annotations into an unreadable sliver.
+const TREND_CHART_START = "2026-07-01";
 const SEED_BP = [{
   id: 1,
   date: "2025-03-26",
@@ -890,28 +896,34 @@ function MiniChart({
 // maps x to actual calendar date so annotation dates line up correctly
 // even when readings are irregularly spaced. Used only in the Health
 // Summary PDF/print export.
-function TrendChartAnnotated({
+// ── TREND CHART (Health Summary export) ─────────────────────────────────────
+// Time-scaled (x maps to actual calendar date, not index position) trend line
+// with per-point status-color coding. Distinct from MiniChart, which is
+// index-spaced and used throughout the in-app tabs. Event annotations were
+// tried here and removed (Aug 2026) — they grow unbounded as medications are
+// added over time and eventually swamp the chart; cross-metric correlation
+// is tracked separately as its own open item instead.
+function TrendChart({
   points,
   goal,
   unit,
-  annotations = [],
   width = 620,
-  height = 150
+  height = 130
 }) {
   if (!points || points.length < 2) return null;
   const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
-  const pad = 14, topPad = 32, botPad = 20;
+  const pad = 14, topPad = 12, botPad = 20;
   const toMs = d => new Date(d + "T00:00:00").getTime();
-  const domainDates = [...sorted.map(p => p.date), ...annotations.map(a => a.date)];
-  const minMs = Math.min(...domainDates.map(toMs));
-  const maxMs = Math.max(...domainDates.map(toMs));
+  const minMs = Math.min(...sorted.map(p => toMs(p.date)));
+  const maxMs = Math.max(...sorted.map(p => toMs(p.date)));
   const spanMs = (maxMs - minMs) || 1;
   const vals = sorted.map(p => p.value);
   const allVals = goal != null ? [...vals, goal] : vals;
   const mn = Math.min(...allVals), mx = Math.max(...allVals);
   const rng = (mx - mn) || 1;
+  const plotHeight = height - topPad - botPad;
   const xFor = dateStr => pad + (toMs(dateStr) - minMs) / spanMs * (width - 2 * pad);
-  const yFor = v => topPad + (height - topPad - botPad) - (v - mn) / rng * (height - topPad - botPad);
+  const yFor = v => topPad + plotHeight - (v - mn) / rng * plotHeight;
   const pathD = "M" + sorted.map(p => `${xFor(p.date)},${yFor(p.value)}`).join(" L");
   const goalY = goal != null ? yFor(goal) : null;
   return /*#__PURE__*/React.createElement("svg", {
@@ -922,19 +934,6 @@ function TrendChartAnnotated({
     goalY != null && /*#__PURE__*/React.createElement("line", {
       x1: pad, y1: goalY, x2: width - pad, y2: goalY,
       stroke: "#22c55e", strokeWidth: 1, strokeDasharray: "4,3", opacity: 0.7
-    }),
-    ...annotations.map((a, i) => {
-      const x = xFor(a.date);
-      const yOffset = (i % 2) * 9;
-      return /*#__PURE__*/React.createElement("g", { key: "ann-" + i },
-        /*#__PURE__*/React.createElement("line", {
-          x1: x, y1: topPad - 4, x2: x, y2: height - botPad,
-          stroke: "#9ca3af", strokeWidth: 1, strokeDasharray: "2,2"
-        }),
-        /*#__PURE__*/React.createElement("text", {
-          x, y: 10 + yOffset, fontSize: 8, fill: "#6b7280", textAnchor: "middle"
-        }, a.label)
-      );
     }),
     /*#__PURE__*/React.createElement("path", {
       d: pathD, fill: "none", stroke: "#cbd5e1", strokeWidth: 1.5
@@ -3755,11 +3754,6 @@ function PDFSummary({
   }
   const allMeds = [...meds].sort((a, b) => a.name.localeCompare(b.name));
   const activeMeds = allMeds.filter(m => m.active && m.startDate <= today());
-  // Auto-derived event annotations for trend charts: medication start dates.
-  // Dose changes aren't tracked with dates anywhere in the data model, so
-  // those are intentionally left out rather than guessed at.
-  const medAnnotations = allMeds.map(m => ({ date: m.startDate, label: m.name }));
-  const bpAnnotations = [...medAnnotations, { date: "2026-07-08", label: "Cuff calibration" }];
   const watch = ['HbA1c', 'HDL', 'ALT', 'Glucose', 'Sodium', 'LDL', 'Triglycerides'];
   const todayStr = new Date().toLocaleDateString('en-US', {
     month: 'long',
@@ -4086,7 +4080,21 @@ function PDFSummary({
     badgeColor: goals && goals.glucose ? (latestGlucose.value <= goals.glucose ? "#22c55e" : "#f97316") : null
   })), sections.bp && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
-  }, "Blood Pressure — Last 7 Days"), /*#__PURE__*/React.createElement("table", {
+  }, "Blood Pressure"), bpSorted.filter(r => r.date >= TREND_CHART_START).length >= 2 && /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 10, marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.h3
+  }, "Systolic Trend (arm-equivalent, since ", fmtDate(TREND_CHART_START), ")"), /*#__PURE__*/React.createElement(TrendChart, {
+    points: bpSorted.filter(r => r.date >= TREND_CHART_START).map(r => {
+      const n = normBP(r);
+      return { date: r.date, value: n.sys, color: bpCat(n.sys, n.dia).color };
+    }),
+    goal: goals?.systolic,
+    unit: "mmHg",
+    width: 620
+  })), /*#__PURE__*/React.createElement("div", {
+    style: S.h3
+  }, "Last 7 Days"), /*#__PURE__*/React.createElement("table", {
     style: S.table
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
     style: S.th
@@ -4133,23 +4141,18 @@ function PDFSummary({
         /*#__PURE__*/React.createElement("td", { style: { ...S.td, color: bpCat(n.sys, n.dia).color, fontWeight: 600 } }, bpCat(n.sys, n.dia).label)
       );
     });
-  })())
-  ), bpSorted.length >= 2 && /*#__PURE__*/React.createElement("div", {
-    style: { marginTop: 14 }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: S.h3
-  }, "Systolic BP Trend (arm-equivalent)"), /*#__PURE__*/React.createElement(TrendChartAnnotated, {
-    points: bpSorted.map(r => {
-      const n = normBP(r);
-      return { date: r.date, value: n.sys, color: bpCat(n.sys, n.dia).color };
-    }),
-    goal: goals?.systolic,
-    unit: "mmHg",
-    annotations: bpAnnotations,
-    width: 620,
-    height: 150
-  }))), sections.glucose && glucoseLog && glucoseLog.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
-    /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Glucose — Last 7 Days"),
+  })()))), sections.glucose && glucoseLog && glucoseLog.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Glucose"),
+    glucoseLog.filter(r => r.date >= TREND_CHART_START).length >= 2 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 10, marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" } },
+      /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Trend (since ", fmtDate(TREND_CHART_START), ")"),
+      /*#__PURE__*/React.createElement(TrendChart, {
+        points: glucoseLog.filter(r => r.date >= TREND_CHART_START).map(r => ({ date: r.date, value: r.value, color: glucosePointColor(r.value) })),
+        goal: goals?.glucose || SEED_GOALS.glucose,
+        unit: "mg/dL",
+        width: 620
+      })
+    ),
+    /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Last 7 Days"),
     /*#__PURE__*/React.createElement("table", { style: S.table },
       /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
         /*#__PURE__*/React.createElement("th", { style: S.th }, "Date"),
@@ -4198,21 +4201,24 @@ function PDFSummary({
           );
         });
       })())
-    ),
-    glucoseLog.length >= 2 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 14 } },
-      /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Glucose Trend"),
-      /*#__PURE__*/React.createElement(TrendChartAnnotated, {
-        points: glucoseLog.map(r => ({ date: r.date, value: r.value, color: glucosePointColor(r.value) })),
-        goal: goals?.glucose || SEED_GOALS.glucose,
-        unit: "mg/dL",
-        annotations: medAnnotations,
-        width: 620,
-        height: 150
-      })
     )
   ), sections.weight && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
-  }, "Weight — Last 7 Days"), /*#__PURE__*/React.createElement("table", {
+  }, "Weight"), wSorted.filter(e => e.date >= TREND_CHART_START).length >= 2 && /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 10, marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.h3
+  }, "Trend (nude-equivalent, since ", fmtDate(TREND_CHART_START), ")"), /*#__PURE__*/React.createElement(TrendChart, {
+    points: wSorted.filter(e => e.date >= TREND_CHART_START).map(e => {
+      const n = normW(e);
+      return { date: e.date, value: n.w, color: bmiCat(parseFloat(bmi(n.w))).color };
+    }),
+    goal: goals?.weight,
+    unit: "lb",
+    width: 620
+  })), /*#__PURE__*/React.createElement("div", {
+    style: S.h3
+  }, "Last 7 Days"), /*#__PURE__*/React.createElement("table", {
     style: S.table
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
     style: S.th
@@ -4259,22 +4265,7 @@ function PDFSummary({
         /*#__PURE__*/React.createElement("td", { style: S.td }, e.notes || '')
       );
     });
-  })())
-  ), wSorted.length >= 2 && /*#__PURE__*/React.createElement("div", {
-    style: { marginTop: 14 }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: S.h3
-  }, "Weight Trend (nude-equivalent)"), /*#__PURE__*/React.createElement(TrendChartAnnotated, {
-    points: wSorted.map(e => {
-      const n = normW(e);
-      return { date: e.date, value: n.w, color: bmiCat(parseFloat(bmi(n.w))).color };
-    }),
-    goal: goals?.weight,
-    unit: "lb",
-    annotations: medAnnotations,
-    width: 620,
-    height: 150
-  }))), sections.labs && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  })()))), sections.labs && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
   }, "Lab Results — Key Markers"), [...labs].sort((a, b) => b.date.localeCompare(a.date)).map(lab => /*#__PURE__*/React.createElement("div", {
     key: lab.id
