@@ -1199,7 +1199,17 @@ function VitalsTab({
           heartRate: "",
           cuffType: "wrist-home"
         });
-      } else setOpen(true);
+      } else {
+        setF({
+          date: today(),
+          time: nowTime(),
+          systolic: "",
+          diastolic: "",
+          heartRate: "",
+          cuffType: "wrist-home"
+        });
+        setOpen(true);
+      }
     },
     label: open ? "Cancel" : editId ? "Editing Reading…" : "+ Log Reading"
   }), open && /*#__PURE__*/React.createElement(Card, {
@@ -1533,7 +1543,15 @@ function WeightTab({
           weight: "",
           notes: ""
         });
-      } else setOpen(true);
+      } else {
+        setF({
+          date: today(),
+          time: nowTime(),
+          weight: "",
+          notes: ""
+        });
+        setOpen(true);
+      }
     },
     label: open ? "Cancel" : editId ? "Editing Entry…" : "+ Log Weight"
   }), open && /*#__PURE__*/React.createElement(Card, {
