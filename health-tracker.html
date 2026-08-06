@@ -623,6 +623,18 @@ function yesterday() {
 function nowTime() {
   return new Date().toTimeString().slice(0, 5);
 }
+// Returns the last 7 calendar days as YYYY-MM-DD strings, descending
+// (today first, 6 days ago last) — used by the Health Summary export's
+// rolling 7-day detail tables so every day appears, gaps included.
+function last7Dates() {
+  const days = [];
+  for (let i = 0; i <= 6; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(localDateStr(d));
+  }
+  return days;
+}
 
 // ── STYLE TOKENS ──────────────────────────────────────────────────────────────
 const C = {
@@ -869,6 +881,74 @@ function MiniChart({
       color: arrowColor
     }
   }, arrow, " ", Math.abs(delta).toFixed(1), " ", unit)));
+}
+
+// ── ANNOTATED TREND CHART (Health Summary export) ──────────────────────────────
+// Full-history, time-scaled trend line with per-point color coding and
+// vertical event annotation markers (e.g. medication starts). Unlike
+// MiniChart (index-spaced, used throughout the in-app tabs), this chart
+// maps x to actual calendar date so annotation dates line up correctly
+// even when readings are irregularly spaced. Used only in the Health
+// Summary PDF/print export.
+function TrendChartAnnotated({
+  points,
+  goal,
+  unit,
+  annotations = [],
+  width = 620,
+  height = 150
+}) {
+  if (!points || points.length < 2) return null;
+  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
+  const pad = 14, topPad = 32, botPad = 20;
+  const toMs = d => new Date(d + "T00:00:00").getTime();
+  const domainDates = [...sorted.map(p => p.date), ...annotations.map(a => a.date)];
+  const minMs = Math.min(...domainDates.map(toMs));
+  const maxMs = Math.max(...domainDates.map(toMs));
+  const spanMs = (maxMs - minMs) || 1;
+  const vals = sorted.map(p => p.value);
+  const allVals = goal != null ? [...vals, goal] : vals;
+  const mn = Math.min(...allVals), mx = Math.max(...allVals);
+  const rng = (mx - mn) || 1;
+  const xFor = dateStr => pad + (toMs(dateStr) - minMs) / spanMs * (width - 2 * pad);
+  const yFor = v => topPad + (height - topPad - botPad) - (v - mn) / rng * (height - topPad - botPad);
+  const pathD = "M" + sorted.map(p => `${xFor(p.date)},${yFor(p.value)}`).join(" L");
+  const goalY = goal != null ? yFor(goal) : null;
+  return /*#__PURE__*/React.createElement("svg", {
+    width,
+    height,
+    style: { display: "block", overflow: "visible" }
+  },
+    goalY != null && /*#__PURE__*/React.createElement("line", {
+      x1: pad, y1: goalY, x2: width - pad, y2: goalY,
+      stroke: "#22c55e", strokeWidth: 1, strokeDasharray: "4,3", opacity: 0.7
+    }),
+    ...annotations.map((a, i) => {
+      const x = xFor(a.date);
+      const yOffset = (i % 2) * 9;
+      return /*#__PURE__*/React.createElement("g", { key: "ann-" + i },
+        /*#__PURE__*/React.createElement("line", {
+          x1: x, y1: topPad - 4, x2: x, y2: height - botPad,
+          stroke: "#9ca3af", strokeWidth: 1, strokeDasharray: "2,2"
+        }),
+        /*#__PURE__*/React.createElement("text", {
+          x, y: 10 + yOffset, fontSize: 8, fill: "#6b7280", textAnchor: "middle"
+        }, a.label)
+      );
+    }),
+    /*#__PURE__*/React.createElement("path", {
+      d: pathD, fill: "none", stroke: "#cbd5e1", strokeWidth: 1.5
+    }),
+    ...sorted.map((p, i) => /*#__PURE__*/React.createElement("circle", {
+      key: i, cx: xFor(p.date), cy: yFor(p.value), r: 3, fill: p.color || "#2563eb"
+    })),
+    /*#__PURE__*/React.createElement("text", {
+      x: pad, y: height - 4, fontSize: 9, fill: "#9ca3af"
+    }, fmtDate(sorted[0].date)),
+    /*#__PURE__*/React.createElement("text", {
+      x: width - pad, y: height - 4, fontSize: 9, fill: "#9ca3af", textAnchor: "end"
+    }, fmtDate(sorted[sorted.length - 1].date))
+  );
 }
 
 // ── STREAK CALCULATOR ─────────────────────────────────────────────────────────
@@ -3668,8 +3748,18 @@ function PDFSummary({
     if (tir >= 50) return "#eab308";
     return "#ef4444";
   }
+  function glucosePointColor(v) {
+    if (v <= 99) return "#22c55e";
+    if (v <= (goals?.glucose || SEED_GOALS.glucose)) return "#eab308";
+    return "#ef4444";
+  }
   const allMeds = [...meds].sort((a, b) => a.name.localeCompare(b.name));
   const activeMeds = allMeds.filter(m => m.active && m.startDate <= today());
+  // Auto-derived event annotations for trend charts: medication start dates.
+  // Dose changes aren't tracked with dates anywhere in the data model, so
+  // those are intentionally left out rather than guessed at.
+  const medAnnotations = allMeds.map(m => ({ date: m.startDate, label: m.name }));
+  const bpAnnotations = [...medAnnotations, { date: "2026-07-08", label: "Cuff calibration" }];
   const watch = ['HbA1c', 'HDL', 'ALT', 'Glucose', 'Sodium', 'LDL', 'Triglycerides'];
   const todayStr = new Date().toLocaleDateString('en-US', {
     month: 'long',
@@ -3996,7 +4086,7 @@ function PDFSummary({
     badgeColor: goals && goals.glucose ? (latestGlucose.value <= goals.glucose ? "#22c55e" : "#f97316") : null
   })), sections.bp && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
-  }, "Blood Pressure History"), /*#__PURE__*/React.createElement("table", {
+  }, "Blood Pressure — Last 7 Days"), /*#__PURE__*/React.createElement("table", {
     style: S.table
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
     style: S.th
@@ -4012,46 +4102,54 @@ function PDFSummary({
     style: S.th
   }, "Cuff"), /*#__PURE__*/React.createElement("th", {
     style: S.th
-  }, "Category"))), /*#__PURE__*/React.createElement("tbody", null, bpSorted.map((r, i) => {
-    const n = normBP(r);
-    const cuffLabel = r.cuffType === 'wrist-home' ? 'Wrist/Home' : r.cuffType === 'arm-home' ? 'Arm/Home' : r.cuffType === 'arm-office' ? 'Arm/Office' : 'Wrist/Office';
-    return /*#__PURE__*/React.createElement("tr", {
-      key: r.id,
-      style: {
-        background: i % 2 === 0 ? '#fff' : '#fafafa'
+  }, "Category"))), /*#__PURE__*/React.createElement("tbody", null, (() => {
+    const byDate = {};
+    bp.forEach(r => {
+      if (!byDate[r.date] || (r.time || '') > (byDate[r.date].time || '')) byDate[r.date] = r;
+    });
+    return last7Dates().map((d, i) => {
+      const r = byDate[d];
+      const rowStyle = { background: i % 2 === 0 ? '#fff' : '#fafafa' };
+      if (!r) {
+        return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
+          /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(d)),
+          /*#__PURE__*/React.createElement("td", { style: { ...S.td, color: '#9ca3af', fontStyle: 'italic' } }, "No reading logged"),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, "—")
+        );
       }
-    }, /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, fmtDate(r.date)), /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, r.time || '—'), /*#__PURE__*/React.createElement("td", {
-      style: {
-        ...S.td,
-        fontWeight: 600
-      }
-    }, r.systolic, "/", r.diastolic), /*#__PURE__*/React.createElement("td", {
-      style: {
-        ...S.td,
-        ...(n.isEst ? {
-          color: '#7c3aed',
-          fontStyle: 'italic'
-        } : {
-          fontWeight: 600
-        })
-      }
-    }, n.isEst ? n.sys + '/' + n.dia + ' (est.)' : r.systolic + '/' + r.diastolic), /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, r.heartRate > 0 ? r.heartRate + ' bpm' : '—'), /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, cuffLabel), /*#__PURE__*/React.createElement("td", {
-      style: {
-        ...S.td,
-        color: bpCat(n.sys, n.dia).color,
-        fontWeight: 600
-      }
-    }, bpCat(n.sys, n.dia).label));
-  })))), sections.glucose && glucoseLog && glucoseLog.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
-    /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Glucose Readings"),
+      const n = normBP(r);
+      const cuffLabel = r.cuffType === 'wrist-home' ? 'Wrist/Home' : r.cuffType === 'arm-home' ? 'Arm/Home' : r.cuffType === 'arm-office' ? 'Arm/Office' : 'Wrist/Office';
+      return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
+        /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(r.date)),
+        /*#__PURE__*/React.createElement("td", { style: S.td }, r.time || '—'),
+        /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600 } }, r.systolic, "/", r.diastolic),
+        /*#__PURE__*/React.createElement("td", { style: { ...S.td, ...(n.isEst ? { color: '#7c3aed', fontStyle: 'italic' } : { fontWeight: 600 }) } }, n.isEst ? n.sys + '/' + n.dia + ' (est.)' : r.systolic + '/' + r.diastolic),
+        /*#__PURE__*/React.createElement("td", { style: S.td }, r.heartRate > 0 ? r.heartRate + ' bpm' : '—'),
+        /*#__PURE__*/React.createElement("td", { style: S.td }, cuffLabel),
+        /*#__PURE__*/React.createElement("td", { style: { ...S.td, color: bpCat(n.sys, n.dia).color, fontWeight: 600 } }, bpCat(n.sys, n.dia).label)
+      );
+    });
+  })())
+  ), bpSorted.length >= 2 && /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 14 }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.h3
+  }, "Systolic BP Trend (arm-equivalent)"), /*#__PURE__*/React.createElement(TrendChartAnnotated, {
+    points: bpSorted.map(r => {
+      const n = normBP(r);
+      return { date: r.date, value: n.sys, color: bpCat(n.sys, n.dia).color };
+    }),
+    goal: goals?.systolic,
+    unit: "mmHg",
+    annotations: bpAnnotations,
+    width: 620,
+    height: 150
+  }))), sections.glucose && glucoseLog && glucoseLog.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Glucose — Last 7 Days"),
     /*#__PURE__*/React.createElement("table", { style: S.table },
       /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
         /*#__PURE__*/React.createElement("th", { style: S.th }, "Date"),
@@ -4061,31 +4159,60 @@ function PDFSummary({
         /*#__PURE__*/React.createElement("th", { style: S.th }, "Elapsed"),
         /*#__PURE__*/React.createElement("th", { style: S.th }, "Meal Note")
       )),
-      /*#__PURE__*/React.createElement("tbody", null, [...glucoseLog].sort((a, b) => (b.date + (b.time||'')).localeCompare(a.date + (a.time||''))).map((r, i) => {
-        let elapsed = '—';
-        if (r.time && r.lastMealTime) {
-          const [rh, rm] = r.time.split(':').map(Number);
-          const [mh, mm] = r.lastMealTime.split(':').map(Number);
-          const diff = (rh * 60 + rm) - (mh * 60 + mm);
-          if (diff > 0) {
-            const h = Math.floor(diff / 60), m = diff % 60;
-            elapsed = m > 0 ? `${h}hr ${m}min` : `${h}hr`;
+      /*#__PURE__*/React.createElement("tbody", null, (() => {
+        const byDate = {};
+        glucoseLog.forEach(r => {
+          if (!byDate[r.date] || (r.time || '') > (byDate[r.date].time || '')) byDate[r.date] = r;
+        });
+        return last7Dates().map((d, i) => {
+          const r = byDate[d];
+          const rowStyle = { background: i % 2 === 0 ? '#fff' : '#fafafa' };
+          if (!r) {
+            return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
+              /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(d)),
+              /*#__PURE__*/React.createElement("td", { style: { ...S.td, color: '#9ca3af', fontStyle: 'italic' } }, "No reading logged"),
+              /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+              /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+              /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+              /*#__PURE__*/React.createElement("td", { style: S.td }, "—")
+            );
           }
-        }
-        const glColor = r.value <= 99 ? '#16a34a' : r.value <= (goals?.glucose || 120) ? '#d97706' : '#dc2626';
-        return /*#__PURE__*/React.createElement("tr", { key: r.id, style: { background: i % 2 === 0 ? '#fff' : '#fafafa' } },
-          /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(r.date)),
-          /*#__PURE__*/React.createElement("td", { style: S.td }, r.time || '—'),
-          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600, color: glColor } }, r.value, " mg/dL"),
-          /*#__PURE__*/React.createElement("td", { style: S.td }, r.readingType || 'Random'),
-          /*#__PURE__*/React.createElement("td", { style: S.td }, elapsed),
-          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, r.mealNote || r.note || '—')
-        );
-      }))
+          let elapsed = '—';
+          if (r.time && r.lastMealTime) {
+            const [rh, rm] = r.time.split(':').map(Number);
+            const [mh, mm] = r.lastMealTime.split(':').map(Number);
+            const diff = (rh * 60 + rm) - (mh * 60 + mm);
+            if (diff > 0) {
+              const h = Math.floor(diff / 60), m = diff % 60;
+              elapsed = m > 0 ? `${h}hr ${m}min` : `${h}hr`;
+            }
+          }
+          const glColor = r.value <= 99 ? '#16a34a' : r.value <= (goals?.glucose || 120) ? '#d97706' : '#dc2626';
+          return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
+            /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(r.date)),
+            /*#__PURE__*/React.createElement("td", { style: S.td }, r.time || '—'),
+            /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600, color: glColor } }, r.value, " mg/dL"),
+            /*#__PURE__*/React.createElement("td", { style: S.td }, r.readingType || 'Random'),
+            /*#__PURE__*/React.createElement("td", { style: S.td }, elapsed),
+            /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, r.mealNote || r.note || '—')
+          );
+        });
+      })())
+    ),
+    glucoseLog.length >= 2 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 14 } },
+      /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Glucose Trend"),
+      /*#__PURE__*/React.createElement(TrendChartAnnotated, {
+        points: glucoseLog.map(r => ({ date: r.date, value: r.value, color: glucosePointColor(r.value) })),
+        goal: goals?.glucose || SEED_GOALS.glucose,
+        unit: "mg/dL",
+        annotations: medAnnotations,
+        width: 620,
+        height: 150
+      })
     )
   ), sections.weight && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
-  }, "Weight History"), /*#__PURE__*/React.createElement("table", {
+  }, "Weight — Last 7 Days"), /*#__PURE__*/React.createElement("table", {
     style: S.table
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
     style: S.th
@@ -4101,41 +4228,53 @@ function PDFSummary({
     style: S.th
   }, "Condition"), /*#__PURE__*/React.createElement("th", {
     style: S.th
-  }, "Notes"))), /*#__PURE__*/React.createElement("tbody", null, wSorted.map((e, i) => {
-    const n = normW(e);
-    const condLabel = e.condition === 'nude' ? 'Nude' : e.condition === 'light' ? 'Light clothing' : e.condition === 'clothed' ? 'Fully clothed' : 'Clinical/Office';
-    return /*#__PURE__*/React.createElement("tr", {
-      key: e.id,
-      style: {
-        background: i % 2 === 0 ? '#fff' : '#fafafa'
+  }, "Notes"))), /*#__PURE__*/React.createElement("tbody", null, (() => {
+    const byDate = {};
+    weight.forEach(e => {
+      if (!byDate[e.date] || (e.time || '') > (byDate[e.date].time || '')) byDate[e.date] = e;
+    });
+    return last7Dates().map((d, i) => {
+      const e = byDate[d];
+      const rowStyle = { background: i % 2 === 0 ? '#fff' : '#fafafa' };
+      if (!e) {
+        return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
+          /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(d)),
+          /*#__PURE__*/React.createElement("td", { style: { ...S.td, color: '#9ca3af', fontStyle: 'italic' } }, "No reading logged"),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, "—")
+        );
       }
-    }, /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, fmtDate(e.date)), /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, e.time || '—'), /*#__PURE__*/React.createElement("td", {
-      style: {
-        ...S.td,
-        fontWeight: 600
-      }
-    }, e.weight, " lb"), /*#__PURE__*/React.createElement("td", {
-      style: {
-        ...S.td,
-        ...(n.isEst ? {
-          color: '#7c3aed',
-          fontStyle: 'italic'
-        } : {
-          fontWeight: 600
-        })
-      }
-    }, n.isEst ? n.w + ' lb (est.)' : e.weight + ' lb'), /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, bmi(n.w)), /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, condLabel), /*#__PURE__*/React.createElement("td", {
-      style: S.td
-    }, e.notes || ''));
-  })))), sections.labs && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+      const n = normW(e);
+      const condLabel = e.condition === 'nude' ? 'Nude' : e.condition === 'light' ? 'Light clothing' : e.condition === 'clothed' ? 'Fully clothed' : 'Clinical/Office';
+      return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
+        /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(e.date)),
+        /*#__PURE__*/React.createElement("td", { style: S.td }, e.time || '—'),
+        /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600 } }, e.weight, " lb"),
+        /*#__PURE__*/React.createElement("td", { style: { ...S.td, ...(n.isEst ? { color: '#7c3aed', fontStyle: 'italic' } : { fontWeight: 600 }) } }, n.isEst ? n.w + ' lb (est.)' : e.weight + ' lb'),
+        /*#__PURE__*/React.createElement("td", { style: S.td }, bmi(n.w)),
+        /*#__PURE__*/React.createElement("td", { style: S.td }, condLabel),
+        /*#__PURE__*/React.createElement("td", { style: S.td }, e.notes || '')
+      );
+    });
+  })())
+  ), wSorted.length >= 2 && /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 14 }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: S.h3
+  }, "Weight Trend (nude-equivalent)"), /*#__PURE__*/React.createElement(TrendChartAnnotated, {
+    points: wSorted.map(e => {
+      const n = normW(e);
+      return { date: e.date, value: n.w, color: bmiCat(parseFloat(bmi(n.w))).color };
+    }),
+    goal: goals?.weight,
+    unit: "lb",
+    annotations: medAnnotations,
+    width: 620,
+    height: 150
+  }))), sections.labs && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
   }, "Lab Results — Key Markers"), [...labs].sort((a, b) => b.date.localeCompare(a.date)).map(lab => /*#__PURE__*/React.createElement("div", {
     key: lab.id
@@ -4519,16 +4658,16 @@ const SECTION_DEFS = [{
   desc: 'Latest BP, weight, CGM time in range, glucose'
 }, {
   key: 'bp',
-  label: 'Blood Pressure History',
-  desc: 'All readings with cuff type and arm equivalent'
+  label: 'Blood Pressure',
+  desc: 'Rolling 7-day detail table + full-history trend chart'
 }, {
   key: 'glucose',
   label: 'Glucose Readings',
-  desc: 'All home monitor readings with type and meal context'
+  desc: 'Rolling 7-day detail table + full-history trend chart'
 }, {
   key: 'weight',
-  label: 'Weight History',
-  desc: 'All entries with nude equivalent'
+  label: 'Weight',
+  desc: 'Rolling 7-day detail table + full-history trend chart (nude-equiv.)'
 }, {
   key: 'labs',
   label: 'Lab Results',
