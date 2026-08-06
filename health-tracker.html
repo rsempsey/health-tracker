@@ -1413,7 +1413,8 @@ function WeightTab({
   const sorted = [...entries].sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
   const latest = sorted[0];
   const first = sorted[sorted.length - 1];
-  const change = latest && first && latest.id !== first.id ? (latest.weight - first.weight).toFixed(1) : null;
+  const nudeEq = e => (e.condition === "clinical" || e.condition === "clothed" || e.condition === "light") ? +(e.weight + CLOTHING_OFFSET).toFixed(1) : e.weight;
+  const change = latest && first && latest.id !== first.id ? (nudeEq(latest) - nudeEq(first)).toFixed(1) : null;
   function save() {
     if (!f.weight || !f.date) return;
     const entry = {
