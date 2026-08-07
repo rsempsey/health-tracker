@@ -1548,10 +1548,13 @@ function WeightTab({
       behavior: 'smooth'
     });
   }
-  const chartPts = [...entries].sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || ""))).map(e => ({
-    date: e.date,
-    y: e.condition === "clinical" || e.condition === "clothed" || e.condition === "light" ? +(e.weight + CLOTHING_OFFSET).toFixed(1) : e.weight
-  }));
+  const chartPts = [...entries]
+    .filter(e => e.date >= TREND_CHART_START)
+    .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")))
+    .map(e => {
+      const y = e.condition === "clinical" || e.condition === "clothed" || e.condition === "light" ? +(e.weight + CLOTHING_OFFSET).toFixed(1) : e.weight;
+      return { date: e.date, value: y, color: bmiCat(parseFloat(bmi(y))).color };
+    });
   return /*#__PURE__*/React.createElement("div", null, latest && (() => {
     const b = parseFloat(bmi(latest.weight));
     const cat = bmiCat(b);
@@ -1606,12 +1609,18 @@ function WeightTab({
     }, /*#__PURE__*/React.createElement(Badge, {
       label: cat.label,
       color: cat.color
-    })))), chartPts.length >= 2 && /*#__PURE__*/React.createElement(MiniChart, {
-      points: chartPts,
-      color: "#8b5cf6",
-      goal: goals?.weight,
-      unit: "lb"
-    }));
+    })))), chartPts.length >= 2 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 4 } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6 } },
+        "Trend (nude-equivalent, since ", fmtDate(TREND_CHART_START), ")"
+      ),
+      /*#__PURE__*/React.createElement(TrendChart, {
+        points: chartPts,
+        goal: goals?.weight,
+        unit: "lb",
+        width: 440,
+        height: 100
+      })
+    ));
   })(), goals && latest && /*#__PURE__*/React.createElement(Card, {
     style: {
       marginBottom: 14
