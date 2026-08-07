@@ -918,14 +918,23 @@ function TrendChart({
   const maxMs = Math.max(...sorted.map(p => toMs(p.date)));
   const spanMs = (maxMs - minMs) || 1;
   const vals = sorted.map(p => p.value);
-  const allVals = goal != null ? [...vals, goal] : vals;
-  const mn = Math.min(...allVals), mx = Math.max(...allVals);
+  // Scale to the actual data range only, not the goal — a goal that's far
+  // from current values (e.g. a weight-loss target still many pounds away)
+  // would otherwise dominate the range and flatten the real variation to
+  // near-invisible. Small padding keeps points off the plot's hard edges.
+  const dataMn = Math.min(...vals), dataMx = Math.max(...vals);
+  const dataRange = (dataMx - dataMn) || 1;
+  const padAmt = dataRange * 0.1;
+  const mn = dataMn - padAmt, mx = dataMx + padAmt;
   const rng = (mx - mn) || 1;
   const plotHeight = height - topPad - botPad;
   const xFor = dateStr => pad + (toMs(dateStr) - minMs) / spanMs * (width - 2 * pad);
   const yFor = v => topPad + plotHeight - (v - mn) / rng * plotHeight;
   const pathD = "M" + sorted.map(p => `${xFor(p.date)},${yFor(p.value)}`).join(" L");
-  const goalY = goal != null ? yFor(goal) : null;
+  // Only draw the goal line when it actually falls within the visible
+  // range — a distant goal is more misleading floating at a clamped edge
+  // than simply omitted.
+  const goalY = (goal != null && goal >= mn && goal <= mx) ? yFor(goal) : null;
   return /*#__PURE__*/React.createElement("svg", {
     width,
     height,
