@@ -3740,6 +3740,17 @@ function PDFSummary({
 }) {
   const bpSorted = [...bp].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const wSorted = [...weight].sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
+  // Hero cards aren't a "section" — whichever section ends up first in the
+  // actual render order (bp, glucose, weight, or the Medications/Adherence
+  // pair, depending on which are selected) should share a page with the
+  // hero cards rather than force its own break.
+  const firstBreakSection = (() => {
+    if (sections.bp) return 'bp';
+    if (sections.glucose && glucoseLog && glucoseLog.length > 0) return 'glucose';
+    if (sections.weight) return 'weight';
+    if (sections.meds || (sections.adherence && medLogs && medLogs.length > 0)) return 'medsPair';
+    return null;
+  })();
   const latestBP = bpSorted[0];
   const latestW = wSorted[0];
   const latestLab = [...labs].sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -4088,7 +4099,7 @@ function PDFSummary({
     badgeLabel: goals && goals.glucose ? (latestGlucose.value <= goals.glucose ? "At Goal" : "Above Goal") : null,
     badgeColor: goals && goals.glucose ? (latestGlucose.value <= goals.glucose ? "#22c55e" : "#f97316") : null
   })), sections.bp && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: { ...S.h2, pageBreakBefore: "always", breakBefore: "page" }
+    style: { ...S.h2, ...(firstBreakSection !== 'bp' ? { pageBreakBefore: "always", breakBefore: "page" } : {}) }
   }, "Blood Pressure"), bpSorted.filter(r => r.date >= TREND_CHART_START).length >= 2 && /*#__PURE__*/React.createElement("div", {
     style: { marginTop: 10, marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" }
   }, /*#__PURE__*/React.createElement("div", {
@@ -4151,7 +4162,7 @@ function PDFSummary({
       );
     });
   })()))), sections.glucose && glucoseLog && glucoseLog.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
-    /*#__PURE__*/React.createElement("div", { style: { ...S.h2, pageBreakBefore: "always", breakBefore: "page" } }, "Glucose"),
+    /*#__PURE__*/React.createElement("div", { style: { ...S.h2, ...(firstBreakSection !== 'glucose' ? { pageBreakBefore: "always", breakBefore: "page" } : {}) } }, "Glucose"),
     glucoseLog.filter(r => r.date >= TREND_CHART_START).length >= 2 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 10, marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" } },
       /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Trend (since ", fmtDate(TREND_CHART_START), ")"),
       /*#__PURE__*/React.createElement(TrendChart, {
@@ -4212,7 +4223,7 @@ function PDFSummary({
       })())
     )
   ), sections.weight && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: { ...S.h2, pageBreakBefore: "always", breakBefore: "page" }
+    style: { ...S.h2, ...(firstBreakSection !== 'weight' ? { pageBreakBefore: "always", breakBefore: "page" } : {}) }
   }, "Weight"), wSorted.filter(e => e.date >= TREND_CHART_START).length >= 2 && /*#__PURE__*/React.createElement("div", {
     style: { marginTop: 10, marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" }
   }, /*#__PURE__*/React.createElement("div", {
@@ -4324,7 +4335,7 @@ function PDFSummary({
       }
     }, status === 'normal' ? 'Normal' : status === 'high' ? 'High' : 'Low'));
   })))))), (sections.meds || (sections.adherence && medLogs && medLogs.length > 0)) && /*#__PURE__*/React.createElement("div", {
-    style: { pageBreakBefore: "always", breakBefore: "page", pageBreakInside: "avoid", breakInside: "avoid" }
+    style: { ...(firstBreakSection !== 'medsPair' ? { pageBreakBefore: "always", breakBefore: "page" } : {}), pageBreakInside: "avoid", breakInside: "avoid" }
   }, sections.meds && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
   }, "Medications"), /*#__PURE__*/React.createElement("table", {
