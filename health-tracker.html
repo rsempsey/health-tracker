@@ -2236,6 +2236,190 @@ function GlucoseTab({
   );
 }
 
+// ── BM TAB (Bristol Stool Scale tracking) ───────────────────────────────────
+const BRISTOL_TYPES = [
+  { v: 1, label: "Type 1 — Separate hard lumps", desc: "Severe constipation" },
+  { v: 2, label: "Type 2 — Lumpy, sausage-shaped", desc: "Mild constipation" },
+  { v: 3, label: "Type 3 — Sausage with cracks", desc: "Normal" },
+  { v: 4, label: "Type 4 — Smooth, soft sausage", desc: "Normal (ideal)" },
+  { v: 5, label: "Type 5 — Soft blobs, clear edges", desc: "Lacking fiber" },
+  { v: 6, label: "Type 6 — Mushy, ragged edges", desc: "Mild diarrhea" },
+  { v: 7, label: "Type 7 — Liquid, no solid pieces", desc: "Severe diarrhea" }
+];
+function bristolColor(v) {
+  if (v <= 2) return "#ef4444";
+  if (v <= 4) return "#22c55e";
+  return "#eab308";
+}
+function bristolStatusLabel(v) {
+  if (v <= 2) return "Constipated";
+  if (v <= 4) return "Normal";
+  return "Loose";
+}
+function daysSinceDate(dateStr) {
+  const d1 = new Date(dateStr + "T00:00:00");
+  const d2 = new Date(today() + "T00:00:00");
+  return Math.round((d2 - d1) / 86400000);
+}
+function daysSinceColor(n) {
+  if (n <= 2) return "#22c55e";
+  if (n <= 5) return "#eab308";
+  return "#ef4444";
+}
+function BmTab({
+  bmLog,
+  setBmLog
+}) {
+  const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const EMPTY_F = { date: "", time: "", bristol: "4", notes: "" };
+  const [f, setF] = useState(EMPTY_F);
+
+  const sorted = [...(bmLog || [])].sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
+  const latest = sorted[0];
+  const prev = sorted[1];
+
+  const daysSince = latest ? daysSinceDate(latest.date) : null;
+  // Trending-constipated flag: average Bristol score of the last 5 entries.
+  // Requires at least 3 entries so a single low-fiber day doesn't trip a
+  // "trend" flag off noise.
+  const last5 = sorted.slice(0, 5);
+  const avgLast5 = last5.length >= 3 ? last5.reduce((s, r) => s + r.bristol, 0) / last5.length : null;
+  const trendingConstipated = avgLast5 != null && avgLast5 <= 2.5;
+
+  function save() {
+    if (!f.date || f.bristol === "") return;
+    const entry = { date: f.date, time: f.time, bristol: +f.bristol, notes: f.notes };
+    if (editId) {
+      setBmLog(bmLog.map(r => r.id === editId ? { ...r, ...entry } : r));
+      setEditId(null);
+    } else {
+      setBmLog([...(bmLog || []), { id: Date.now(), ...entry }]);
+    }
+    setF(EMPTY_F);
+    setOpen(false);
+  }
+
+  function startEdit(r) {
+    setF({
+      date: r.date, time: r.time || "", bristol: String(r.bristol), notes: r.notes || ""
+    });
+    setEditId(r.id);
+    setOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function del(id) {
+    setBmLog(bmLog.filter(r => r.id !== id));
+  }
+
+  const chartPts = [...(bmLog || [])]
+    .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")))
+    .map(r => ({ date: r.date, y: r.bristol }));
+
+  return /*#__PURE__*/React.createElement("div", null,
+    // Status card: days since last + trending flag
+    (latest || trendingConstipated) && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement(SectionTitle, null, "STATUS"),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" } },
+        latest && /*#__PURE__*/React.createElement(Badge, {
+          label: (daysSince === 0 ? "Logged today" : daysSince === 1 ? "1 day since last" : daysSince + " days since last"),
+          color: daysSinceColor(daysSince)
+        }),
+        trendingConstipated && /*#__PURE__*/React.createElement(Badge, { label: "⚠ Trending constipated", color: "#ef4444" })
+      )
+    ),
+    // Latest card (chart embedded, matching Glucose/BP/Weight tabs)
+    latest && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST · ", fmtDate(latest.date)),
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 24, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 8 } },
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 34, fontWeight: 800, color: C.text, letterSpacing: -1 } }, "Type ", latest.bristol)
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } },
+          /*#__PURE__*/React.createElement(Badge, { label: bristolStatusLabel(latest.bristol), color: bristolColor(latest.bristol), small: true }),
+          latest.time && /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: C.faint } }, latest.time)
+        )
+      ),
+      prev && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } },
+        "prev Type ", prev.bristol, prev.time ? " · " + prev.time : ""
+      ),
+      latest.notes && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.muted, marginTop: 4, fontStyle: "italic" } }, "📝 ", latest.notes),
+      chartPts.length > 1 && /*#__PURE__*/React.createElement(MiniChart, { points: chartPts, color: "#3b82f6", bad: "low" })
+    ),
+    // Log/Cancel toggle button
+    /*#__PURE__*/React.createElement(AddBtn, {
+      onClick: () => {
+        if (open) {
+          setOpen(false);
+          setEditId(null);
+          setF(EMPTY_F);
+        } else {
+          setF({ ...EMPTY_F, date: today(), time: nowTime() });
+          setOpen(true);
+        }
+      },
+      label: open ? "Cancel" : editId ? "Editing Entry…" : "+ Log BM"
+    }),
+    // Add / Edit form
+    open && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement(SectionTitle, null, editId ? "EDIT ENTRY" : "ADD ENTRY"),
+      /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", { style: labelSt }, "Date"),
+          /*#__PURE__*/React.createElement("input", { style: inputSt, type: "date", value: f.date, onChange: e => setF({ ...f, date: e.target.value }) })
+        ),
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("label", { style: labelSt }, "Time"),
+          /*#__PURE__*/React.createElement("input", { style: inputSt, type: "time", value: f.time, onChange: e => setF({ ...f, time: e.target.value }) })
+        )
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { marginBottom: 10 } },
+        /*#__PURE__*/React.createElement("label", { style: labelSt }, "Bristol Stool Scale"),
+        /*#__PURE__*/React.createElement("select", { style: inputSt, value: f.bristol, onChange: e => setF({ ...f, bristol: e.target.value }) },
+          BRISTOL_TYPES.map(t => /*#__PURE__*/React.createElement("option", { key: t.v, value: t.v }, t.label, " (", t.desc, ")"))
+        )
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { marginBottom: 14 } },
+        /*#__PURE__*/React.createElement("label", { style: labelSt }, "Notes (optional)"),
+        /*#__PURE__*/React.createElement("input", { style: inputSt, type: "text", placeholder: "e.g. after coffee, felt urgent", value: f.notes, onChange: e => setF({ ...f, notes: e.target.value }) })
+      ),
+      /*#__PURE__*/React.createElement(SaveBtn, { onClick: save, label: editId ? "Update" : "Save" })
+    ),
+    // Entries list
+    sorted.length > 0 && /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement(SectionTitle, null, "ALL ENTRIES"),
+      sorted.map(r => /*#__PURE__*/React.createElement("div", {
+        key: r.id,
+        style: { background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", marginBottom: 8 }
+      },
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } },
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 4 } },
+              fmtDate(r.date), r.time ? " · " + r.time : ""
+            ),
+            /*#__PURE__*/React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 4 } },
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 18, fontWeight: 700, color: C.text } }, "Type ", r.bristol),
+              /*#__PURE__*/React.createElement(Badge, { label: bristolStatusLabel(r.bristol), color: bristolColor(r.bristol), small: true })
+            ),
+            r.notes && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, fontStyle: "italic" } }, r.notes)
+          ),
+          /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" } },
+            /*#__PURE__*/React.createElement("button", {
+              onClick: () => startEdit(r),
+              style: { fontSize: 11, color: C.accent, background: "none", border: `1px solid ${C.border}`, borderRadius: 6, cursor: "pointer", padding: "2px 8px", fontWeight: 600 }
+            }, "Edit"),
+            /*#__PURE__*/React.createElement(DelBtn, { onClick: () => del(r.id) })
+          )
+        )
+      ))
+    ),
+    (!bmLog || bmLog.length === 0) && !open && /*#__PURE__*/React.createElement("div", {
+      style: { textAlign: "center", color: C.faint, fontSize: 14, padding: "40px 0" }
+    }, "No BM entries yet.")
+  );
+}
+
 // ── LABS TAB ──────────────────────────────────────────────────────────────────
 function LabsTab({
   labs,
@@ -3736,6 +3920,7 @@ function PDFSummary({
   meds,
   medLogs,
   healthkitDailyLog,
+  bmLog,
   sections
 }) {
   const bpSorted = [...bp].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
@@ -4659,6 +4844,36 @@ function PDFSummary({
         )))
       )
     );
+  })(), sections.bm && bmLog && bmLog.length > 0 && (() => {
+    const sorted = [...bmLog].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Bowel Movements"),
+      /*#__PURE__*/React.createElement("table", { style: S.table },
+        /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Date"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Time"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Bristol Type"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Status"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Notes")
+        )),
+        /*#__PURE__*/React.createElement("tbody", null, sorted.map((r, i) => /*#__PURE__*/React.createElement("tr", {
+          key: r.id,
+          style: { background: i % 2 === 0 ? '#fff' : '#fafafa' }
+        },
+          /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(r.date)),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, r.time || '—'),
+          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600 } }, "Type ", r.bristol),
+          /*#__PURE__*/React.createElement("td", {
+            style: {
+              ...S.td,
+              fontWeight: 600,
+              color: r.bristol <= 2 ? '#dc2626' : r.bristol <= 4 ? '#22c55e' : '#b45309'
+            }
+          }, bristolStatusLabel(r.bristol)),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, r.notes || '')
+        )))
+      )
+    );
   })(), /*#__PURE__*/React.createElement("div", {
     style: S.note
   }, "For personal reference and provider communication only. Not a substitute for professional medical advice.", /*#__PURE__*/React.createElement("br", null), "Generated by Health Tracker · rsempsey.github.io/health-tracker/health-tracker.html"));
@@ -4705,6 +4920,10 @@ const SECTION_DEFS = [{
   key: 'activity',
   label: 'Activity & Vitals',
   desc: 'Sleep, steps, active energy, water, resting heart rate'
+}, {
+  key: 'bm',
+  label: 'Bowel Movements',
+  desc: 'Bristol Stool Scale entries with regularity flags'
 }];
 const PRESETS = {
   'Doctor Visit': {
@@ -4717,7 +4936,8 @@ const PRESETS = {
     adherence: true,
     nutrition: true,
     goals: true,
-    activity: true
+    activity: true,
+    bm: false
   },
   'Full Export': {
     hero: true,
@@ -4729,7 +4949,8 @@ const PRESETS = {
     adherence: true,
     nutrition: true,
     goals: true,
-    activity: true
+    activity: true,
+    bm: false
   },
   'Labs Only': {
     hero: true,
@@ -4741,7 +4962,8 @@ const PRESETS = {
     adherence: false,
     nutrition: false,
     goals: false,
-    activity: false
+    activity: false,
+    bm: false
   },
   'Goal Progress': {
     hero: false,
@@ -4753,7 +4975,8 @@ const PRESETS = {
     adherence: false,
     nutrition: false,
     goals: true,
-    activity: false
+    activity: false,
+    bm: false
   },
   'Vitals': {
     hero: false,
@@ -4765,7 +4988,8 @@ const PRESETS = {
     adherence: false,
     nutrition: false,
     goals: false,
-    activity: true
+    activity: true,
+    bm: false
   },
   'Current Snapshot': {
     hero: true,
@@ -4777,7 +5001,8 @@ const PRESETS = {
     adherence: true,
     nutrition: false,
     goals: false,
-    activity: true
+    activity: true,
+    bm: false
   }
 };
 const EMPTY_SECTIONS = {
@@ -4790,7 +5015,8 @@ const EMPTY_SECTIONS = {
   adherence: false,
   nutrition: false,
   goals: false,
-  activity: false
+  activity: false,
+  bm: false
 };
 function ExportTab({
   bp,
@@ -4802,7 +5028,8 @@ function ExportTab({
   journal,
   meds,
   medLogs,
-  healthkitDailyLog
+  healthkitDailyLog,
+  bmLog
 }) {
   const [view, setView] = useState(null);
   const [sections, setSections] = useState(EMPTY_SECTIONS);
@@ -4914,6 +5141,16 @@ function ExportTab({
         d.waterOz != null ? Math.round(d.waterOz) : '',
         d.restingHeartRate != null ? Math.round(d.restingHeartRate) : ''
       ]));
+      return makeCSV(rows);
+    }
+  }, {
+    label: 'Bowel Movements',
+    count: (bmLog || []).length,
+    build: () => {
+      const rows = [['Date', 'Time', 'Bristol Type', 'Status', 'Notes']];
+      [...(bmLog || [])].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).forEach(r => {
+        rows.push([r.date, r.time || '', r.bristol, bristolStatusLabel(r.bristol), r.notes || '']);
+      });
       return makeCSV(rows);
     }
   }];
@@ -5061,6 +5298,7 @@ function ExportTab({
     meds: meds,
     medLogs: medLogs,
     healthkitDailyLog: healthkitDailyLog,
+    bmLog: bmLog,
     sections: sections
   }));
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Card, {
@@ -5601,12 +5839,13 @@ function WaterTab({ healthkitDailyLog, goals }) {
 }
 
 // ── ROOT ──────────────────────────────────────────────────────────────────────
-const TABS = ["Dashboard", "Vitals", "Glucose", "Weight", "Activity", "Water", "Labs", "Goals", "Meds", "Export"];
+const TABS = ["Dashboard", "Glucose", "Vitals", "Meds", "Weight", "BM", "Activity", "Water", "Labs", "Goals", "Export"];
 const TAB_LABELS = {
   "Dashboard": "Home",
   "Vitals": "BP",
   "Glucose": "Glucose",
   "Weight": "Wt",
+  "BM": "BM",
   "Activity": "Activity",
   "Water": "Water",
   "Labs": "Labs",
@@ -5628,7 +5867,8 @@ function App() {
   const [cgmSummaryLog, setCgmSummaryLog, cgmLoaded] = usePersistedState("cgm-summary-log", []);
   const [healthkitDailyLog, setHealthkitDailyLog, hkdlLoaded] = usePersistedState("healthkit-daily-log", []);
   const [cgmSummaryDraft, setCgmSummaryDraft, cgmDraftLoaded] = usePersistedState("cgm-summary-draft", []);
-  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded && cgmLoaded && hkdlLoaded && cgmDraftLoaded;
+  const [bmLog, setBmLog, bmLoaded] = usePersistedState("bowel-log", []);
+  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded && cgmLoaded && hkdlLoaded && cgmDraftLoaded && bmLoaded;
   const shared = {
     bp,
     setBp,
@@ -5651,7 +5891,9 @@ function App() {
     healthkitDailyLog,
     setHealthkitDailyLog,
     cgmSummaryDraft,
-    setCgmSummaryDraft
+    setCgmSummaryDraft,
+    bmLog,
+    setBmLog
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "app-root",
@@ -5729,6 +5971,10 @@ function App() {
       display: tab === "Weight" ? "block" : "none"
     }
   }, /*#__PURE__*/React.createElement(WeightTab, shared)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: tab === "BM" ? "block" : "none"
+    }
+  }, /*#__PURE__*/React.createElement(BmTab, shared)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: tab === "Activity" ? "block" : "none"
     }
