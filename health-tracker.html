@@ -3509,6 +3509,7 @@ function MedsTab({
     time: nowTime(),
     notes: ""
   });
+  const [bulkMsg, setBulkMsg] = useState("");
   const active = meds.filter(m => m.active);
   const inactive = meds.filter(m => !m.active);
   function saveMed() {
@@ -3577,6 +3578,32 @@ function MedsTab({
       ...m,
       active: !m.active
     } : m));
+  }
+  // Bulk-logs today's dose for every active, already-started, Daily-frequency
+  // medication that hasn't already been logged today — skips anything logged,
+  // Twice daily/As needed/Weekly/Other, or not yet started (pending).
+  function logAllDaily() {
+    const todayStr = today();
+    const loggedTodayIds = new Set(medLogs.filter(l => l.date === todayStr).map(l => l.medId));
+    const eligible = active.filter(m => m.frequency === "Daily" && m.startDate <= todayStr && !loggedTodayIds.has(m.id));
+    if (eligible.length === 0) {
+      setBulkMsg("No daily meds left to log today.");
+      setTimeout(() => setBulkMsg(""), 2500);
+      return;
+    }
+    const now = nowTime();
+    const newLogs = eligible.map((m, i) => ({
+      id: Date.now() + i,
+      medId: m.id,
+      medName: m.name,
+      dose: m.dose,
+      date: todayStr,
+      time: now,
+      notes: ""
+    }));
+    setMedLogs([...medLogs, ...newLogs]);
+    setBulkMsg(`Logged ${eligible.length} daily med${eligible.length > 1 ? "s" : ""}.`);
+    setTimeout(() => setBulkMsg(""), 2500);
   }
 
   // group logs by date, most recent first
@@ -3818,7 +3845,27 @@ function MedsTab({
   }, "Select…"), active.map(m => /*#__PURE__*/React.createElement("option", {
     key: m.id,
     value: m.id
-  }, m.name, m.dose ? " " + m.dose : "")))), /*#__PURE__*/React.createElement("div", {
+  }, m.name, m.dose ? " " + m.dose : "")))), active.some(m => m.frequency === "Daily") && /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 10 }
+  },
+    /*#__PURE__*/React.createElement("button", {
+      onClick: logAllDaily,
+      style: {
+        width: "100%",
+        padding: "8px",
+        background: "none",
+        color: C.accent,
+        border: `1px dashed ${C.accent}`,
+        borderRadius: 8,
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    }, "⚡ Log All Daily Meds Now"),
+    bulkMsg && /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11, color: C.muted, textAlign: "center", marginTop: 4 }
+    }, bulkMsg)
+  ), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
