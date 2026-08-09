@@ -3990,6 +3990,7 @@ function PDFSummary({
     if (sections.glucose && glucoseLog && glucoseLog.length > 0) return 'glucose';
     if (sections.weight) return 'weight';
     if (sections.meds || (sections.adherence && medLogs && medLogs.length > 0)) return 'medsPair';
+    if (sections.activity && healthkitDailyLog && healthkitDailyLog.length > 0) return 'activity';
     return null;
   })();
   const latestBP = bpSorted[0];
@@ -4890,7 +4891,7 @@ function PDFSummary({
     const byDate = {};
     healthkitDailyLog.forEach(d => { byDate[d.date] = d; });
     return /*#__PURE__*/React.createElement(React.Fragment, null,
-      /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Activity & Vitals (from Apple Health)"),
+      /*#__PURE__*/React.createElement("div", { style: { ...S.h2, ...(firstBreakSection !== 'activity' ? { pageBreakBefore: "always", breakBefore: "page" } : {}) } }, "Activity & Vitals (from Apple Health)"),
       sleepPts.length >= 2 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 10, marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" } },
         /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Sleep Trend (since ", fmtDate(TREND_CHART_START), ")"),
         /*#__PURE__*/React.createElement(TrendChart, {
