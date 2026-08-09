@@ -643,6 +643,55 @@ function last7Dates() {
   return days;
 }
 
+// ── TREND SUMMARY TIME WINDOWS (Export tab's Trend Summary section) ──────────
+// Independent of TREND_CHART_START (which only governs the fixed BP/Glucose/
+// Weight/CGM full-history trend charts) — this is a separate, user-selectable
+// window used solely for the Trend Summary's first-vs-latest comparisons.
+const TREND_WINDOWS = ["ALL", "7 DAYS", "14 DAYS", "30 DAYS", "60 DAYS", "90 DAYS", "12 MONTHS", "MTD", "YTD"];
+function trendWindowRange(key) {
+  const end = today();
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  if (key === "ALL") return { start: TREND_CHART_START, end };
+  if (key === "MTD") {
+    const first = new Date(d.getFullYear(), d.getMonth(), 1);
+    return { start: localDateStr(first), end };
+  }
+  if (key === "YTD") {
+    const first = new Date(d.getFullYear(), 0, 1);
+    return { start: localDateStr(first), end };
+  }
+  if (key === "12 MONTHS") {
+    const past = new Date(d);
+    past.setMonth(past.getMonth() - 12);
+    return { start: localDateStr(past), end };
+  }
+  const daysMap = { "7 DAYS": 7, "14 DAYS": 14, "30 DAYS": 30, "60 DAYS": 60, "90 DAYS": 90 };
+  const n = daysMap[key] || 7;
+  const past = new Date(d);
+  past.setDate(past.getDate() - (n - 1));
+  return { start: localDateStr(past), end };
+}
+function trendWindowLabel(key) {
+  if (key === "ALL") return `all data (since ${fmtDate(TREND_CHART_START)})`;
+  if (key === "MTD") return "month to date";
+  if (key === "YTD") return "year to date";
+  if (key === "12 MONTHS") return "the last 12 months";
+  return "the last " + key.toLowerCase();
+}
+// Basic first-vs-latest comparison used throughout the Trend Summary.
+// readingsAsc: ascending-by-date [{date, value}], already window-filtered.
+function trendStats(readingsAsc, goal, bad) {
+  if (!readingsAsc || !readingsAsc.length) return null;
+  const first = readingsAsc[0].value;
+  const latest = readingsAsc[readingsAsc.length - 1].value;
+  const delta = +(latest - first).toFixed(1);
+  const pct = first ? +((delta / Math.abs(first)) * 100).toFixed(1) : null;
+  const streak = goal != null ? calcStreak(readingsAsc, goal, bad || "high") : null;
+  return { first, latest, delta, pct, n: readingsAsc.length, streak };
+}
+
+
 // ── STYLE TOKENS ──────────────────────────────────────────────────────────────
 const C = {
   bg: "#f4f6f8",
@@ -4052,7 +4101,8 @@ function PDFSummary({
   medLogs,
   healthkitDailyLog,
   bmLog,
-  sections
+  sections,
+  trendWindow
 }) {
   const bpSorted = [...bp].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const wSorted = [...weight].sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
@@ -4378,7 +4428,179 @@ function PDFSummary({
     style: S.metaLabel
   }, "Report Generated"), /*#__PURE__*/React.createElement("span", {
     style: S.metaVal
-  }, todayStr)))), sections.hero && /*#__PURE__*/React.createElement("div", {
+  }, todayStr)))), sections.trend && (() => {
+    const { start: winStart, end: winEnd } = trendWindowRange(trendWindow);
+    const windowLabel = trendWindowLabel(trendWindow);
+    const rows = [];
+
+    if (sections.bp) {
+      const windowed = [...bp].filter(r => r.date >= winStart && r.date <= winEnd)
+        .map(r => { const n = normBP(r); return { date: r.date, time: r.time || '', value: n.sys }; })
+        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+      const st = trendStats(windowed, goals?.systolic, "high");
+      if (st) rows.push({ group: "Vitals", metric: "Systolic BP", unit: "mmHg", ...st });
+    }
+
+    if (sections.glucose && glucoseLog && glucoseLog.length > 0) {
+      const fastingWindowed = glucoseLog.filter(r => r.readingType === "Fasting" && r.date >= winStart && r.date <= winEnd)
+        .map(r => ({ date: r.date, time: r.time || '', value: r.value }))
+        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+      const fastingSt = trendStats(fastingWindowed, goals?.fastingGlucose || SEED_GOALS.fastingGlucose, "high");
+      if (fastingSt) rows.push({ group: "Vitals", metric: "Fasting Glucose", unit: "mg/dL", ...fastingSt });
+
+      const avgCgmWindowed = (cgmSummaryLog || []).filter(r => r.avgGlucose != null && r.date >= winStart && r.date <= winEnd)
+        .map(r => ({ date: r.date, value: r.avgGlucose }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+      const avgSt = trendStats(avgCgmWindowed, goals?.avgCgmGlucose || SEED_GOALS.avgCgmGlucose, "high");
+      if (avgSt) rows.push({ group: "Vitals", metric: "Avg CGM Glucose", unit: "mg/dL", ...avgSt });
+
+      const tirWindowed = (cgmSummaryLog || []).filter(r => r.tir != null && r.date >= winStart && r.date <= winEnd)
+        .map(r => ({ date: r.date, value: r.tir }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+      const tirSt = trendStats(tirWindowed, null, null);
+      if (tirSt) rows.push({ group: "Vitals", metric: "CGM Time in Range", unit: "%", ...tirSt });
+    }
+
+    if (sections.weight) {
+      const windowed = [...weight].filter(e => e.date >= winStart && e.date <= winEnd)
+        .map(e => { const n = normW(e); return { date: e.date, time: e.time || '', value: n.w }; })
+        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+      const st = trendStats(windowed, goals?.weight, "high");
+      if (st) rows.push({ group: "Vitals", metric: "Weight", unit: "lb", ...st });
+    }
+
+    if (sections.labs) {
+      ["HbA1c", "HDL", "LDL"].forEach(marker => {
+        const panels = [...labs].filter(l => l.values && l.values[marker] != null).sort((a, b) => a.date.localeCompare(b.date));
+        if (!panels.length) return;
+        const latestPanel = panels[panels.length - 1];
+        if (latestPanel.date < winStart || latestPanel.date > winEnd) return;
+        const latestVal = firstNum(latestPanel.values[marker]);
+        const prevPanel = panels.length >= 2 ? panels[panels.length - 2] : null;
+        const firstVal = prevPanel ? firstNum(prevPanel.values[marker]) : latestVal;
+        const delta = +(latestVal - firstVal).toFixed(1);
+        const pct = firstVal ? +((delta / Math.abs(firstVal)) * 100).toFixed(1) : null;
+        const goal = goals?.[marker];
+        const bad = marker === "HDL" ? "low" : "high";
+        const streak = goal != null ? calcStreak(panels.map(l => ({ date: l.date, value: firstNum(l.values[marker]) })), goal, bad) : null;
+        rows.push({ group: "Labs", metric: marker, unit: marker === "HbA1c" ? "%" : "mg/dL", first: firstVal, latest: latestVal, delta, pct, streak, n: prevPanel ? 2 : 1, note: prevPanel ? null : "only 1 panel on record" });
+      });
+    }
+
+    if (sections.meds || (sections.adherence && medLogs && medLogs.length > 0)) {
+      const eligible = meds.filter(m => m.frequency !== "As needed" && m.startDate <= winEnd);
+      let totalLogs = 0, totalExpected = 0;
+      eligible.forEach(m => {
+        const effStart = m.startDate > winStart ? m.startDate : winStart;
+        if (effStart > winEnd) return;
+        const logsN = (medLogs || []).filter(l => l.medId === m.id && l.date >= effStart && l.date <= winEnd).length;
+        const startD = new Date(effStart + 'T00:00:00');
+        const endD = new Date(winEnd + 'T00:00:00');
+        const daysElapsed = Math.round((endD - startD) / 86400000) + 1;
+        const expected = m.frequency === 'Weekly' ? Math.max(1, Math.ceil(daysElapsed / 7)) : Math.max(1, daysElapsed);
+        totalLogs += logsN;
+        totalExpected += expected;
+      });
+      if (totalExpected > 0) {
+        const pct = Math.round(totalLogs / totalExpected * 100);
+        rows.push({ group: "Medications", metric: "Adherence", unit: "%", first: null, latest: pct, delta: null, pct: null, streak: null, n: eligible.length, isRate: true });
+      }
+    }
+
+    if (sections.activity && healthkitDailyLog && healthkitDailyLog.length > 0) {
+      const windowedDaily = healthkitDailyLog.filter(d => d.date >= winStart && d.date <= winEnd).sort((a, b) => a.date.localeCompare(b.date));
+      const sleepReadings = windowedDaily.filter(d => d.sleepMinutes != null).map(d => ({ date: d.date, value: +(d.sleepMinutes / 60).toFixed(1) }));
+      const sleepSt = trendStats(sleepReadings, goals?.sleepHours, "low");
+      if (sleepSt) rows.push({ group: "Activity", metric: "Sleep", unit: "hr", ...sleepSt });
+
+      const stepsReadings = windowedDaily.filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps }));
+      const stepsSt = trendStats(stepsReadings, goals?.steps, "low");
+      if (stepsSt) rows.push({ group: "Activity", metric: "Steps", unit: "", ...stepsSt });
+
+      const aeReadings = windowedDaily.filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) }));
+      const aeSt = trendStats(aeReadings, goals?.activeEnergy, "low");
+      if (aeSt) rows.push({ group: "Activity", metric: "Active Energy", unit: "kcal", ...aeSt });
+
+      const rhrReadings = windowedDaily.filter(d => d.restingHeartRate != null).map(d => ({ date: d.date, value: Math.round(d.restingHeartRate) }));
+      const rhrSt = trendStats(rhrReadings, goals?.restingHeartRate, "high");
+      if (rhrSt) rows.push({ group: "Activity", metric: "Resting Heart Rate", unit: "bpm", ...rhrSt });
+    }
+
+    if (sections.bm && bmLog && bmLog.length > 0) {
+      const windowed = bmLog.filter(r => r.date >= winStart && r.date <= winEnd);
+      if (windowed.length) {
+        const avgBristol = +(windowed.reduce((s, r) => s + r.bristol, 0) / windowed.length).toFixed(1);
+        const allSorted = [...bmLog].sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
+        const last5 = allSorted.slice(0, 5);
+        const trendingConstipated = last5.length === 5 && (last5.reduce((s, r) => s + r.bristol, 0) / 5) <= 2.5;
+        const daysSinceLast = allSorted.length ? Math.round((new Date(today() + 'T00:00:00') - new Date(allSorted[0].date + 'T00:00:00')) / 86400000) : null;
+        rows.push({ group: "Digestive", metric: "Bowel Movements", unit: "", first: null, latest: avgBristol, delta: null, pct: null, streak: null, n: windowed.length, isBM: true, trendingConstipated, daysSinceLast });
+      }
+    }
+
+    function fmtVal(v, unit) {
+      if (v == null) return '—';
+      return v + (unit ? ' ' + unit : '');
+    }
+    function narrativeFor(r) {
+      if (r.isRate) return `${r.metric}: ${r.latest}% over ${windowLabel} (${r.n} medication${r.n === 1 ? '' : 's'} tracked).`;
+      if (r.isBM) {
+        let s = `${r.metric}: average Bristol type ${r.latest} over ${windowLabel} (${r.n} entr${r.n === 1 ? 'y' : 'ies'} logged).`;
+        if (r.trendingConstipated) s += ' Trending constipated (avg of last 5 entries ≤2.5).';
+        if (r.daysSinceLast != null) s += ` Last logged ${r.daysSinceLast} day${r.daysSinceLast === 1 ? '' : 's'} ago.`;
+        return s;
+      }
+      if (r.n === 1) {
+        let s = `${r.metric}: ${fmtVal(r.latest, r.unit)} (only 1 reading in ${windowLabel}).`;
+        if (r.streak) s += ` Currently on a ${r.streak.days}-day streak at goal.`;
+        return s;
+      }
+      const deltaStr = r.delta != null ? `${r.delta > 0 ? '+' : ''}${r.delta}${r.unit ? ' ' + r.unit : ''}` : null;
+      const pctStr = r.pct != null ? `${r.pct > 0 ? '+' : ''}${r.pct}%` : null;
+      const changeStr = (deltaStr || pctStr) ? ` (${[deltaStr, pctStr].filter(Boolean).join(', ')})` : '';
+      let s = `${r.metric}: ${fmtVal(r.first, r.unit)} → ${fmtVal(r.latest, r.unit)}${changeStr} over ${windowLabel}.`;
+      if (r.note) s += ` (${r.note})`;
+      if (r.streak) s += ` Currently on a ${r.streak.days}-day streak at goal.`;
+      return s;
+    }
+
+    if (!rows.length) return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Trend Summary"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint, fontStyle: 'italic', marginBottom: 14 } },
+        "No underlying sections selected (or no data in ", windowLabel, "). Select Blood Pressure, Glucose, Weight, Lab Results, Medications/Adherence, Activity & Vitals, or Bowel Movements above to see trends here."
+      )
+    );
+
+    const groups = [];
+    rows.forEach(r => { if (!groups.includes(r.group)) groups.push(r.group); });
+
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Trend Summary"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 10 } }, "Window: ", windowLabel),
+      ...groups.map(g => /*#__PURE__*/React.createElement(React.Fragment, { key: g },
+        /*#__PURE__*/React.createElement("div", { style: S.h3 }, g),
+        ...rows.filter(r => r.group === g).map((r, i) => /*#__PURE__*/React.createElement("div", { key: i, style: { fontSize: 12, color: C.text, marginBottom: 4, lineHeight: 1.5 } }, narrativeFor(r)))
+      )),
+      /*#__PURE__*/React.createElement("table", { style: { ...S.table, marginTop: 10 } },
+        /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Metric"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Start"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Latest"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Δ"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "% Change"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Streak")
+        )),
+        /*#__PURE__*/React.createElement("tbody", null, rows.map((r, i) => /*#__PURE__*/React.createElement("tr", { key: i, style: { background: i % 2 === 0 ? '#fff' : '#fafafa' } },
+          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600 } }, r.metric),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, r.isRate || r.isBM ? '—' : fmtVal(r.first, r.unit)),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, r.isRate ? r.latest + '%' : fmtVal(r.latest, r.unit)),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, (r.isRate || r.isBM || r.delta == null) ? '—' : (r.delta > 0 ? '+' : '') + r.delta),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, (r.isRate || r.isBM || r.pct == null) ? '—' : (r.pct > 0 ? '+' : '') + r.pct + '%'),
+          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, r.streak ? `${r.streak.days}d` : '—')
+        )))
+      )
+    );
+  })(), sections.hero && /*#__PURE__*/React.createElement("div", {
     style: S.hero
   }, latestNormBP && /*#__PURE__*/React.createElement(StatBox, {
     label: "Blood Pressure" + (latestNormBP.isEst ? " (est.)" : ""),
@@ -5054,6 +5276,10 @@ function PDFSummary({
 
 // ── EXPORT TAB ────────────────────────────────────────────────────────────────
 const SECTION_DEFS = [{
+  key: 'trend',
+  label: 'Trend Summary',
+  desc: 'Narrative + stats deltas/streaks for every other selected section, over a configurable time window. Always renders first.'
+}, {
   key: 'hero',
   label: 'Summary Stats',
   desc: 'Latest BP, weight, CGM time in range, glucose'
@@ -5100,6 +5326,7 @@ const SECTION_DEFS = [{
 }];
 const PRESETS = {
   'Doctor Visit': {
+    trend: false,
     hero: true,
     bp: true,
     glucose: true,
@@ -5113,6 +5340,7 @@ const PRESETS = {
     bm: false
   },
   'Full Export': {
+    trend: false,
     hero: true,
     bp: true,
     glucose: true,
@@ -5126,6 +5354,7 @@ const PRESETS = {
     bm: false
   },
   'Labs Only': {
+    trend: false,
     hero: true,
     bp: false,
     glucose: false,
@@ -5139,6 +5368,7 @@ const PRESETS = {
     bm: false
   },
   'Goal Progress': {
+    trend: false,
     hero: false,
     bp: false,
     glucose: false,
@@ -5152,6 +5382,7 @@ const PRESETS = {
     bm: false
   },
   'Vitals': {
+    trend: false,
     hero: false,
     bp: true,
     glucose: true,
@@ -5165,6 +5396,7 @@ const PRESETS = {
     bm: false
   },
   'Current Snapshot': {
+    trend: false,
     hero: true,
     bp: true,
     glucose: true,
@@ -5179,6 +5411,7 @@ const PRESETS = {
   }
 };
 const EMPTY_SECTIONS = {
+  trend: false,
   hero: false,
   bp: false,
   glucose: false,
@@ -5207,6 +5440,7 @@ function ExportTab({
   const [view, setView] = useState(null);
   const [sections, setSections] = useState(EMPTY_SECTIONS);
   const [activePreset, setActivePreset] = useState(null);
+  const [trendWindow, setTrendWindow] = useState("7 DAYS");
   function toggleSection(key) {
     setSections(s => ({
       ...s,
@@ -5472,7 +5706,8 @@ function ExportTab({
     medLogs: medLogs,
     healthkitDailyLog: healthkitDailyLog,
     bmLog: bmLog,
-    sections: sections
+    sections: sections,
+    trendWindow: trendWindow
   }));
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Card, {
     style: {
@@ -5554,7 +5789,16 @@ function ExportTab({
       fontSize: 10,
       color: C.faint
     }
-  }, s.desc))))), /*#__PURE__*/React.createElement("button", {
+  }, s.desc))))), sections.trend && /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 14, padding: '10px 12px', background: '#fafafa', border: '1px solid ' + C.border, borderRadius: 8 }
+  },
+    /*#__PURE__*/React.createElement("label", { style: { fontSize: 12, color: C.muted, fontWeight: 600, display: 'block', marginBottom: 6 } }, "Trend Summary Time Window"),
+    /*#__PURE__*/React.createElement("select", {
+      value: trendWindow,
+      onChange: e => setTrendWindow(e.target.value),
+      style: { ...inputSt, padding: '6px 8px', fontSize: 13 }
+    }, TREND_WINDOWS.map(w => /*#__PURE__*/React.createElement("option", { key: w, value: w }, w)))
+  ), /*#__PURE__*/React.createElement("button", {
     onClick: () => setView({
       type: 'pdf'
     }),
