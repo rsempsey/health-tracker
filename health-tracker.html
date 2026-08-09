@@ -4431,42 +4431,82 @@ function PDFSummary({
   }, todayStr)))), sections.trend && (() => {
     const { start: winStart, end: winEnd } = trendWindowRange(trendWindow);
     const windowLabel = trendWindowLabel(trendWindow);
+    const priorRange = (() => {
+      const startMs = new Date(winStart + 'T00:00:00').getTime();
+      const endMs = new Date(winEnd + 'T00:00:00').getTime();
+      const days = Math.round((endMs - startMs) / 86400000) + 1;
+      const priorEndMs = startMs - 86400000;
+      const priorStartMs = priorEndMs - (days - 1) * 86400000;
+      return { start: localDateStr(new Date(priorStartMs)), end: localDateStr(new Date(priorEndMs)) };
+    })();
     const rows = [];
 
+    // direction: does this delta represent an improvement, given which way is "bad"?
+    function direction(delta, bad) {
+      if (delta == null || Math.abs(delta) < 1e-9) return 'flat';
+      if (bad === 'low') return delta > 0 ? 'improving' : 'worsening';
+      return delta < 0 ? 'improving' : 'worsening';
+    }
+    function metGoal(latest, goal, bad) {
+      if (latest == null || goal == null) return null;
+      return bad === 'low' ? latest >= goal : latest <= goal;
+    }
+    // Compares this window's delta to the immediately preceding window of
+    // equal length — "accelerating"/"slowing" (same direction, different
+    // magnitude), "reversing course" (direction flipped), or null if there
+    // isn't enough prior data to say anything meaningful.
+    function paceNote(delta, priorDelta, bad) {
+      if (delta == null || priorDelta == null) return null;
+      const dCur = direction(delta, bad), dPrior = direction(priorDelta, bad);
+      if (dCur === 'flat' || dPrior === 'flat') return null;
+      if (dCur !== dPrior) return 'reversing course from the prior period';
+      const ratio = Math.abs(delta) / Math.abs(priorDelta || 1e-9);
+      if (ratio >= 1.25) return 'accelerating vs. the prior period';
+      if (ratio <= 0.75) return 'slowing vs. the prior period';
+      return 'holding a steady pace vs. the prior period';
+    }
+
     if (sections.bp) {
-      const windowed = [...bp].filter(r => r.date >= winStart && r.date <= winEnd)
+      const buildBP = (s, e) => [...bp].filter(r => r.date >= s && r.date <= e)
         .map(r => { const n = normBP(r); return { date: r.date, time: r.time || '', value: n.sys }; })
         .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-      const st = trendStats(windowed, goals?.systolic, "high");
-      if (st) rows.push({ group: "Vitals", metric: "Systolic BP", unit: "mmHg", ...st });
+      const st = trendStats(buildBP(winStart, winEnd), goals?.systolic, "high");
+      const priorSt = trendStats(buildBP(priorRange.start, priorRange.end), goals?.systolic, "high");
+      if (st) rows.push({ group: "Vitals", metric: "Systolic BP", unit: "mmHg", bad: "high", goal: goals?.systolic, priorDelta: (priorSt && priorSt.n >= 2) ? priorSt.delta : null, ...st });
     }
 
     if (sections.glucose && glucoseLog && glucoseLog.length > 0) {
-      const fastingWindowed = glucoseLog.filter(r => r.readingType === "Fasting" && r.date >= winStart && r.date <= winEnd)
+      const buildFasting = (s, e) => glucoseLog.filter(r => r.readingType === "Fasting" && r.date >= s && r.date <= e)
         .map(r => ({ date: r.date, time: r.time || '', value: r.value }))
         .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-      const fastingSt = trendStats(fastingWindowed, goals?.fastingGlucose || SEED_GOALS.fastingGlucose, "high");
-      if (fastingSt) rows.push({ group: "Vitals", metric: "Fasting Glucose", unit: "mg/dL", ...fastingSt });
+      const fastingGoal = goals?.fastingGlucose || SEED_GOALS.fastingGlucose;
+      const fastingSt = trendStats(buildFasting(winStart, winEnd), fastingGoal, "high");
+      const fastingPriorSt = trendStats(buildFasting(priorRange.start, priorRange.end), fastingGoal, "high");
+      if (fastingSt) rows.push({ group: "Vitals", metric: "Fasting Glucose", unit: "mg/dL", bad: "high", goal: fastingGoal, priorDelta: (fastingPriorSt && fastingPriorSt.n >= 2) ? fastingPriorSt.delta : null, ...fastingSt });
 
-      const avgCgmWindowed = (cgmSummaryLog || []).filter(r => r.avgGlucose != null && r.date >= winStart && r.date <= winEnd)
+      const buildAvgCgm = (s, e) => (cgmSummaryLog || []).filter(r => r.avgGlucose != null && r.date >= s && r.date <= e)
         .map(r => ({ date: r.date, value: r.avgGlucose }))
         .sort((a, b) => a.date.localeCompare(b.date));
-      const avgSt = trendStats(avgCgmWindowed, goals?.avgCgmGlucose || SEED_GOALS.avgCgmGlucose, "high");
-      if (avgSt) rows.push({ group: "Vitals", metric: "Avg CGM Glucose", unit: "mg/dL", ...avgSt });
+      const avgCgmGoal = goals?.avgCgmGlucose || SEED_GOALS.avgCgmGlucose;
+      const avgSt = trendStats(buildAvgCgm(winStart, winEnd), avgCgmGoal, "high");
+      const avgPriorSt = trendStats(buildAvgCgm(priorRange.start, priorRange.end), avgCgmGoal, "high");
+      if (avgSt) rows.push({ group: "Vitals", metric: "Avg CGM Glucose", unit: "mg/dL", bad: "high", goal: avgCgmGoal, priorDelta: (avgPriorSt && avgPriorSt.n >= 2) ? avgPriorSt.delta : null, ...avgSt });
 
-      const tirWindowed = (cgmSummaryLog || []).filter(r => r.tir != null && r.date >= winStart && r.date <= winEnd)
+      const buildTir = (s, e) => (cgmSummaryLog || []).filter(r => r.tir != null && r.date >= s && r.date <= e)
         .map(r => ({ date: r.date, value: r.tir }))
         .sort((a, b) => a.date.localeCompare(b.date));
-      const tirSt = trendStats(tirWindowed, null, null);
-      if (tirSt) rows.push({ group: "Vitals", metric: "CGM Time in Range", unit: "%", ...tirSt });
+      const tirSt = trendStats(buildTir(winStart, winEnd), null, null);
+      const tirPriorSt = trendStats(buildTir(priorRange.start, priorRange.end), null, null);
+      if (tirSt) rows.push({ group: "Vitals", metric: "CGM Time in Range", unit: "%", bad: "low", goal: 70, priorDelta: (tirPriorSt && tirPriorSt.n >= 2) ? tirPriorSt.delta : null, ...tirSt });
     }
 
     if (sections.weight) {
-      const windowed = [...weight].filter(e => e.date >= winStart && e.date <= winEnd)
-        .map(e => { const n = normW(e); return { date: e.date, time: e.time || '', value: n.w }; })
+      const buildW = (s, e) => [...weight].filter(e2 => e2.date >= s && e2.date <= e)
+        .map(e2 => { const n = normW(e2); return { date: e2.date, time: e2.time || '', value: n.w }; })
         .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-      const st = trendStats(windowed, goals?.weight, "high");
-      if (st) rows.push({ group: "Vitals", metric: "Weight", unit: "lb", ...st });
+      const st = trendStats(buildW(winStart, winEnd), goals?.weight, "high");
+      const priorSt = trendStats(buildW(priorRange.start, priorRange.end), goals?.weight, "high");
+      if (st) rows.push({ group: "Vitals", metric: "Weight", unit: "lb", bad: "high", goal: goals?.weight, priorDelta: (priorSt && priorSt.n >= 2) ? priorSt.delta : null, ...st });
     }
 
     if (sections.labs) {
@@ -4483,47 +4523,56 @@ function PDFSummary({
         const goal = goals?.[marker];
         const bad = marker === "HDL" ? "low" : "high";
         const streak = goal != null ? calcStreak(panels.map(l => ({ date: l.date, value: firstNum(l.values[marker]) })), goal, bad) : null;
-        rows.push({ group: "Labs", metric: marker, unit: marker === "HbA1c" ? "%" : "mg/dL", first: firstVal, latest: latestVal, delta, pct, streak, n: prevPanel ? 2 : 1, note: prevPanel ? null : "only 1 panel on record" });
+        rows.push({ group: "Labs", metric: marker, unit: marker === "HbA1c" ? "%" : "mg/dL", bad, goal, priorDelta: null, first: firstVal, latest: latestVal, delta, pct, streak, n: prevPanel ? 2 : 1, note: prevPanel ? null : "only 1 panel on record" });
       });
     }
 
     if (sections.meds || (sections.adherence && medLogs && medLogs.length > 0)) {
-      const eligible = meds.filter(m => m.frequency !== "As needed" && m.startDate <= winEnd);
-      let totalLogs = 0, totalExpected = 0;
-      eligible.forEach(m => {
-        const effStart = m.startDate > winStart ? m.startDate : winStart;
-        if (effStart > winEnd) return;
-        const logsN = (medLogs || []).filter(l => l.medId === m.id && l.date >= effStart && l.date <= winEnd).length;
-        const startD = new Date(effStart + 'T00:00:00');
-        const endD = new Date(winEnd + 'T00:00:00');
-        const daysElapsed = Math.round((endD - startD) / 86400000) + 1;
-        const expected = m.frequency === 'Weekly' ? Math.max(1, Math.ceil(daysElapsed / 7)) : Math.max(1, daysElapsed);
-        totalLogs += logsN;
-        totalExpected += expected;
-      });
-      if (totalExpected > 0) {
-        const pct = Math.round(totalLogs / totalExpected * 100);
-        rows.push({ group: "Medications", metric: "Adherence", unit: "%", first: null, latest: pct, delta: null, pct: null, streak: null, n: eligible.length, isRate: true });
+      function adherenceFor(s, e) {
+        const eligible = meds.filter(m => m.frequency !== "As needed" && m.startDate <= e);
+        let totalLogs = 0, totalExpected = 0;
+        eligible.forEach(m => {
+          const effStart = m.startDate > s ? m.startDate : s;
+          if (effStart > e) return;
+          const logsN = (medLogs || []).filter(l => l.medId === m.id && l.date >= effStart && l.date <= e).length;
+          const startD = new Date(effStart + 'T00:00:00');
+          const endD = new Date(e + 'T00:00:00');
+          const daysElapsed = Math.round((endD - startD) / 86400000) + 1;
+          const expected = m.frequency === 'Weekly' ? Math.max(1, Math.ceil(daysElapsed / 7)) : Math.max(1, daysElapsed);
+          totalLogs += logsN;
+          totalExpected += expected;
+        });
+        return { pct: totalExpected > 0 ? Math.round(totalLogs / totalExpected * 100) : null, n: eligible.length };
+      }
+      const cur = adherenceFor(winStart, winEnd);
+      const prior = adherenceFor(priorRange.start, priorRange.end);
+      if (cur.pct != null) {
+        rows.push({ group: "Medications", metric: "Adherence", unit: "%", first: null, latest: cur.pct, delta: null, pct: null, streak: null, n: cur.n, isRate: true, priorPct: prior.pct });
       }
     }
 
     if (sections.activity && healthkitDailyLog && healthkitDailyLog.length > 0) {
-      const windowedDaily = healthkitDailyLog.filter(d => d.date >= winStart && d.date <= winEnd).sort((a, b) => a.date.localeCompare(b.date));
-      const sleepReadings = windowedDaily.filter(d => d.sleepMinutes != null).map(d => ({ date: d.date, value: +(d.sleepMinutes / 60).toFixed(1) }));
-      const sleepSt = trendStats(sleepReadings, goals?.sleepHours, "low");
-      if (sleepSt) rows.push({ group: "Activity", metric: "Sleep", unit: "hr", ...sleepSt });
+      const buildDaily = (s, e) => healthkitDailyLog.filter(d => d.date >= s && d.date <= e).sort((a, b) => a.date.localeCompare(b.date));
 
-      const stepsReadings = windowedDaily.filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps }));
-      const stepsSt = trendStats(stepsReadings, goals?.steps, "low");
-      if (stepsSt) rows.push({ group: "Activity", metric: "Steps", unit: "", ...stepsSt });
+      const sleepGoal = goals?.sleepHours;
+      const sleepSt = trendStats(buildDaily(winStart, winEnd).filter(d => d.sleepMinutes != null).map(d => ({ date: d.date, value: +(d.sleepMinutes / 60).toFixed(1) })), sleepGoal, "low");
+      const sleepPriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.sleepMinutes != null).map(d => ({ date: d.date, value: +(d.sleepMinutes / 60).toFixed(1) })), sleepGoal, "low");
+      if (sleepSt) rows.push({ group: "Activity", metric: "Sleep", unit: "hr", bad: "low", goal: sleepGoal, priorDelta: (sleepPriorSt && sleepPriorSt.n >= 2) ? sleepPriorSt.delta : null, ...sleepSt });
 
-      const aeReadings = windowedDaily.filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) }));
-      const aeSt = trendStats(aeReadings, goals?.activeEnergy, "low");
-      if (aeSt) rows.push({ group: "Activity", metric: "Active Energy", unit: "kcal", ...aeSt });
+      const stepsGoal = goals?.steps;
+      const stepsSt = trendStats(buildDaily(winStart, winEnd).filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps })), stepsGoal, "low");
+      const stepsPriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps })), stepsGoal, "low");
+      if (stepsSt) rows.push({ group: "Activity", metric: "Steps", unit: "", bad: "low", goal: stepsGoal, priorDelta: (stepsPriorSt && stepsPriorSt.n >= 2) ? stepsPriorSt.delta : null, ...stepsSt });
 
-      const rhrReadings = windowedDaily.filter(d => d.restingHeartRate != null).map(d => ({ date: d.date, value: Math.round(d.restingHeartRate) }));
-      const rhrSt = trendStats(rhrReadings, goals?.restingHeartRate, "high");
-      if (rhrSt) rows.push({ group: "Activity", metric: "Resting Heart Rate", unit: "bpm", ...rhrSt });
+      const aeGoal = goals?.activeEnergy;
+      const aeSt = trendStats(buildDaily(winStart, winEnd).filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) })), aeGoal, "low");
+      const aePriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) })), aeGoal, "low");
+      if (aeSt) rows.push({ group: "Activity", metric: "Active Energy", unit: "kcal", bad: "low", goal: aeGoal, priorDelta: (aePriorSt && aePriorSt.n >= 2) ? aePriorSt.delta : null, ...aeSt });
+
+      const rhrGoal = goals?.restingHeartRate;
+      const rhrSt = trendStats(buildDaily(winStart, winEnd).filter(d => d.restingHeartRate != null).map(d => ({ date: d.date, value: Math.round(d.restingHeartRate) })), rhrGoal, "high");
+      const rhrPriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.restingHeartRate != null).map(d => ({ date: d.date, value: Math.round(d.restingHeartRate) })), rhrGoal, "high");
+      if (rhrSt) rows.push({ group: "Activity", metric: "Resting Heart Rate", unit: "bpm", bad: "high", goal: rhrGoal, priorDelta: (rhrPriorSt && rhrPriorSt.n >= 2) ? rhrPriorSt.delta : null, ...rhrSt });
     }
 
     if (sections.bm && bmLog && bmLog.length > 0) {
@@ -4542,26 +4591,31 @@ function PDFSummary({
       if (v == null) return '—';
       return v + (unit ? ' ' + unit : '');
     }
-    function narrativeFor(r) {
-      if (r.isRate) return `${r.metric}: ${r.latest}% over ${windowLabel} (${r.n} medication${r.n === 1 ? '' : 's'} tracked).`;
+    // Lowercase the first letter for mid-sentence use, except acronym-style
+    // metric names (HbA1c, HDL, LDL) which should keep their exact casing.
+    function lcName(name) {
+      if (["HbA1c", "HDL", "LDL"].includes(name)) return name;
+      return name.charAt(0).toLowerCase() + name.slice(1);
+    }
+    // Short clause for a numeric (first-vs-latest) row, used inside the
+    // flowing per-group paragraphs.
+    function clauseFor(r) {
+      if (r.isRate) {
+        let c = `medication adherence was ${r.latest}%`;
+        if (r.priorPct != null && r.priorPct !== r.latest) c += ` (${r.priorPct}% the prior period)`;
+        return c;
+      }
       if (r.isBM) {
-        let s = `${r.metric}: average Bristol type ${r.latest} over ${windowLabel} (${r.n} entr${r.n === 1 ? 'y' : 'ies'} logged).`;
-        if (r.trendingConstipated) s += ' Trending constipated (avg of last 5 entries ≤2.5).';
-        if (r.daysSinceLast != null) s += ` Last logged ${r.daysSinceLast} day${r.daysSinceLast === 1 ? '' : 's'} ago.`;
-        return s;
+        let c = `bowel movements averaged Bristol type ${r.latest} (${r.n} entr${r.n === 1 ? 'y' : 'ies'})`;
+        if (r.trendingConstipated) c += ', trending constipated';
+        return c;
       }
-      if (r.n === 1) {
-        let s = `${r.metric}: ${fmtVal(r.latest, r.unit)} (only 1 reading in ${windowLabel}).`;
-        if (r.streak) s += ` Currently on a ${r.streak.days}-day streak at goal.`;
-        return s;
-      }
-      const deltaStr = r.delta != null ? `${r.delta > 0 ? '+' : ''}${r.delta}${r.unit ? ' ' + r.unit : ''}` : null;
-      const pctStr = r.pct != null ? `${r.pct > 0 ? '+' : ''}${r.pct}%` : null;
-      const changeStr = (deltaStr || pctStr) ? ` (${[deltaStr, pctStr].filter(Boolean).join(', ')})` : '';
-      let s = `${r.metric}: ${fmtVal(r.first, r.unit)} → ${fmtVal(r.latest, r.unit)}${changeStr} over ${windowLabel}.`;
-      if (r.note) s += ` (${r.note})`;
-      if (r.streak) s += ` Currently on a ${r.streak.days}-day streak at goal.`;
-      return s;
+      if (r.n === 1) return `${lcName(r.metric)} was ${fmtVal(r.latest, r.unit)} (only one reading this window)`;
+      const dir = direction(r.delta, r.bad);
+      if (dir === 'flat') return `${lcName(r.metric)} held steady at ${fmtVal(r.latest, r.unit)}`;
+      const verb = dir === 'improving' ? 'improved' : 'declined';
+      const pctStr = r.pct != null ? ` (${r.pct > 0 ? '+' : ''}${r.pct}%)` : '';
+      return `${lcName(r.metric)} ${verb} to ${fmtVal(r.latest, r.unit)} from ${fmtVal(r.first, r.unit)}${pctStr}`;
     }
 
     if (!rows.length) return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -4574,12 +4628,49 @@ function PDFSummary({
     const groups = [];
     rows.forEach(r => { if (!groups.includes(r.group)) groups.push(r.group); });
 
+    // ── Opening "at a glance" paragraph: biggest improvement + biggest concern ──
+    const ranked = rows.filter(r => r.pct != null && Math.abs(r.pct) >= 3)
+      .map(r => ({ ...r, signedImprovement: direction(r.delta, r.bad) === 'improving' ? Math.abs(r.pct) : -Math.abs(r.pct) }))
+      .sort((a, b) => b.signedImprovement - a.signedImprovement);
+    const mostImproved = ranked.length && ranked[0].signedImprovement > 0 ? ranked[0] : null;
+    const mostConcerning = ranked.length && ranked[ranked.length - 1].signedImprovement < 0 ? ranked[ranked.length - 1] : null;
+    let openingText = `Over ${windowLabel}, `;
+    if (mostImproved && mostConcerning && mostImproved.metric !== mostConcerning.metric) {
+      openingText += `${lcName(mostImproved.metric)} showed the most improvement (${mostImproved.pct > 0 ? '+' : ''}${mostImproved.pct}%), while ${lcName(mostConcerning.metric)} moved in the wrong direction (${mostConcerning.pct > 0 ? '+' : ''}${mostConcerning.pct}%).`;
+    } else if (mostImproved) {
+      openingText += `${lcName(mostImproved.metric)} showed the most improvement (${mostImproved.pct > 0 ? '+' : ''}${mostImproved.pct}%).`;
+    } else if (mostConcerning) {
+      openingText += `${lcName(mostConcerning.metric)} moved in the wrong direction (${mostConcerning.pct > 0 ? '+' : ''}${mostConcerning.pct}%); nothing else changed by more than a few percent.`;
+    } else {
+      openingText += `nothing changed by more than a few percent — a stable period across the board.`;
+    }
+
+    // ── Consistency paragraph: active streaks + pace notes worth flagging ──
+    const streakRows = rows.filter(r => r.streak && r.streak.days >= 2);
+    const paceRows = rows.filter(r => !r.isRate && !r.isBM && paceNote(r.delta, r.priorDelta, r.bad));
+    let consistencyParts = [];
+    if (streakRows.length) {
+      consistencyParts.push(streakRows.map(r => `${lcName(r.metric)} (${r.streak.days}d)`).join(', ') + (streakRows.length === 1 ? ' is' : ' are') + ' currently on a streak at goal');
+    }
+    if (paceRows.length) {
+      paceRows.forEach(r => consistencyParts.push(`${lcName(r.metric)} is ${paceNote(r.delta, r.priorDelta, r.bad)}`));
+    }
+    const consistencyText = consistencyParts.length ? consistencyParts.join('; ') + '.' : null;
+
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Trend Summary"),
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 10 } }, "Window: ", windowLabel),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.text, marginBottom: 8, lineHeight: 1.5 } }, openingText),
+      consistencyText && /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.text, marginBottom: 14, lineHeight: 1.5, fontStyle: 'italic' } }, consistencyText),
       ...groups.map(g => /*#__PURE__*/React.createElement(React.Fragment, { key: g },
         /*#__PURE__*/React.createElement("div", { style: S.h3 }, g),
-        ...rows.filter(r => r.group === g).map((r, i) => /*#__PURE__*/React.createElement("div", { key: i, style: { fontSize: 12, color: C.text, marginBottom: 4, lineHeight: 1.5 } }, narrativeFor(r)))
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.text, marginBottom: 10, lineHeight: 1.5 } },
+          (() => {
+            const clauses = rows.filter(r => r.group === g).map(clauseFor);
+            if (clauses.length === 1) return clauses[0].charAt(0).toUpperCase() + clauses[0].slice(1) + '.';
+            return clauses.slice(0, -1).join(', ') + ', and ' + clauses[clauses.length - 1] + '.';
+          })().replace(/^./, c => c.toUpperCase())
+        )
       )),
       /*#__PURE__*/React.createElement("table", { style: { ...S.table, marginTop: 10 } },
         /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
@@ -4588,6 +4679,7 @@ function PDFSummary({
           /*#__PURE__*/React.createElement("th", { style: S.th }, "Latest"),
           /*#__PURE__*/React.createElement("th", { style: S.th }, "Δ"),
           /*#__PURE__*/React.createElement("th", { style: S.th }, "% Change"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "vs. Prior Period"),
           /*#__PURE__*/React.createElement("th", { style: S.th }, "Streak")
         )),
         /*#__PURE__*/React.createElement("tbody", null, rows.map((r, i) => /*#__PURE__*/React.createElement("tr", { key: i, style: { background: i % 2 === 0 ? '#fff' : '#fafafa' } },
@@ -4596,6 +4688,7 @@ function PDFSummary({
           /*#__PURE__*/React.createElement("td", { style: S.td }, r.isRate ? r.latest + '%' : fmtVal(r.latest, r.unit)),
           /*#__PURE__*/React.createElement("td", { style: S.td }, (r.isRate || r.isBM || r.delta == null) ? '—' : (r.delta > 0 ? '+' : '') + r.delta),
           /*#__PURE__*/React.createElement("td", { style: S.td }, (r.isRate || r.isBM || r.pct == null) ? '—' : (r.pct > 0 ? '+' : '') + r.pct + '%'),
+          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, paceNote(r.delta, r.priorDelta, r.bad) || '—'),
           /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, r.streak ? `${r.streak.days}d` : '—')
         )))
       )
