@@ -4875,9 +4875,41 @@ function PDFSummary({
       return `Since ${fmtDate(startDate)} (${dur})`;
     })() : '—'))))));
   })(), sections.activity && healthkitDailyLog && healthkitDailyLog.length > 0 && (() => {
-    const sorted = [...healthkitDailyLog].sort((a, b) => a.date.localeCompare(b.date));
+    const sleepPts = healthkitDailyLog
+      .filter(d => d.sleepMinutes != null && d.date >= TREND_CHART_START)
+      .map(d => {
+        const hrs = +(d.sleepMinutes / 60).toFixed(1);
+        return { date: d.date, value: hrs, color: (goals?.sleepHours != null && hrs >= goals.sleepHours) ? '#22c55e' : '#f97316' };
+      });
+    const hrPts = healthkitDailyLog
+      .filter(d => d.restingHeartRate != null && d.date >= TREND_CHART_START)
+      .map(d => {
+        const bpm = Math.round(d.restingHeartRate);
+        return { date: d.date, value: bpm, color: (goals?.restingHeartRate != null && bpm <= goals.restingHeartRate) ? '#22c55e' : '#f97316' };
+      });
+    const byDate = {};
+    healthkitDailyLog.forEach(d => { byDate[d.date] = d; });
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Activity & Vitals (from Apple Health)"),
+      sleepPts.length >= 2 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 10, marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" } },
+        /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Sleep Trend (since ", fmtDate(TREND_CHART_START), ")"),
+        /*#__PURE__*/React.createElement(TrendChart, {
+          points: sleepPts,
+          goal: goals?.sleepHours,
+          unit: "hr",
+          width: 620
+        })
+      ),
+      hrPts.length >= 2 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 10, marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" } },
+        /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Resting Heart Rate Trend (since ", fmtDate(TREND_CHART_START), ")"),
+        /*#__PURE__*/React.createElement(TrendChart, {
+          points: hrPts,
+          goal: goals?.restingHeartRate,
+          unit: "bpm",
+          width: 620
+        })
+      ),
+      /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Last 7 Days"),
       /*#__PURE__*/React.createElement("table", { style: S.table },
         /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
           /*#__PURE__*/React.createElement("th", { style: S.th }, "Date"),
@@ -4887,17 +4919,28 @@ function PDFSummary({
           /*#__PURE__*/React.createElement("th", { style: S.th }, "Water"),
           /*#__PURE__*/React.createElement("th", { style: S.th }, "Resting HR")
         )),
-        /*#__PURE__*/React.createElement("tbody", null, sorted.map((d, i) => /*#__PURE__*/React.createElement("tr", {
-          key: d.date,
-          style: { background: i % 2 === 0 ? '#fff' : '#fafafa' }
-        },
-          /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(d.date)),
-          /*#__PURE__*/React.createElement("td", { style: S.td }, d.sleepMinutes != null ? `${Math.floor(d.sleepMinutes / 60)}h ${d.sleepMinutes % 60}m` : '—'),
-          /*#__PURE__*/React.createElement("td", { style: S.td }, d.steps != null ? d.steps.toLocaleString() : '—'),
-          /*#__PURE__*/React.createElement("td", { style: S.td }, d.activeEnergyKcal != null ? Math.round(d.activeEnergyKcal) + ' kcal' : '—'),
-          /*#__PURE__*/React.createElement("td", { style: S.td }, d.waterOz != null ? Math.round(d.waterOz) + ' oz' : '—'),
-          /*#__PURE__*/React.createElement("td", { style: S.td }, d.restingHeartRate != null ? Math.round(d.restingHeartRate) + ' bpm' : '—')
-        )))
+        /*#__PURE__*/React.createElement("tbody", null, last7Dates().map((dt, i) => {
+          const d = byDate[dt];
+          const rowStyle = { background: i % 2 === 0 ? '#fff' : '#fafafa' };
+          if (!d) {
+            return /*#__PURE__*/React.createElement("tr", { key: dt, style: rowStyle },
+              /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(dt)),
+              /*#__PURE__*/React.createElement("td", { style: { ...S.td, color: '#9ca3af', fontStyle: 'italic' } }, "No data logged"),
+              /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+              /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+              /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+              /*#__PURE__*/React.createElement("td", { style: S.td }, "—")
+            );
+          }
+          return /*#__PURE__*/React.createElement("tr", { key: dt, style: rowStyle },
+            /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(d.date)),
+            /*#__PURE__*/React.createElement("td", { style: S.td }, d.sleepMinutes != null ? `${Math.floor(d.sleepMinutes / 60)}h ${d.sleepMinutes % 60}m` : '—'),
+            /*#__PURE__*/React.createElement("td", { style: S.td }, d.steps != null ? d.steps.toLocaleString() : '—'),
+            /*#__PURE__*/React.createElement("td", { style: S.td }, d.activeEnergyKcal != null ? Math.round(d.activeEnergyKcal) + ' kcal' : '—'),
+            /*#__PURE__*/React.createElement("td", { style: S.td }, d.waterOz != null ? Math.round(d.waterOz) + ' oz' : '—'),
+            /*#__PURE__*/React.createElement("td", { style: S.td }, d.restingHeartRate != null ? Math.round(d.restingHeartRate) + ' bpm' : '—')
+          );
+        }))
       )
     );
   })(), sections.bm && bmLog && bmLog.length > 0 && (() => {
@@ -4975,7 +5018,7 @@ const SECTION_DEFS = [{
 }, {
   key: 'activity',
   label: 'Activity & Vitals',
-  desc: 'Sleep, steps, active energy, water, resting heart rate'
+  desc: 'Rolling 7-day table (sleep, steps, active energy, water, resting HR) + trend charts for sleep and resting HR'
 }, {
   key: 'bm',
   label: 'Bowel Movements',
