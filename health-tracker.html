@@ -909,8 +909,64 @@ function TrendChart({
   goal,
   unit,
   width = 620,
-  height = 130
+  height = 130,
+  series
 }) {
+  // Multi-series mode: series = [{ points: [{date, value}], color, label }, ...]
+  // Used when a chart needs more than one comparable line (e.g. Fasting Glucose
+  // + Avg CGM Glucose) instead of the single-line + goal-line + status-colored-dots
+  // mode used everywhere else (BP, Weight, single-metric Glucose, Sleep, RHR).
+  if (series && series.length) {
+    const activeSeries = series.filter(s => s.points && s.points.length);
+    if (activeSeries.length < 1 || !activeSeries.some(s => s.points.length >= 2)) return null;
+    const pad = 14, topPad = 12, botPad = 20, legendH = 18;
+    const toMs = d => new Date(d + "T00:00:00").getTime();
+    const allPoints = activeSeries.flatMap(s => s.points);
+    const minMs = Math.min(...allPoints.map(p => toMs(p.date)));
+    const maxMs = Math.max(...allPoints.map(p => toMs(p.date)));
+    const spanMs = (maxMs - minMs) || 1;
+    const vals = allPoints.map(p => p.value);
+    const dataMn = Math.min(...vals), dataMx = Math.max(...vals);
+    const dataRange = (dataMx - dataMn) || 1;
+    const padAmt = dataRange * 0.1;
+    const mn = dataMn - padAmt, mx = dataMx + padAmt;
+    const rng = (mx - mn) || 1;
+    const plotHeight = height - topPad - botPad;
+    const xFor = dateStr => pad + (toMs(dateStr) - minMs) / spanMs * (width - 2 * pad);
+    const yFor = v => topPad + plotHeight - (v - mn) / rng * plotHeight;
+    const dateLabelSorted = [...allPoints].sort((a, b) => a.date.localeCompare(b.date));
+    return /*#__PURE__*/React.createElement("div", null,
+      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 14, marginBottom: 4, flexWrap: "wrap" } },
+        ...activeSeries.map((s, i) => /*#__PURE__*/React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 4 } },
+          /*#__PURE__*/React.createElement("span", { style: { width: 8, height: 8, borderRadius: 4, background: s.color, display: "inline-block" } }),
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 10, color: "#6b7280" } }, s.label)
+        ))
+      ),
+      /*#__PURE__*/React.createElement("svg", {
+        width, height,
+        style: { display: "block", overflow: "visible" }
+      },
+        ...activeSeries.flatMap((s, si) => {
+          const sorted = [...s.points].sort((a, b) => a.date.localeCompare(b.date));
+          const pathD = "M" + sorted.map(p => `${xFor(p.date)},${yFor(p.value)}`).join(" L");
+          return [
+            sorted.length >= 2 && /*#__PURE__*/React.createElement("path", {
+              key: `path-${si}`, d: pathD, fill: "none", stroke: s.color, strokeWidth: 1.5, opacity: 0.7
+            }),
+            ...sorted.map((p, i) => /*#__PURE__*/React.createElement("circle", {
+              key: `pt-${si}-${i}`, cx: xFor(p.date), cy: yFor(p.value), r: 3, fill: s.color
+            }))
+          ];
+        }),
+        /*#__PURE__*/React.createElement("text", {
+          x: pad, y: height - 4, fontSize: 9, fill: "#9ca3af"
+        }, fmtDate(dateLabelSorted[0].date)),
+        /*#__PURE__*/React.createElement("text", {
+          x: width - pad, y: height - 4, fontSize: 9, fill: "#9ca3af", textAnchor: "end"
+        }, fmtDate(dateLabelSorted[dateLabelSorted.length - 1].date))
+      )
+    );
+  }
   if (!points || points.length < 2) return null;
   const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
   const pad = 14, topPad = 12, botPad = 20;
@@ -4024,11 +4080,6 @@ function PDFSummary({
     const sorted = [...(cgmSummaryLog || [])].sort((a, b) => b.date.localeCompare(a.date));
     return sorted.length ? sorted[0] : null;
   })();
-  function glucosePointColor(v) {
-    if (v <= 99) return "#22c55e";
-    if (v <= (goals?.fastingGlucose || SEED_GOALS.fastingGlucose)) return "#eab308";
-    return "#ef4444";
-  }
   const allMeds = [...meds].sort((a, b) => a.name.localeCompare(b.name));
   const activeMeds = allMeds.filter(m => m.active && m.startDate <= today());
   const watch = ['HbA1c', 'HDL', 'ALT', 'Glucose', 'Sodium', 'LDL', 'Triglycerides'];
@@ -4420,61 +4471,58 @@ function PDFSummary({
     });
   })()))), sections.glucose && glucoseLog && glucoseLog.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null,
     /*#__PURE__*/React.createElement("div", { style: { ...S.h2, ...(firstBreakSection !== 'glucose' ? { pageBreakBefore: "always", breakBefore: "page" } : {}) } }, "Glucose"),
-    glucoseLog.filter(r => r.date >= TREND_CHART_START).length >= 2 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 10, marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" } },
-      /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Trend (since ", fmtDate(TREND_CHART_START), ")"),
-      /*#__PURE__*/React.createElement(TrendChart, {
-        points: glucoseLog.filter(r => r.date >= TREND_CHART_START).map(r => ({ date: r.date, value: r.value, color: glucosePointColor(r.value) })),
-        goal: goals?.fastingGlucose || SEED_GOALS.fastingGlucose,
-        unit: "mg/dL",
-        width: 620
-      })
-    ),
+    (() => {
+      const fastingChartPts = glucoseLog.filter(r => r.readingType === "Fasting" && r.date >= TREND_CHART_START).map(r => ({ date: r.date, value: r.value }));
+      const avgCgmChartPts = (cgmSummaryLog || []).filter(r => r.avgGlucose != null && r.date >= TREND_CHART_START).map(r => ({ date: r.date, value: r.avgGlucose }));
+      if (fastingChartPts.length < 2 && avgCgmChartPts.length < 2) return null;
+      return /*#__PURE__*/React.createElement("div", { style: { marginTop: 10, marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" } },
+        /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Fasting & Avg CGM Glucose Trend (since ", fmtDate(TREND_CHART_START), ")"),
+        /*#__PURE__*/React.createElement(TrendChart, {
+          series: [
+            { points: fastingChartPts, color: "#3b82f6", label: "Fasting Glucose" },
+            { points: avgCgmChartPts, color: "#f97316", label: "Avg CGM Glucose" }
+          ],
+          width: 620
+        })
+      );
+    })(),
     /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Last 7 Days"),
     /*#__PURE__*/React.createElement("table", { style: S.table },
       /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
         /*#__PURE__*/React.createElement("th", { style: S.th }, "Date"),
         /*#__PURE__*/React.createElement("th", { style: S.th }, "Time"),
-        /*#__PURE__*/React.createElement("th", { style: S.th }, "Value"),
-        /*#__PURE__*/React.createElement("th", { style: S.th }, "Type"),
-        /*#__PURE__*/React.createElement("th", { style: S.th }, "Elapsed"),
-        /*#__PURE__*/React.createElement("th", { style: S.th }, "Meal Note")
+        /*#__PURE__*/React.createElement("th", { style: S.th }, "Fasting Glucose"),
+        /*#__PURE__*/React.createElement("th", { style: S.th }, "Meal Note"),
+        /*#__PURE__*/React.createElement("th", { style: S.th }, "Avg CGM Glucose"),
+        /*#__PURE__*/React.createElement("th", { style: S.th }, "TIR")
       )),
       /*#__PURE__*/React.createElement("tbody", null, (() => {
-        const byDate = {};
-        glucoseLog.forEach(r => {
-          if (!byDate[r.date] || (r.time || '') > (byDate[r.date].time || '')) byDate[r.date] = r;
+        const fastingByDate = {};
+        glucoseLog.filter(r => r.readingType === "Fasting").forEach(r => {
+          if (!fastingByDate[r.date] || (r.time || '') > (fastingByDate[r.date].time || '')) fastingByDate[r.date] = r;
         });
+        const cgmByDate = {};
+        (cgmSummaryLog || []).forEach(r => { cgmByDate[r.date] = r; });
         return last7Dates().map((d, i) => {
-          const r = byDate[d];
+          const r = fastingByDate[d];
+          const c = cgmByDate[d];
           const rowStyle = { background: i % 2 === 0 ? '#fff' : '#fafafa' };
-          if (!r) {
-            return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
-              /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(d)),
-              /*#__PURE__*/React.createElement("td", { style: { ...S.td, color: '#9ca3af', fontStyle: 'italic' } }, "No reading logged"),
-              /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
-              /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
-              /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
-              /*#__PURE__*/React.createElement("td", { style: S.td }, "—")
-            );
-          }
-          let elapsed = '—';
-          if (r.time && r.lastMealTime) {
-            const [rh, rm] = r.time.split(':').map(Number);
-            const [mh, mm] = r.lastMealTime.split(':').map(Number);
-            const diff = (rh * 60 + rm) - (mh * 60 + mm);
-            if (diff > 0) {
-              const h = Math.floor(diff / 60), m = diff % 60;
-              elapsed = m > 0 ? `${h}hr ${m}min` : `${h}hr`;
-            }
-          }
-          const glColor = r.value <= 99 ? '#16a34a' : r.value <= (goals?.fastingGlucose || 110) ? '#d97706' : '#dc2626';
+          const glColor = r ? (r.value <= 99 ? '#16a34a' : r.value <= (goals?.fastingGlucose || SEED_GOALS.fastingGlucose) ? '#d97706' : '#dc2626') : null;
+          const avgColor = (c && c.avgGlucose != null) ? (c.avgGlucose <= 99 ? '#16a34a' : c.avgGlucose <= (goals?.avgCgmGlucose || SEED_GOALS.avgCgmGlucose) ? '#d97706' : '#dc2626') : null;
+          const tirColor = (c && c.tir != null) ? (c.tir >= 70 ? '#16a34a' : c.tir >= 50 ? '#d97706' : '#dc2626') : null;
           return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
-            /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(r.date)),
-            /*#__PURE__*/React.createElement("td", { style: S.td }, r.time || '—'),
-            /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600, color: glColor } }, r.value, " mg/dL"),
-            /*#__PURE__*/React.createElement("td", { style: S.td }, r.readingType || 'Random'),
-            /*#__PURE__*/React.createElement("td", { style: S.td }, elapsed),
-            /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, r.mealNote || r.note || '—')
+            /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(d)),
+            /*#__PURE__*/React.createElement("td", { style: S.td }, r ? (r.time || '—') : '—'),
+            r
+              ? /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600, color: glColor } }, r.value, " mg/dL")
+              : /*#__PURE__*/React.createElement("td", { style: { ...S.td, color: '#9ca3af', fontStyle: 'italic' } }, "No reading logged"),
+            /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, r ? (r.mealNote || r.note || '—') : '—'),
+            (c && c.avgGlucose != null)
+              ? /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600, color: avgColor } }, c.avgGlucose, " mg/dL")
+              : /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+            (c && c.tir != null)
+              ? /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600, color: tirColor } }, c.tir, "%")
+              : /*#__PURE__*/React.createElement("td", { style: S.td }, "—")
           );
         });
       })())
