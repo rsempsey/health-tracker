@@ -690,6 +690,26 @@ function trendStats(readingsAsc, goal, bad) {
   const streak = goal != null ? calcStreak(readingsAsc, goal, bad || "high") : null;
   return { first, latest, delta, pct, n: readingsAsc.length, streak };
 }
+// Like trendStats, but for noisy daily-total metrics (Steps, Active Energy,
+// Water) where a single atypical day sitting right at the window's edge
+// (e.g. a travel/rest day) can make a plain first-vs-latest % change wildly
+// misleading. Averages N days at each boundary instead of using single
+// endpoints; N scales with the window length so short windows still smooth
+// a little and long windows fall back to plain first-vs-latest (a single
+// outlier day is statistically insignificant at that scale anyway).
+function boundaryAvgStats(readingsAsc, goal, bad, windowDays) {
+  if (!readingsAsc || !readingsAsc.length) return null;
+  const n = windowDays <= 7 ? 2 : windowDays <= 14 ? 3 : windowDays <= 30 ? 5 : 1;
+  const avg = arr => +(arr.reduce((s, r) => s + r.value, 0) / arr.length).toFixed(1);
+  const firstSlice = readingsAsc.slice(0, Math.min(n, readingsAsc.length));
+  const lastSlice = readingsAsc.slice(-Math.min(n, readingsAsc.length));
+  const first = n > 1 ? avg(firstSlice) : readingsAsc[0].value;
+  const latest = n > 1 ? avg(lastSlice) : readingsAsc[readingsAsc.length - 1].value;
+  const delta = +(latest - first).toFixed(1);
+  const pct = first ? +((delta / Math.abs(first)) * 100).toFixed(1) : null;
+  const streak = goal != null ? calcStreak(readingsAsc, goal, bad || "high") : null;
+  return { first, latest, delta, pct, n: readingsAsc.length, streak };
+}
 
 
 // ── STYLE TOKENS ──────────────────────────────────────────────────────────────
@@ -4431,6 +4451,7 @@ function PDFSummary({
   }, todayStr)))), sections.trend && (() => {
     const { start: winStart, end: winEnd } = trendWindowRange(trendWindow);
     const windowLabel = trendWindowLabel(trendWindow);
+    const windowDays = Math.round((new Date(winEnd + 'T00:00:00') - new Date(winStart + 'T00:00:00')) / 86400000) + 1;
     const priorRange = (() => {
       const startMs = new Date(winStart + 'T00:00:00').getTime();
       const endMs = new Date(winEnd + 'T00:00:00').getTime();
@@ -4465,6 +4486,12 @@ function PDFSummary({
       if (ratio <= 0.75) return 'slowing vs. the prior period';
       return 'holding a steady pace vs. the prior period';
     }
+    // A metric already at its defined maximum (e.g. 100% Time in Range) has
+    // nowhere left to improve — "slowing" reads as a concern there when it's
+    // really just ceiling-bounded, so pace comparisons are suppressed for it.
+    function atCeiling(r) {
+      return r.ceiling != null && r.latest === r.ceiling;
+    }
 
     if (sections.bp) {
       const buildBP = (s, e) => [...bp].filter(r => r.date >= s && r.date <= e)
@@ -4497,7 +4524,7 @@ function PDFSummary({
         .sort((a, b) => a.date.localeCompare(b.date));
       const tirSt = trendStats(buildTir(winStart, winEnd), null, null);
       const tirPriorSt = trendStats(buildTir(priorRange.start, priorRange.end), null, null);
-      if (tirSt) rows.push({ group: "Vitals", metric: "CGM Time in Range", unit: "%", bad: "low", goal: 70, priorDelta: (tirPriorSt && tirPriorSt.n >= 2) ? tirPriorSt.delta : null, ...tirSt });
+      if (tirSt) rows.push({ group: "Vitals", metric: "CGM Time in Range", unit: "%", bad: "low", goal: 70, ceiling: 100, priorDelta: (tirPriorSt && tirPriorSt.n >= 2) ? tirPriorSt.delta : null, ...tirSt });
     }
 
     if (sections.weight) {
@@ -4568,13 +4595,13 @@ function PDFSummary({
       if (sleepSt) rows.push({ group: "Activity", metric: "Sleep", unit: "hr", bad: "low", goal: sleepGoal, priorDelta: (sleepPriorSt && sleepPriorSt.n >= 2) ? sleepPriorSt.delta : null, ...sleepSt });
 
       const stepsGoal = goals?.steps;
-      const stepsSt = trendStats(buildDaily(winStart, activityWinEnd).filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps })), stepsGoal, "low");
-      const stepsPriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps })), stepsGoal, "low");
+      const stepsSt = boundaryAvgStats(buildDaily(winStart, activityWinEnd).filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps })), stepsGoal, "low", windowDays);
+      const stepsPriorSt = boundaryAvgStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps })), stepsGoal, "low", windowDays);
       if (stepsSt) rows.push({ group: "Activity", metric: "Steps", unit: "", bad: "low", goal: stepsGoal, priorDelta: (stepsPriorSt && stepsPriorSt.n >= 2) ? stepsPriorSt.delta : null, ...stepsSt });
 
       const aeGoal = goals?.activeEnergy;
-      const aeSt = trendStats(buildDaily(winStart, activityWinEnd).filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) })), aeGoal, "low");
-      const aePriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) })), aeGoal, "low");
+      const aeSt = boundaryAvgStats(buildDaily(winStart, activityWinEnd).filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) })), aeGoal, "low", windowDays);
+      const aePriorSt = boundaryAvgStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) })), aeGoal, "low", windowDays);
       if (aeSt) rows.push({ group: "Activity", metric: "Active Energy", unit: "kcal", bad: "low", goal: aeGoal, priorDelta: (aePriorSt && aePriorSt.n >= 2) ? aePriorSt.delta : null, ...aeSt });
 
       const rhrGoal = goals?.restingHeartRate;
@@ -4583,8 +4610,8 @@ function PDFSummary({
       if (rhrSt) rows.push({ group: "Activity", metric: "Resting Heart Rate", unit: "bpm", bad: "high", goal: rhrGoal, priorDelta: (rhrPriorSt && rhrPriorSt.n >= 2) ? rhrPriorSt.delta : null, ...rhrSt });
 
       const waterGoal = goals?.water;
-      const waterSt = trendStats(buildDaily(winStart, activityWinEnd).filter(d => d.waterOz != null).map(d => ({ date: d.date, value: Math.round(d.waterOz) })), waterGoal, "low");
-      const waterPriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.waterOz != null).map(d => ({ date: d.date, value: Math.round(d.waterOz) })), waterGoal, "low");
+      const waterSt = boundaryAvgStats(buildDaily(winStart, activityWinEnd).filter(d => d.waterOz != null).map(d => ({ date: d.date, value: Math.round(d.waterOz) })), waterGoal, "low", windowDays);
+      const waterPriorSt = boundaryAvgStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.waterOz != null).map(d => ({ date: d.date, value: Math.round(d.waterOz) })), waterGoal, "low", windowDays);
       if (waterSt) rows.push({ group: "Activity", metric: "Water", unit: "oz", bad: "low", goal: waterGoal, priorDelta: (waterPriorSt && waterPriorSt.n >= 2) ? waterPriorSt.delta : null, ...waterSt });
     }
 
@@ -4671,7 +4698,7 @@ function PDFSummary({
 
     // ── Consistency paragraph: active streaks + pace notes worth flagging ──
     const streakRows = rows.filter(r => r.streak && r.streak.days >= 2);
-    const paceRows = rows.filter(r => !r.isRate && !r.isBM && paceNote(r.delta, r.priorDelta, r.bad));
+    const paceRows = rows.filter(r => !r.isRate && !r.isBM && !atCeiling(r) && paceNote(r.delta, r.priorDelta, r.bad));
     let consistencyParts = [];
     if (streakRows.length) {
       consistencyParts.push(streakRows.map(r => `${lcName(r.metric)} (${r.streak.days}d)`).join(', ') + (streakRows.length === 1 ? ' is' : ' are') + ' currently on a streak at goal');
@@ -4713,7 +4740,7 @@ function PDFSummary({
           /*#__PURE__*/React.createElement("td", { style: S.td }, r.isRate ? r.latest + '%' : fmtVal(r.latest, r.unit)),
           /*#__PURE__*/React.createElement("td", { style: S.td }, (r.isRate || r.isBM || r.delta == null) ? '—' : (r.delta > 0 ? '+' : '') + r.delta),
           /*#__PURE__*/React.createElement("td", { style: S.td }, (r.isRate || r.isBM || r.pct == null) ? '—' : (r.pct > 0 ? '+' : '') + r.pct + '%'),
-          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, paceNote(r.delta, r.priorDelta, r.bad) || '—'),
+          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, atCeiling(r) ? 'at ceiling' : (paceNote(r.delta, r.priorDelta, r.bad) || '—')),
           /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, r.streak ? `${r.streak.days}d` : '—')
         )))
       )
