@@ -4604,10 +4604,15 @@ function PDFSummary({
       if (v == null) return '—';
       return v + (unit ? ' ' + unit : '');
     }
-    // Lowercase the first letter for mid-sentence use, except acronym-style
-    // metric names (HbA1c, HDL, LDL) which should keep their exact casing.
+    // Lowercase the first letter for mid-sentence use, except when the
+    // metric name is (or starts with) an all-caps acronym — e.g. "CGM Time
+    // in Range" should stay "CGM Time in Range", not "cGM Time in Range".
+    // HbA1c is explicitly listed since it mixes case and digits, so the
+    // all-caps regex below wouldn't catch it on its own.
     function lcName(name) {
-      if (["HbA1c", "HDL", "LDL"].includes(name)) return name;
+      if (["HbA1c"].includes(name)) return name;
+      const firstWord = name.split(' ')[0];
+      if (/^[A-Z]{2,}$/.test(firstWord)) return name;
       return name.charAt(0).toLowerCase() + name.slice(1);
     }
     // Short clause for a numeric (first-vs-latest) row, used inside the
@@ -4624,11 +4629,17 @@ function PDFSummary({
         return c;
       }
       if (r.n === 1) return `${lcName(r.metric)} was ${fmtVal(r.latest, r.unit)} (only one reading this window)`;
-      const dir = direction(r.delta, r.bad);
-      if (dir === 'flat') return `${lcName(r.metric)} held steady at ${fmtVal(r.latest, r.unit)}`;
-      const verb = dir === 'improving' ? 'improved' : 'declined';
+      // Verb reflects what the raw number actually did (rose/fell), not
+      // whether that's good or bad — "declined" next to a rising number
+      // reads as a contradiction. Goodness is conveyed separately via the
+      // off-goal note below, not baked into the verb.
+      const verb = r.delta > 0 ? 'rose' : (r.delta < 0 ? 'fell' : 'held steady');
+      if (verb === 'held steady') return `${lcName(r.metric)} held steady at ${fmtVal(r.latest, r.unit)}`;
       const pctStr = r.pct != null ? ` (${r.pct > 0 ? '+' : ''}${r.pct}%)` : '';
-      return `${lcName(r.metric)} ${verb} to ${fmtVal(r.latest, r.unit)} from ${fmtVal(r.first, r.unit)}${pctStr}`;
+      let clause = `${lcName(r.metric)} ${verb} to ${fmtVal(r.latest, r.unit)} from ${fmtVal(r.first, r.unit)}${pctStr}`;
+      const met = metGoal(r.latest, r.goal, r.bad);
+      if (met === false) clause += r.bad === 'low' ? ', below goal' : ', above goal';
+      return clause;
     }
 
     if (!rows.length) return /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -5324,10 +5335,12 @@ function PDFSummary({
         )),
         /*#__PURE__*/React.createElement("tbody", null, last7Dates().map((dt, i) => {
           const d = byDate[dt];
+          const isToday = dt === today();
           const rowStyle = { background: i % 2 === 0 ? '#fff' : '#fafafa' };
+          const cellSt = isToday ? { ...S.td, color: C.faint, fontStyle: 'italic' } : S.td;
           if (!d) {
             return /*#__PURE__*/React.createElement("tr", { key: dt, style: rowStyle },
-              /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(dt)),
+              /*#__PURE__*/React.createElement("td", { style: cellSt }, fmtDate(dt), isToday ? '*' : ''),
               /*#__PURE__*/React.createElement("td", { style: { ...S.td, color: '#9ca3af', fontStyle: 'italic' } }, "No data logged"),
               /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
               /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
@@ -5336,15 +5349,16 @@ function PDFSummary({
             );
           }
           return /*#__PURE__*/React.createElement("tr", { key: dt, style: rowStyle },
-            /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(d.date)),
-            /*#__PURE__*/React.createElement("td", { style: S.td }, d.sleepMinutes != null ? `${Math.floor(d.sleepMinutes / 60)}h ${d.sleepMinutes % 60}m` : '—'),
-            /*#__PURE__*/React.createElement("td", { style: S.td }, d.steps != null ? d.steps.toLocaleString() : '—'),
-            /*#__PURE__*/React.createElement("td", { style: S.td }, d.activeEnergyKcal != null ? Math.round(d.activeEnergyKcal) + ' kcal' : '—'),
-            /*#__PURE__*/React.createElement("td", { style: S.td }, d.waterOz != null ? Math.round(d.waterOz) + ' oz' : '—'),
-            /*#__PURE__*/React.createElement("td", { style: S.td }, d.restingHeartRate != null ? Math.round(d.restingHeartRate) + ' bpm' : '—')
+            /*#__PURE__*/React.createElement("td", { style: cellSt }, fmtDate(d.date), isToday ? '*' : ''),
+            /*#__PURE__*/React.createElement("td", { style: cellSt }, d.sleepMinutes != null ? `${Math.floor(d.sleepMinutes / 60)}h ${d.sleepMinutes % 60}m` : '—'),
+            /*#__PURE__*/React.createElement("td", { style: cellSt }, d.steps != null ? d.steps.toLocaleString() : '—'),
+            /*#__PURE__*/React.createElement("td", { style: cellSt }, d.activeEnergyKcal != null ? Math.round(d.activeEnergyKcal) + ' kcal' : '—'),
+            /*#__PURE__*/React.createElement("td", { style: cellSt }, d.waterOz != null ? Math.round(d.waterOz) + ' oz' : '—'),
+            /*#__PURE__*/React.createElement("td", { style: cellSt }, d.restingHeartRate != null ? Math.round(d.restingHeartRate) + ' bpm' : '—')
           );
         }))
-      )
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, fontStyle: 'italic', marginTop: 6 } }, "* Today's totals are still accumulating and may not reflect a full day.")
     );
   })(), sections.bm && bmLog && bmLog.length > 0 && (() => {
     const sorted = [...bmLog].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
