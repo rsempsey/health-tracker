@@ -437,7 +437,8 @@ const SEED_GOALS = {
   HbA1c: 5.6,
   HDL: 50,
   LDL: 80,
-  glucose: 120,
+  fastingGlucose: 110,
+  avgCgmGlucose: 120,
   // Nutrition targets
   caloriesWeekday: 1785,
   caloriesWeekend: 2053,
@@ -1903,10 +1904,13 @@ function GlucoseTab({
   const cgmChartPts = [...(cgmSummaryLog || [])]
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(r => ({ date: r.date, y: r.tir }));
+  const avgCgmGoal = goals?.avgCgmGlucose || SEED_GOALS.avgCgmGlucose;
+  const avgCgmReadings = (cgmSummaryLog || [])
+    .filter(r => r.avgGlucose != null)
+    .map(r => ({ date: r.date, value: r.avgGlucose }));
+  const avgCgmStreak = calcStreak(avgCgmReadings, avgCgmGoal, "high");
   const sorted = [...glucoseLog].sort((a, b) => (b.date + (b.time||"")).localeCompare(a.date + (a.time||"")));
-  const latest = sorted[0];
-  const prev = sorted[1];
-  const goal = goals?.glucose || SEED_GOALS.glucose;
+  const goal = goals?.fastingGlucose || SEED_GOALS.fastingGlucose;
 
   function elapsedMins(readingTime, mealTime) {
     if (!readingTime || !mealTime) return null;
@@ -1964,12 +1968,17 @@ function GlucoseTab({
     return "#6b7280";
   }
 
-  const chartPts = [...glucoseLog]
+  // Fasting-only variants for the LATEST/GOAL cards (mirrors the Dashboard's
+  // Fasting Glucose hero card treatment) — the full "ALL READINGS" list below
+  // still shows every reading regardless of type.
+  const fastingSorted = sorted.filter(r => r.readingType === "Fasting");
+  const latestFasting = fastingSorted[0];
+  const prevFasting = fastingSorted[1];
+  const chartPtsFasting = [...fastingSorted]
     .sort((a, b) => (a.date + (a.time||"")).localeCompare(b.date + (b.time||"")))
     .map(r => ({ date: r.date, y: r.value }));
-
-  const glucoseReadings = sorted.map(r => ({ date: r.date, value: r.value }));
-  const streak = calcStreak(glucoseReadings, goal, "high");
+  const fastingGlucoseReadings = fastingSorted.map(r => ({ date: r.date, value: r.value }));
+  const streak = calcStreak(fastingGlucoseReadings, goal, "high");
 
   return /*#__PURE__*/React.createElement("div", null,
     // Sub-view toggle
@@ -1986,29 +1995,29 @@ function GlucoseTab({
       }, "CGM Summary")
     ),
     view === "meter" && /*#__PURE__*/React.createElement(React.Fragment, null,
-    // Latest card (chart embedded, matching BP/Weight tabs)
-    latest && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
-      /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST · ", fmtDate(latest.date)),
+    // Latest card (chart embedded, matching BP/Weight tabs) — Fasting readings only
+    latestFasting && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST FASTING · ", fmtDate(latestFasting.date)),
       /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 24, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 8 } },
         /*#__PURE__*/React.createElement("div", null,
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: 34, fontWeight: 800, color: C.text, letterSpacing: -1 } }, latest.value),
+          /*#__PURE__*/React.createElement("span", { style: { fontSize: 34, fontWeight: 800, color: C.text, letterSpacing: -1 } }, latestFasting.value),
           /*#__PURE__*/React.createElement("span", { style: { fontSize: 14, color: C.faint, marginLeft: 4 } }, "mg/dL"),
-          prev && /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: 13, fontWeight: 700, color: latest.value < prev.value ? "#22c55e" : "#ef4444", marginLeft: 8 }
-          }, latest.value < prev.value ? "↓" : "↑")
+          prevFasting && /*#__PURE__*/React.createElement("span", {
+            style: { fontSize: 13, fontWeight: 700, color: latestFasting.value < prevFasting.value ? "#22c55e" : "#ef4444", marginLeft: 8 }
+          }, latestFasting.value < prevFasting.value ? "↓" : "↑")
         ),
         /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } },
-          /*#__PURE__*/React.createElement(Badge, { label: latest.value <= 99 ? "Normal" : latest.value <= goal ? "Elevated" : "High", color: glucoseColor(latest.value), small: true }),
-          latest.readingType && /*#__PURE__*/React.createElement(Badge, { label: latest.readingType, color: readingTypeBadgeColor(latest.readingType), small: true }),
-          latest.time && /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: C.faint } }, latest.time)
+          /*#__PURE__*/React.createElement(Badge, { label: latestFasting.value <= 99 ? "Normal" : latestFasting.value <= goal ? "Elevated" : "High", color: glucoseColor(latestFasting.value), small: true }),
+          latestFasting.readingType && /*#__PURE__*/React.createElement(Badge, { label: latestFasting.readingType, color: readingTypeBadgeColor(latestFasting.readingType), small: true }),
+          latestFasting.time && /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: C.faint } }, latestFasting.time)
         )
       ),
-      prev && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } },
-        "prev ", prev.value, " mg/dL", prev.readingType ? " · " + prev.readingType : "", prev.time ? " · " + prev.time : ""
+      prevFasting && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } },
+        "prev ", prevFasting.value, " mg/dL", prevFasting.readingType ? " · " + prevFasting.readingType : "", prevFasting.time ? " · " + prevFasting.time : ""
       ),
       (() => {
-        const elapsed = elapsedMins(latest.time, latest.lastMealTime);
-        const mealNote = latest.mealNote || latest.note;
+        const elapsed = elapsedMins(latestFasting.time, latestFasting.lastMealTime);
+        const mealNote = latestFasting.mealNote || latestFasting.note;
         if (!elapsed && !mealNote) return null;
         return /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.muted, marginTop: 4, fontStyle: "italic" } },
           elapsed ? fmtElapsed(elapsed) : null,
@@ -2016,12 +2025,12 @@ function GlucoseTab({
           mealNote ? "📝 " + mealNote : null
         );
       })(),
-      chartPts.length > 1 && /*#__PURE__*/React.createElement(MiniChart, { points: chartPts, color: "#3b82f6", goal: goal, bad: "high" })
+      chartPtsFasting.length > 1 && /*#__PURE__*/React.createElement(MiniChart, { points: chartPtsFasting, color: "#3b82f6", goal: goal, bad: "high" })
     ),
     // Goal card
-    latest && goal && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+    latestFasting && goal && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
       /*#__PURE__*/React.createElement(SectionTitle, null, "GOAL"),
-      /*#__PURE__*/React.createElement(GoalBar, { label: "Glucose", current: latest.value, goal: goal, unit: "mg/dL", streak: streak })
+      /*#__PURE__*/React.createElement(GoalBar, { label: "Fasting Glucose", current: latestFasting.value, goal: goal, unit: "mg/dL", streak: streak })
     ),
     // Log/Cancel toggle button
     /*#__PURE__*/React.createElement(AddBtn, {
@@ -2137,6 +2146,11 @@ function GlucoseTab({
         ),
         latestCgm.note && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.muted, fontStyle: "italic", marginBottom: 8 } }, "📝 ", latestCgm.note),
         cgmChartPts.length > 1 && /*#__PURE__*/React.createElement(MiniChart, { points: cgmChartPts, color: "#3b82f6", goal: 70, bad: "low" })
+      ),
+      // Goal card — Average CGM Glucose
+      latestCgm && latestCgm.avgGlucose != null && avgCgmGoal && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+        /*#__PURE__*/React.createElement(SectionTitle, null, "GOAL"),
+        /*#__PURE__*/React.createElement(GoalBar, { label: "Avg CGM Glucose", current: latestCgm.avgGlucose, goal: avgCgmGoal, unit: "mg/dL", streak: avgCgmStreak })
       ),
       /*#__PURE__*/React.createElement(AddBtn, {
         onClick: () => {
@@ -2875,8 +2889,13 @@ function GoalsTab({
     unit: "mg/dL",
     bad: "high"
   }, {
-    key: "glucose",
-    label: "Glucose",
+    key: "fastingGlucose",
+    label: "Fasting Glucose",
+    unit: "mg/dL",
+    bad: "high"
+  }, {
+    key: "avgCgmGlucose",
+    label: "Avg CGM Glucose",
     unit: "mg/dL",
     bad: "high"
   }];
@@ -3997,21 +4016,17 @@ function PDFSummary({
   const latestW = wSorted[0];
   const latestLab = [...labs].sort((a, b) => b.date.localeCompare(a.date))[0];
   const latestGlucose = (() => {
-    const sorted = [...(glucoseLog || [])].sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
+    const fasting = (glucoseLog || []).filter(r => r.readingType === "Fasting");
+    const sorted = [...fasting].sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
     return sorted.length ? sorted[0] : null;
   })();
   const latestCgmSummary = (() => {
     const sorted = [...(cgmSummaryLog || [])].sort((a, b) => b.date.localeCompare(a.date));
     return sorted.length ? sorted[0] : null;
   })();
-  function tirHeroColor(tir) {
-    if (tir >= 70) return "#22c55e";
-    if (tir >= 50) return "#eab308";
-    return "#ef4444";
-  }
   function glucosePointColor(v) {
     if (v <= 99) return "#22c55e";
-    if (v <= (goals?.glucose || SEED_GOALS.glucose)) return "#eab308";
+    if (v <= (goals?.fastingGlucose || SEED_GOALS.fastingGlucose)) return "#eab308";
     return "#ef4444";
   }
   const allMeds = [...meds].sort((a, b) => a.name.localeCompare(b.name));
@@ -4328,18 +4343,18 @@ function PDFSummary({
     est: latestNormW.isEst ? 'Est. nude equivalent' : null,
     badgeLabel: 'BMI ' + bmi(latestNormW.w),
     badgeColor: bmiCat(parseFloat(bmi(latestNormW.w))).color
-  }), latestCgmSummary && /*#__PURE__*/React.createElement(StatBox, {
-    label: "CGM · Time in Range",
-    value: latestCgmSummary.tir + '%',
+  }), latestCgmSummary && latestCgmSummary.avgGlucose != null && /*#__PURE__*/React.createElement(StatBox, {
+    label: "CGM · Avg Glucose",
+    value: Math.round(latestCgmSummary.avgGlucose) + ' mg/dL',
     date: fmtDate(latestCgmSummary.date),
-    badgeLabel: latestCgmSummary.tir >= 70 ? "On Target" : latestCgmSummary.tir >= 50 ? "Below Target" : "Well Below Target",
-    badgeColor: tirHeroColor(latestCgmSummary.tir)
+    badgeLabel: goals && goals.avgCgmGlucose ? (latestCgmSummary.avgGlucose <= goals.avgCgmGlucose ? "At Goal" : "Above Goal") : null,
+    badgeColor: goals && goals.avgCgmGlucose ? (latestCgmSummary.avgGlucose <= goals.avgCgmGlucose ? "#22c55e" : "#f97316") : null
   }), latestGlucose && /*#__PURE__*/React.createElement(StatBox, {
-    label: "Glucose",
+    label: "Fasting Glucose",
     value: latestGlucose.value + ' mg/dL',
     date: fmtDate(latestGlucose.date),
-    badgeLabel: goals && goals.glucose ? (latestGlucose.value <= goals.glucose ? "At Goal" : "Above Goal") : null,
-    badgeColor: goals && goals.glucose ? (latestGlucose.value <= goals.glucose ? "#22c55e" : "#f97316") : null
+    badgeLabel: goals && goals.fastingGlucose ? (latestGlucose.value <= goals.fastingGlucose ? "At Goal" : "Above Goal") : null,
+    badgeColor: goals && goals.fastingGlucose ? (latestGlucose.value <= goals.fastingGlucose ? "#22c55e" : "#f97316") : null
   })), sections.bp && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: { ...S.h2, ...(firstBreakSection !== 'bp' ? { pageBreakBefore: "always", breakBefore: "page" } : {}) }
   }, "Blood Pressure"), bpSorted.filter(r => r.date >= TREND_CHART_START).length >= 2 && /*#__PURE__*/React.createElement("div", {
@@ -4409,7 +4424,7 @@ function PDFSummary({
       /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Trend (since ", fmtDate(TREND_CHART_START), ")"),
       /*#__PURE__*/React.createElement(TrendChart, {
         points: glucoseLog.filter(r => r.date >= TREND_CHART_START).map(r => ({ date: r.date, value: r.value, color: glucosePointColor(r.value) })),
-        goal: goals?.glucose || SEED_GOALS.glucose,
+        goal: goals?.fastingGlucose || SEED_GOALS.fastingGlucose,
         unit: "mg/dL",
         width: 620
       })
@@ -4452,7 +4467,7 @@ function PDFSummary({
               elapsed = m > 0 ? `${h}hr ${m}min` : `${h}hr`;
             }
           }
-          const glColor = r.value <= 99 ? '#16a34a' : r.value <= (goals?.glucose || 120) ? '#d97706' : '#dc2626';
+          const glColor = r.value <= 99 ? '#16a34a' : r.value <= (goals?.fastingGlucose || 110) ? '#d97706' : '#dc2626';
           return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
             /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(r.date)),
             /*#__PURE__*/React.createElement("td", { style: S.td }, r.time || '—'),
@@ -4808,15 +4823,25 @@ function PDFSummary({
       met: firstNum(latestLab.values['HDL']) >= goals.HDL,
       streak: calcStreak(hdlReadings, goals.HDL, 'low')
     });
-    const glucoseReadingsExport = [...(glucoseLog || [])].map(r => ({ date: r.date, value: r.value }));
-    const latestGlucoseReading = [...glucoseReadingsExport].sort((a, b) => b.date.localeCompare(a.date))[0];
-    if ((goals.glucose || SEED_GOALS.glucose) && latestGlucoseReading) rows.push({
-      label: 'Glucose',
-      target: (goals.glucose || SEED_GOALS.glucose) + ' mg/dL',
-      current: latestGlucoseReading.value + ' mg/dL',
+    const fastingGlucoseReadingsExport = (glucoseLog || []).filter(r => r.readingType === "Fasting").map(r => ({ date: r.date, value: r.value }));
+    const latestFastingGlucoseReading = [...fastingGlucoseReadingsExport].sort((a, b) => b.date.localeCompare(a.date))[0];
+    if ((goals.fastingGlucose || SEED_GOALS.fastingGlucose) && latestFastingGlucoseReading) rows.push({
+      label: 'Fasting Glucose',
+      target: (goals.fastingGlucose || SEED_GOALS.fastingGlucose) + ' mg/dL',
+      current: latestFastingGlucoseReading.value + ' mg/dL',
       est: false,
-      met: latestGlucoseReading.value <= (goals.glucose || SEED_GOALS.glucose),
-      streak: calcStreak(glucoseReadingsExport, goals.glucose || SEED_GOALS.glucose, 'high')
+      met: latestFastingGlucoseReading.value <= (goals.fastingGlucose || SEED_GOALS.fastingGlucose),
+      streak: calcStreak(fastingGlucoseReadingsExport, goals.fastingGlucose || SEED_GOALS.fastingGlucose, 'high')
+    });
+    const avgCgmReadingsExport = (cgmSummaryLog || []).filter(r => r.avgGlucose != null).map(r => ({ date: r.date, value: r.avgGlucose }));
+    const latestAvgCgmReading = [...avgCgmReadingsExport].sort((a, b) => b.date.localeCompare(a.date))[0];
+    if ((goals.avgCgmGlucose || SEED_GOALS.avgCgmGlucose) && latestAvgCgmReading) rows.push({
+      label: 'Avg CGM Glucose',
+      target: (goals.avgCgmGlucose || SEED_GOALS.avgCgmGlucose) + ' mg/dL',
+      current: latestAvgCgmReading.value + ' mg/dL',
+      est: false,
+      met: latestAvgCgmReading.value <= (goals.avgCgmGlucose || SEED_GOALS.avgCgmGlucose),
+      streak: calcStreak(avgCgmReadingsExport, goals.avgCgmGlucose || SEED_GOALS.avgCgmGlucose, 'high')
     });
     if (!rows.length) return null;
     return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
@@ -5602,9 +5627,10 @@ function Dashboard({
     })();
     const medLabel = medColor === "#22c55e" ? "✓ Meds" : medColor === "#ef4444" ? "⚠ Overdue" : "! Check";
     const medSub = medColor === "#22c55e" ? "All taken today" : medColor === "#ef4444" ? "Overdue" : "Pending";
-    // Get latest glucose reading for hero card (from glucoseLog)
+    // Get latest FASTING glucose reading for hero card (from glucoseLog)
     const latestGlucose = (() => {
-      const sorted = [...(glucoseLog || [])].sort((a, b) => (b.date + (b.time||"")).localeCompare(a.date + (a.time||"")));
+      const fasting = (glucoseLog || []).filter(r => r.readingType === "Fasting");
+      const sorted = [...fasting].sort((a, b) => (b.date + (b.time||"")).localeCompare(a.date + (a.time||"")));
       return sorted.length ? sorted[0] : null;
     })();
     // Get latest CGM summary for hero card
@@ -5612,11 +5638,6 @@ function Dashboard({
       const sorted = [...(cgmSummaryLog || [])].sort((a, b) => b.date.localeCompare(a.date));
       return sorted.length ? sorted[0] : null;
     })();
-    function tirHeroColor(tir) {
-      if (tir >= 70) return "#22c55e";
-      if (tir >= 50) return "#eab308";
-      return "#ef4444";
-    }
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {
         style: { marginBottom: 10, textAlign: "center" }
@@ -5667,30 +5688,30 @@ function Dashboard({
       /*#__PURE__*/React.createElement("div", {
         style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14, textAlign: "center" }
       },
-        latestCgmSummary && /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Glucose") },
-          /*#__PURE__*/React.createElement(SectionTitle, null, "CGM · TIME IN RANGE"),
+        latestCgmSummary && latestCgmSummary.avgGlucose != null && /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Glucose") },
+          /*#__PURE__*/React.createElement(SectionTitle, null, "CGM · AVG GLUCOSE"),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
-            latestCgmSummary.tir, " ", /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 400, color: C.faint } }, "%")
+            Math.round(latestCgmSummary.avgGlucose), " ", /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 400, color: C.faint } }, "mg/dL")
           ),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6, textAlign: "center" } }, fmtDate(latestCgmSummary.date)),
-          /*#__PURE__*/React.createElement("div", { style: { textAlign: "center" } },
+          goals && goals.avgCgmGlucose && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center" } },
             /*#__PURE__*/React.createElement(Badge, {
-              label: latestCgmSummary.tir >= 70 ? "On Target" : latestCgmSummary.tir >= 50 ? "Below Target" : "Well Below Target",
-              color: tirHeroColor(latestCgmSummary.tir),
+              label: latestCgmSummary.avgGlucose <= goals.avgCgmGlucose ? "At Goal" : "Above Goal",
+              color: latestCgmSummary.avgGlucose <= goals.avgCgmGlucose ? "#22c55e" : "#f97316",
               small: true
             })
           )
         ),
         latestGlucose && /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Glucose") },
-          /*#__PURE__*/React.createElement(SectionTitle, null, "GLUCOSE"),
+          /*#__PURE__*/React.createElement(SectionTitle, null, "FASTING GLUCOSE"),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
             latestGlucose.value, " ", /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 400, color: C.faint } }, "mg/dL")
           ),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6, textAlign: "center" } }, fmtDate(latestGlucose.date)),
-          goals && goals.glucose && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center" } },
+          goals && goals.fastingGlucose && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center" } },
             /*#__PURE__*/React.createElement(Badge, {
-              label: latestGlucose.value <= goals.glucose ? "At Goal" : "Above Goal",
-              color: latestGlucose.value <= goals.glucose ? "#22c55e" : "#f97316",
+              label: latestGlucose.value <= goals.fastingGlucose ? "At Goal" : "Above Goal",
+              color: latestGlucose.value <= goals.fastingGlucose ? "#22c55e" : "#f97316",
               small: true
             })
           )
@@ -5801,14 +5822,17 @@ function Dashboard({
     const hdlReadings = (labData || [])
       .filter(l => l.values["HDL"] != null)
       .map(l => ({ date: l.date, value: firstNum(l.values["HDL"]) }));
-    const glucoseReadings = [...(glucoseLog || [])].map(r => ({ date: r.date, value: r.value }));
+    const fastingGlucoseReadings = (glucoseLog || []).filter(r => r.readingType === "Fasting").map(r => ({ date: r.date, value: r.value }));
+    const avgCgmReadings = (cgmSummaryLog || []).filter(r => r.avgGlucose != null).map(r => ({ date: r.date, value: r.avgGlucose }));
     // Find most recent reading per marker independently
-    const latestGlucoseLab = [...glucoseReadings].sort((a, b) => b.date.localeCompare(a.date))[0];
+    const latestFastingGlucoseLab = [...fastingGlucoseReadings].sort((a, b) => b.date.localeCompare(a.date))[0];
+    const latestAvgCgmLab = [...avgCgmReadings].sort((a, b) => b.date.localeCompare(a.date))[0];
     const latestHbA1cLab = hba1cReadings.sort((a, b) => b.date.localeCompare(a.date))[0];
     const latestHDLLab = hdlReadings.sort((a, b) => b.date.localeCompare(a.date))[0];
     const hba1cStreak = calcStreak(hba1cReadings, goals.HbA1c, "high");
     const hdlStreak = calcStreak(hdlReadings, goals.HDL, "low");
-    const glucoseStreak = calcStreak(glucoseReadings, goals.glucose, "high");
+    const fastingGlucoseStreak = calcStreak(fastingGlucoseReadings, goals.fastingGlucose || SEED_GOALS.fastingGlucose, "high");
+    const avgCgmStreak = calcStreak(avgCgmReadings, goals.avgCgmGlucose || SEED_GOALS.avgCgmGlucose, "high");
     return /*#__PURE__*/React.createElement(React.Fragment, null, goals.HbA1c && latestHbA1cLab && /*#__PURE__*/React.createElement(GoalBar, {
       label: "HbA1c",
       current: latestHbA1cLab.value,
@@ -5822,12 +5846,18 @@ function Dashboard({
       unit: "mg/dL",
       bad: "low",
       streak: hdlStreak
-    }), latestGlucoseLab && (goals.glucose || SEED_GOALS.glucose) && /*#__PURE__*/React.createElement(GoalBar, {
-      label: "Glucose",
-      current: latestGlucoseLab.value,
-      goal: goals.glucose || SEED_GOALS.glucose,
+    }), latestFastingGlucoseLab && (goals.fastingGlucose || SEED_GOALS.fastingGlucose) && /*#__PURE__*/React.createElement(GoalBar, {
+      label: "Fasting Glucose",
+      current: latestFastingGlucoseLab.value,
+      goal: goals.fastingGlucose || SEED_GOALS.fastingGlucose,
       unit: "mg/dL",
-      streak: glucoseStreak
+      streak: fastingGlucoseStreak
+    }), latestAvgCgmLab && (goals.avgCgmGlucose || SEED_GOALS.avgCgmGlucose) && /*#__PURE__*/React.createElement(GoalBar, {
+      label: "Avg CGM Glucose",
+      current: latestAvgCgmLab.value,
+      goal: goals.avgCgmGlucose || SEED_GOALS.avgCgmGlucose,
+      unit: "mg/dL",
+      streak: avgCgmStreak
     }));
   })()));
 }
