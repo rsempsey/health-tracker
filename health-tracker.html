@@ -4553,26 +4553,39 @@ function PDFSummary({
 
     if (sections.activity && healthkitDailyLog && healthkitDailyLog.length > 0) {
       const buildDaily = (s, e) => healthkitDailyLog.filter(d => d.date >= s && d.date <= e).sort((a, b) => a.date.localeCompare(b.date));
+      // healthkitDailyLog's entry for "today" is a running total that hasn't
+      // finished accumulating (synced mid-day via the Push-to-Web-App
+      // Shortcut) — comparing it against a completed prior day understates
+      // steps/active energy/sleep that just haven't happened yet today, and
+      // skews the delta. Clip the window's end to yesterday for Activity
+      // specifically; BP/Glucose/Weight are manually-logged point-in-time
+      // readings and don't have this partial-day problem.
+      const activityWinEnd = winEnd < yesterday() ? winEnd : yesterday();
 
       const sleepGoal = goals?.sleepHours;
-      const sleepSt = trendStats(buildDaily(winStart, winEnd).filter(d => d.sleepMinutes != null).map(d => ({ date: d.date, value: +(d.sleepMinutes / 60).toFixed(1) })), sleepGoal, "low");
+      const sleepSt = trendStats(buildDaily(winStart, activityWinEnd).filter(d => d.sleepMinutes != null).map(d => ({ date: d.date, value: +(d.sleepMinutes / 60).toFixed(1) })), sleepGoal, "low");
       const sleepPriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.sleepMinutes != null).map(d => ({ date: d.date, value: +(d.sleepMinutes / 60).toFixed(1) })), sleepGoal, "low");
       if (sleepSt) rows.push({ group: "Activity", metric: "Sleep", unit: "hr", bad: "low", goal: sleepGoal, priorDelta: (sleepPriorSt && sleepPriorSt.n >= 2) ? sleepPriorSt.delta : null, ...sleepSt });
 
       const stepsGoal = goals?.steps;
-      const stepsSt = trendStats(buildDaily(winStart, winEnd).filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps })), stepsGoal, "low");
+      const stepsSt = trendStats(buildDaily(winStart, activityWinEnd).filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps })), stepsGoal, "low");
       const stepsPriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps })), stepsGoal, "low");
       if (stepsSt) rows.push({ group: "Activity", metric: "Steps", unit: "", bad: "low", goal: stepsGoal, priorDelta: (stepsPriorSt && stepsPriorSt.n >= 2) ? stepsPriorSt.delta : null, ...stepsSt });
 
       const aeGoal = goals?.activeEnergy;
-      const aeSt = trendStats(buildDaily(winStart, winEnd).filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) })), aeGoal, "low");
+      const aeSt = trendStats(buildDaily(winStart, activityWinEnd).filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) })), aeGoal, "low");
       const aePriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) })), aeGoal, "low");
       if (aeSt) rows.push({ group: "Activity", metric: "Active Energy", unit: "kcal", bad: "low", goal: aeGoal, priorDelta: (aePriorSt && aePriorSt.n >= 2) ? aePriorSt.delta : null, ...aeSt });
 
       const rhrGoal = goals?.restingHeartRate;
-      const rhrSt = trendStats(buildDaily(winStart, winEnd).filter(d => d.restingHeartRate != null).map(d => ({ date: d.date, value: Math.round(d.restingHeartRate) })), rhrGoal, "high");
+      const rhrSt = trendStats(buildDaily(winStart, activityWinEnd).filter(d => d.restingHeartRate != null).map(d => ({ date: d.date, value: Math.round(d.restingHeartRate) })), rhrGoal, "high");
       const rhrPriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.restingHeartRate != null).map(d => ({ date: d.date, value: Math.round(d.restingHeartRate) })), rhrGoal, "high");
       if (rhrSt) rows.push({ group: "Activity", metric: "Resting Heart Rate", unit: "bpm", bad: "high", goal: rhrGoal, priorDelta: (rhrPriorSt && rhrPriorSt.n >= 2) ? rhrPriorSt.delta : null, ...rhrSt });
+
+      const waterGoal = goals?.water;
+      const waterSt = trendStats(buildDaily(winStart, activityWinEnd).filter(d => d.waterOz != null).map(d => ({ date: d.date, value: Math.round(d.waterOz) })), waterGoal, "low");
+      const waterPriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.waterOz != null).map(d => ({ date: d.date, value: Math.round(d.waterOz) })), waterGoal, "low");
+      if (waterSt) rows.push({ group: "Activity", metric: "Water", unit: "oz", bad: "low", goal: waterGoal, priorDelta: (waterPriorSt && waterPriorSt.n >= 2) ? waterPriorSt.delta : null, ...waterSt });
     }
 
     if (sections.bm && bmLog && bmLog.length > 0) {
@@ -4664,13 +4677,14 @@ function PDFSummary({
       consistencyText && /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.text, marginBottom: 14, lineHeight: 1.5, fontStyle: 'italic' } }, consistencyText),
       ...groups.map(g => /*#__PURE__*/React.createElement(React.Fragment, { key: g },
         /*#__PURE__*/React.createElement("div", { style: S.h3 }, g),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.text, marginBottom: 10, lineHeight: 1.5 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.text, marginBottom: g === "Activity" ? 4 : 10, lineHeight: 1.5 } },
           (() => {
             const clauses = rows.filter(r => r.group === g).map(clauseFor);
             if (clauses.length === 1) return clauses[0].charAt(0).toUpperCase() + clauses[0].slice(1) + '.';
             return clauses.slice(0, -1).join(', ') + ', and ' + clauses[clauses.length - 1] + '.';
           })().replace(/^./, c => c.toUpperCase())
-        )
+        ),
+        g === "Activity" && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.faint, fontStyle: 'italic', marginBottom: 10 } }, "Excludes today — today's totals are still accumulating and would otherwise skew the comparison.")
       )),
       /*#__PURE__*/React.createElement("table", { style: { ...S.table, marginTop: 10 } },
         /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
