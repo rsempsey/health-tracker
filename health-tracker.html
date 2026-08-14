@@ -546,6 +546,59 @@ function interpolatedWeightTarget(cfg, weightEntries) {
   const status = diff == null ? null : diff <= 0 ? "ahead" : "behind";
   return { target, actual, diff, status, currentMilestone: current, nextMilestone: next };
 }
+// HT-32: generalizes interpolatedWeightTarget to an arbitrary date (not just
+// today) — "what weight should I be on date X?" Returns { outOfRange: true,
+// ... } if dateStr falls before the model's start or beyond its week-156
+// horizon, since a flat extrapolation past that point wouldn't be meaningful.
+function weightTargetForDate(cfg, weightEntries, dateStr) {
+  if (!cfg || !cfg.startDate || !dateStr) return null;
+  const milestones = buildWeeklyMilestones(cfg, weightEntries || []);
+  const horizonDate = milestones[milestones.length - 1].date;
+  if (dateStr < cfg.startDate) return { outOfRange: true, reason: "before-start", horizonStart: cfg.startDate };
+  if (dateStr > horizonDate) return { outOfRange: true, reason: "beyond-horizon", horizonDate, horizonWeight: milestones[milestones.length - 1].target };
+  let idx = -1;
+  for (let i = 0; i < milestones.length; i++) {
+    if (milestones[i].date <= dateStr) idx = i;
+    else break;
+  }
+  const current = milestones[idx];
+  const next = milestones[idx + 1] || current;
+  const daysElapsed = Math.round((new Date(dateStr + "T00:00:00").getTime() - new Date(current.date + "T00:00:00").getTime()) / 86400000);
+  const target = +(current.target + (next.target - current.target) * (daysElapsed / 7)).toFixed(2);
+  return { target, currentMilestone: current, nextMilestone: next };
+}
+// HT-32: "when should I hit weight Y?" — walks the weekly milestone table
+// forward from today's bracket, looking for the week-pair where the
+// projected trajectory crosses targetWeight, then interpolates a specific
+// date within that week. Only past weeks are recalibrated off actual
+// weigh-ins, so this is a projection based on current pace, not a
+// guarantee. Returns { outOfRange: true, ... } if targetWeight is never
+// reached within the model's week-156 horizon.
+function dateForWeightTarget(cfg, weightEntries, targetWeight) {
+  if (!cfg || !cfg.startDate || targetWeight == null) return null;
+  const milestones = buildWeeklyMilestones(cfg, weightEntries || []);
+  const todayStr = today();
+  let startIdx = 0;
+  for (let i = 0; i < milestones.length; i++) {
+    if (milestones[i].date <= todayStr) startIdx = i;
+    else break;
+  }
+  for (let i = startIdx; i < milestones.length - 1; i++) {
+    const a = milestones[i], b = milestones[i + 1];
+    if (a.target === targetWeight) {
+      return { date: a.date, currentMilestone: a, nextMilestone: b };
+    }
+    if (a.target > targetWeight && targetWeight >= b.target) {
+      const frac = (a.target - targetWeight) / (a.target - b.target);
+      const days = Math.round(frac * 7);
+      const date = localDateStr(new Date(new Date(a.date + "T00:00:00").getTime() + days * 86400000));
+      return { date, currentMilestone: a, nextMilestone: b };
+    }
+  }
+  const last = milestones[milestones.length - 1];
+  if (last.target === targetWeight) return { date: last.date, currentMilestone: last, nextMilestone: last };
+  return { outOfRange: true, horizonDate: last.date, horizonWeight: last.target };
+}
 const SEED_MEDS = [{
   id: 1,
   name: "Amlodipine Besylate",
@@ -1729,6 +1782,12 @@ function WeightTab({
   weightProjectionConfig
 }) {
   const dailyTarget = interpolatedWeightTarget(weightProjectionConfig, entries);
+  const [lookupMode, setLookupMode] = useState("dateToWeight"); // "dateToWeight" | "weightToDate"
+  const [lookupDate, setLookupDate] = useState(today());
+  const [lookupWeight, setLookupWeight] = useState("");
+  const lookupResult = lookupMode === "dateToWeight"
+    ? (lookupDate ? weightTargetForDate(weightProjectionConfig, entries, lookupDate) : null)
+    : (lookupWeight !== "" ? dateForWeightTarget(weightProjectionConfig, entries, +lookupWeight) : null);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [f, setF] = useState({
@@ -1909,7 +1968,86 @@ function WeightTab({
       color: C.faint,
       marginTop: 8
     }
-  }, "Interpolated between ", fmtDate(dailyTarget.currentMilestone.date), " (", dailyTarget.currentMilestone.target, " lb) and ", fmtDate(dailyTarget.nextMilestone.date), " (", dailyTarget.nextMilestone.target, " lb)")), /*#__PURE__*/React.createElement(AddBtn, {
+  }, "Interpolated between ", fmtDate(dailyTarget.currentMilestone.date), " (", dailyTarget.currentMilestone.target, " lb) and ", fmtDate(dailyTarget.nextMilestone.date), " (", dailyTarget.nextMilestone.target, " lb)")), /*#__PURE__*/React.createElement(Card, {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(SectionTitle, null, "PROJECTION LOOKUP"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setLookupMode("dateToWeight"),
+    style: {
+      flex: 1,
+      padding: "7px",
+      background: lookupMode === "dateToWeight" ? C.accent : "none",
+      color: lookupMode === "dateToWeight" ? "#fff" : C.muted,
+      border: `1px solid ${lookupMode === "dateToWeight" ? C.accent : C.border}`,
+      borderRadius: 8,
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Weight on a date"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setLookupMode("weightToDate"),
+    style: {
+      flex: 1,
+      padding: "7px",
+      background: lookupMode === "weightToDate" ? C.accent : "none",
+      color: lookupMode === "weightToDate" ? "#fff" : C.muted,
+      border: `1px solid ${lookupMode === "weightToDate" ? C.accent : C.border}`,
+      borderRadius: 8,
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Date for a weight")), lookupMode === "dateToWeight" ? /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12 }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: labelSt
+  }, "What weight should I be on…"), /*#__PURE__*/React.createElement("input", {
+    style: inputSt,
+    type: "date",
+    value: lookupDate,
+    onChange: e => setLookupDate(e.target.value)
+  })) : /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 12 }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: labelSt
+  }, "When should I hit… (lb)"), /*#__PURE__*/React.createElement("input", {
+    style: inputSt,
+    type: "number",
+    step: "0.1",
+    placeholder: "e.g. 275",
+    value: lookupWeight,
+    onChange: e => setLookupWeight(e.target.value)
+  })), lookupResult && lookupResult.outOfRange ? /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12, color: C.faint }
+  }, lookupResult.reason === "before-start"
+    ? `The projection model starts ${fmtDate(lookupResult.horizonStart)} — pick a later date.`
+    : `That's beyond the model's projection horizon (through ${fmtDate(lookupResult.horizonDate)}, projected to ${lookupResult.horizonWeight} lb). Try a nearer date or a less ambitious weight.`
+  ) : lookupResult && lookupMode === "dateToWeight" ? /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 26, fontWeight: 800, color: C.text, letterSpacing: -0.5 }
+    }, lookupResult.target), /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 13, color: C.faint, marginLeft: 5 }
+    }, "lb target"),
+    /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11, color: C.faint, marginTop: 6 }
+    }, "Projection only — recalibrates as you log actual weigh-ins; not a guarantee.")
+  ) : lookupResult && lookupMode === "weightToDate" ? /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 18, fontWeight: 700, color: C.text }
+    }, "On pace to hit ", lookupWeight, " lb by ~", fmtDate(lookupResult.date)),
+    /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11, color: C.faint, marginTop: 6 }
+    }, "Projection only — recalibrates as you log actual weigh-ins; not a guarantee.")
+  ) : /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 12, color: C.faint }
+  }, lookupMode === "weightToDate" ? "Enter a target weight above." : "Pick a date above.")), /*#__PURE__*/React.createElement(AddBtn, {
     onClick: () => {
       if (open) {
         setOpen(false);
