@@ -3815,6 +3815,9 @@ function MedsTab({
     time: nowTime(),
     notes: ""
   });
+  const [editLogId, setEditLogId] = useState(null);
+  const [bulkDate, setBulkDate] = useState(today());
+  const [bulkTime, setBulkTime] = useState(nowTime());
   const [bulkMsg, setBulkMsg] = useState("");
   const active = meds.filter(m => m.active);
   const inactive = meds.filter(m => !m.active);
@@ -3862,15 +3865,28 @@ function MedsTab({
     if (!lf.medId || !lf.date) return;
     const med = meds.find(m => m.id === +lf.medId);
     if (!med) return;
-    setMedLogs([...medLogs, {
-      id: Date.now(),
-      medId: +lf.medId,
-      medName: med.name,
-      dose: med.dose,
-      date: lf.date,
-      time: lf.time,
-      notes: lf.notes
-    }]);
+    if (editLogId) {
+      setMedLogs(medLogs.map(l => l.id === editLogId ? {
+        ...l,
+        medId: +lf.medId,
+        medName: med.name,
+        dose: med.dose,
+        date: lf.date,
+        time: lf.time,
+        notes: lf.notes
+      } : l));
+      setEditLogId(null);
+    } else {
+      setMedLogs([...medLogs, {
+        id: Date.now(),
+        medId: +lf.medId,
+        medName: med.name,
+        dose: med.dose,
+        date: lf.date,
+        time: lf.time,
+        notes: lf.notes
+      }]);
+    }
     setLf({
       medId: lf.medId,
       date: today(),
@@ -3879,36 +3895,51 @@ function MedsTab({
     });
     setLogOpen(false);
   }
+  function startEditLog(l) {
+    setLf({
+      medId: String(l.medId),
+      date: l.date,
+      time: l.time || "",
+      notes: l.notes || ""
+    });
+    setEditLogId(l.id);
+    setLogOpen(true);
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }
   function toggle(id) {
     setMeds(meds.map(m => m.id === id ? {
       ...m,
       active: !m.active
     } : m));
   }
-  // Bulk-logs today's dose for every active, already-started, Daily-frequency
-  // medication that hasn't already been logged today — skips anything logged,
+  // Bulk-logs a dose (default today/now, but backdatable via bulkDate/bulkTime)
+  // for every active, already-started, Daily-frequency medication that hasn't
+  // already been logged on the chosen date — skips anything logged,
   // Twice daily/As needed/Weekly/Other, or not yet started (pending).
   function logAllDaily() {
-    const todayStr = today();
-    const loggedTodayIds = new Set(medLogs.filter(l => l.date === todayStr).map(l => l.medId));
-    const eligible = active.filter(m => m.frequency === "Daily" && m.startDate <= todayStr && !loggedTodayIds.has(m.id));
+    const targetDate = bulkDate || today();
+    const loggedIds = new Set(medLogs.filter(l => l.date === targetDate).map(l => l.medId));
+    const eligible = active.filter(m => m.frequency === "Daily" && m.startDate <= targetDate && !loggedIds.has(m.id));
     if (eligible.length === 0) {
-      setBulkMsg("No daily meds left to log today.");
+      setBulkMsg("No daily meds left to log for that date.");
       setTimeout(() => setBulkMsg(""), 2500);
       return;
     }
-    const now = nowTime();
+    const targetTime = bulkTime || nowTime();
     const newLogs = eligible.map((m, i) => ({
       id: Date.now() + i,
       medId: m.id,
       medName: m.name,
       dose: m.dose,
-      date: todayStr,
-      time: now,
+      date: targetDate,
+      time: targetTime,
       notes: ""
     }));
     setMedLogs([...medLogs, ...newLogs]);
-    setBulkMsg(`Logged ${eligible.length} daily med${eligible.length > 1 ? "s" : ""}.`);
+    setBulkMsg(`Logged ${eligible.length} daily med${eligible.length > 1 ? "s" : ""} for ${fmtDate(targetDate)}.`);
     setTimeout(() => setBulkMsg(""), 2500);
   }
 
@@ -4122,6 +4153,7 @@ function MedsTab({
     onClick: () => {
       if (logOpen) {
         setLogOpen(false);
+        setEditLogId(null);
       } else {
         setLf({
           medId: active.length === 1 ? String(active[0].id) : "",
@@ -4132,7 +4164,7 @@ function MedsTab({
         setLogOpen(true);
       }
     },
-    label: logOpen ? "Cancel" : "+ Log Dose Taken"
+    label: logOpen ? "Cancel" : editLogId ? "Editing Dose…" : "+ Log Dose Taken"
   }), logOpen && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10
@@ -4151,9 +4183,25 @@ function MedsTab({
   }, "Select…"), active.map(m => /*#__PURE__*/React.createElement("option", {
     key: m.id,
     value: m.id
-  }, m.name, m.dose ? " " + m.dose : "")))), active.some(m => m.frequency === "Daily") && /*#__PURE__*/React.createElement("div", {
+  }, m.name, m.dose ? " " + m.dose : "")))), !editLogId && active.some(m => m.frequency === "Daily") && /*#__PURE__*/React.createElement("div", {
     style: { marginBottom: 10 }
   },
+    /*#__PURE__*/React.createElement("div", {
+      style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }
+    },
+      /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", { style: labelSt }, "Bulk log date"), /*#__PURE__*/React.createElement("input", {
+        style: inputSt,
+        type: "date",
+        value: bulkDate,
+        onChange: e => setBulkDate(e.target.value)
+      })),
+      /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", { style: labelSt }, "Time"), /*#__PURE__*/React.createElement("input", {
+        style: inputSt,
+        type: "time",
+        value: bulkTime,
+        onChange: e => setBulkTime(e.target.value)
+      }))
+    ),
     /*#__PURE__*/React.createElement("button", {
       onClick: logAllDaily,
       style: {
@@ -4256,9 +4304,27 @@ function MedsTab({
       fontSize: 11,
       color: C.faint
     }
-  }, fmtDate(l.date), l.time ? " @ " + l.time : "", l.notes ? " · " + l.notes : "")), /*#__PURE__*/React.createElement(DelBtn, {
+  }, fmtDate(l.date), l.time ? " @ " + l.time : "", l.notes ? " · " + l.notes : "")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => startEditLog(l),
+    style: {
+      fontSize: 11,
+      color: C.accent,
+      background: "none",
+      border: `1px solid ${C.border}`,
+      borderRadius: 6,
+      cursor: "pointer",
+      padding: "2px 8px",
+      fontWeight: 600
+    }
+  }, "Edit"), /*#__PURE__*/React.createElement(DelBtn, {
     onClick: () => setMedLogs(medLogs.filter(x => x.id !== l.id))
-  })))));
+  }))))));
 }
 
 // ── PDF SUMMARY COMPONENT ────────────────────────────────────────────────────
