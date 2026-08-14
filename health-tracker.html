@@ -1338,6 +1338,21 @@ function VitalsTab({
   const sorted = [...readings].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const latest = sorted[0];
   const prev = sorted[1];
+  // 7-day rolling average, arm-equivalent — normalizes wrist readings the
+  // same way the LATEST card and charts do, then averages every reading
+  // (not just one per day) within the last 7 calendar days including today.
+  const rolling7 = (() => {
+    const window7 = last7Dates();
+    const inWindow = readings.filter(r => window7.includes(r.date));
+    if (!inWindow.length) return null;
+    const norm = inWindow.map(r => ({
+      sys: r.cuffType === "wrist-home" || r.cuffType === "wrist-office" ? r.systolic + WRIST_OFFSET.systolic : r.systolic,
+      dia: r.cuffType === "wrist-home" || r.cuffType === "wrist-office" ? r.diastolic + WRIST_OFFSET.diastolic : r.diastolic
+    }));
+    const avgSys = norm.reduce((s, n) => s + n.sys, 0) / norm.length;
+    const avgDia = norm.reduce((s, n) => s + n.dia, 0) / norm.length;
+    return { sys: Math.round(avgSys), dia: Math.round(avgDia), n: norm.length };
+  })();
   function save() {
     if (!f.systolic || !f.diastolic || !f.heartRate || !f.date) return;
     const entry = {
@@ -1441,7 +1456,13 @@ function VitalsTab({
       marginTop: 5,
       fontStyle: "italic"
     }
-  }, "Est. arm equiv: ", latest.systolic + WRIST_OFFSET.systolic, "/", latest.diastolic + WRIST_OFFSET.diastolic, " mmHg")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+  }, "Est. arm equiv: ", latest.systolic + WRIST_OFFSET.systolic, "/", latest.diastolic + WRIST_OFFSET.diastolic, " mmHg"), rolling7 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.faint,
+      marginTop: 4
+    }
+  }, "7-day avg (arm-equiv): ", rolling7.sys, "/", rolling7.dia, " mmHg (", rolling7.n, " reading", rolling7.n === 1 ? "" : "s", ")")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 26,
       fontWeight: 700,
