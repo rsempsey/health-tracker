@@ -455,6 +455,97 @@ const SEED_GOALS = {
   activeEnergy: 1000,
   restingHeartRate: 66
 };
+// ── WEIGHT PROJECTION MODEL (HT-31) ──────────────────────────────────────────
+// Self-correcting weekly milestone model matching the "Weekly Weight
+// Milestones" Google Sheet: each week's target is either recalibrated from
+// an actual nude-equivalent weigh-in near that week's milestone date, or
+// projected forward from the prior week's target using a phase-based weekly
+// loss rate. Today's target is then linearly interpolated between the
+// current and next weekly milestones. Config lives in Firestore
+// (weight-projection-config) so constants can be tuned without a code push.
+const SEED_WEIGHT_PROJECTION_CONFIG = {
+  startingWeight: 306.2,
+  startDate: "2026-07-06", // Week 1 milestone date
+  phase1Rate: 0.0052, phase1EndWeek: 26,
+  phase2Rate: 0.0034, phase2EndWeek: 78,
+  phase3Rate: 0.0013, phase3EndWeek: 156,
+  totalWeeks: 156,
+  matchWindowDays: 3 // ± days to match an actual weigh-in to a milestone date
+};
+function weightNudeEquivalent(e) {
+  return (e.condition === "clinical" || e.condition === "clothed" || e.condition === "light")
+    ? +(e.weight + CLOTHING_OFFSET).toFixed(1)
+    : e.weight;
+}
+function phaseRateForWeek(cfg, weekNum) {
+  if (weekNum <= cfg.phase1EndWeek) return cfg.phase1Rate;
+  if (weekNum <= cfg.phase2EndWeek) return cfg.phase2Rate;
+  return cfg.phase3Rate;
+}
+// Finds the nude-equivalent weight entry closest to targetDate, within
+// ±matchWindowDays. Returns null if none found (e.g. future weeks, or a
+// past week with no nearby weigh-in).
+function findMilestoneActual(weightEntries, targetDate, windowDays) {
+  const targetMs = new Date(targetDate + "T00:00:00").getTime();
+  let best = null, bestDiff = Infinity;
+  for (const e of weightEntries) {
+    if (!e.date) continue;
+    const ms = new Date(e.date + "T00:00:00").getTime();
+    const diffDays = Math.abs(ms - targetMs) / 86400000;
+    if (diffDays <= windowDays && diffDays < bestDiff) {
+      bestDiff = diffDays;
+      best = e;
+    }
+  }
+  return best ? weightNudeEquivalent(best) : null;
+}
+// Builds the full weekly milestone table (date + target weight per week),
+// recalibrating from actual weigh-ins where available — same behavior as
+// the spreadsheet's manual "actual weight" column. Ascending by week.
+function buildWeeklyMilestones(cfg, weightEntries) {
+  const milestones = [];
+  let prevTarget = cfg.startingWeight;
+  const startMs = new Date(cfg.startDate + "T00:00:00").getTime();
+  for (let week = 1; week <= cfg.totalWeeks; week++) {
+    const date = localDateStr(new Date(startMs + (week - 1) * 7 * 86400000));
+    const actual = findMilestoneActual(weightEntries, date, cfg.matchWindowDays);
+    let target;
+    if (actual != null) {
+      target = actual;
+    } else {
+      const rate = phaseRateForWeek(cfg, week);
+      const loss = Math.floor(prevTarget * rate * 100) / 100; // ROUNDDOWN, matches sheet
+      target = +(prevTarget - loss).toFixed(2);
+    }
+    milestones.push({ week, date, target });
+    prevTarget = target;
+  }
+  return milestones;
+}
+// Interpolates today's target weight between the current and next weekly
+// milestones, and compares it against today's actual nude-equivalent weight
+// (if logged). Returns null if today is before the model's start date.
+function interpolatedWeightTarget(cfg, weightEntries) {
+  if (!cfg || !cfg.startDate) return null;
+  const todayStr = today();
+  if (todayStr < cfg.startDate) return null;
+  const milestones = buildWeeklyMilestones(cfg, weightEntries || []);
+  let idx = -1;
+  for (let i = 0; i < milestones.length; i++) {
+    if (milestones[i].date <= todayStr) idx = i;
+    else break;
+  }
+  if (idx === -1) return null;
+  const current = milestones[idx];
+  const next = milestones[idx + 1] || current; // past final week: no further projection
+  const daysElapsed = Math.round((new Date(todayStr + "T00:00:00").getTime() - new Date(current.date + "T00:00:00").getTime()) / 86400000);
+  const target = +(current.target + (next.target - current.target) * (daysElapsed / 7)).toFixed(2);
+  const todaysEntry = (weightEntries || []).find(e => e.date === todayStr);
+  const actual = todaysEntry ? weightNudeEquivalent(todaysEntry) : null;
+  const diff = actual != null ? +(actual - target).toFixed(2) : null;
+  const status = diff == null ? null : diff <= 0 ? "ahead" : "behind";
+  return { target, actual, diff, status, currentMilestone: current, nextMilestone: next };
+}
 const SEED_MEDS = [{
   id: 1,
   name: "Amlodipine Besylate",
@@ -1613,8 +1704,10 @@ function VitalsTab({
 function WeightTab({
   weight: entries,
   setWeight: setEntries,
-  goals
+  goals,
+  weightProjectionConfig
 }) {
+  const dailyTarget = interpolatedWeightTarget(weightProjectionConfig, entries);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [f, setF] = useState({
@@ -1756,7 +1849,46 @@ function WeightTab({
     current: latest.weight,
     goal: goals.weight,
     unit: "lb"
-  })), /*#__PURE__*/React.createElement(AddBtn, {
+  })), dailyTarget && /*#__PURE__*/React.createElement(Card, {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement(SectionTitle, null, "TODAY'S TARGET · INTERPOLATED"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 28,
+      alignItems: "flex-end",
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 30,
+      fontWeight: 800,
+      color: C.text,
+      letterSpacing: -1
+    }
+  }, dailyTarget.target), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      color: C.faint,
+      marginLeft: 5
+    }
+  }, "lb target")), dailyTarget.actual != null && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Badge, {
+    label: dailyTarget.status === "ahead" ? `Ahead of pace by ${Math.abs(dailyTarget.diff)} lb` : `Behind pace by ${dailyTarget.diff} lb`,
+    color: dailyTarget.status === "ahead" ? "#22c55e" : "#ef4444"
+  }))), !dailyTarget.actual && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: C.faint,
+      marginTop: 8
+    }
+  }, "Log today's weight to see pace vs. target."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: C.faint,
+      marginTop: 8
+    }
+  }, "Interpolated between ", fmtDate(dailyTarget.currentMilestone.date), " (", dailyTarget.currentMilestone.target, " lb) and ", fmtDate(dailyTarget.nextMilestone.date), " (", dailyTarget.nextMilestone.target, " lb)")), /*#__PURE__*/React.createElement(AddBtn, {
     onClick: () => {
       if (open) {
         setOpen(false);
@@ -6008,8 +6140,10 @@ function Dashboard({
   medLogs,
   glucoseLog,
   cgmSummaryLog,
-  healthkitDailyLog
+  healthkitDailyLog,
+  weightProjectionConfig
 }) {
+  const dashDailyTarget = interpolatedWeightTarget(weightProjectionConfig, wData);
   const bpSorted = [...(bpData || [])].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const latestBP = bpSorted[0];
   const prevBP = bpSorted[1];
@@ -6121,6 +6255,12 @@ function Dashboard({
             /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6, textAlign: "center" } }, fmtDate(latestW.date)),
             /*#__PURE__*/React.createElement("div", { style: { textAlign: "center" } },
               /*#__PURE__*/React.createElement(Badge, { label: `BMI ${b}`, color: bmiCat(b).color, small: true })
+            ),
+            dashDailyTarget && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.faint, marginTop: 6, textAlign: "center" } },
+              "Target: ", dashDailyTarget.target, " lb",
+              dashDailyTarget.actual != null && (dashDailyTarget.status === "ahead"
+                ? ` · Ahead by ${Math.abs(dashDailyTarget.diff)} lb`
+                : ` · Behind by ${dashDailyTarget.diff} lb`)
             )
           );
         })()
@@ -6438,7 +6578,8 @@ function App() {
   const [healthkitDailyLog, setHealthkitDailyLog, hkdlLoaded] = usePersistedState("healthkit-daily-log", []);
   const [cgmSummaryDraft, setCgmSummaryDraft, cgmDraftLoaded] = usePersistedState("cgm-summary-draft", []);
   const [bmLog, setBmLog, bmLoaded] = usePersistedState("bowel-log", []);
-  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded && cgmLoaded && hkdlLoaded && cgmDraftLoaded && bmLoaded;
+  const [weightProjectionConfig, setWeightProjectionConfig, wpcLoaded] = usePersistedState("weight-projection-config", SEED_WEIGHT_PROJECTION_CONFIG);
+  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded && cgmLoaded && hkdlLoaded && cgmDraftLoaded && bmLoaded && wpcLoaded;
   const shared = {
     bp,
     setBp,
@@ -6463,7 +6604,9 @@ function App() {
     cgmSummaryDraft,
     setCgmSummaryDraft,
     bmLog,
-    setBmLog
+    setBmLog,
+    weightProjectionConfig,
+    setWeightProjectionConfig
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "app-root",
