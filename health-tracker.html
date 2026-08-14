@@ -6207,10 +6207,19 @@ function Dashboard({
       const sorted = [...fasting].sort((a, b) => (b.date + (b.time||"")).localeCompare(a.date + (a.time||"")));
       return sorted.length ? sorted[0] : null;
     })();
+    const prevGlucose = (() => {
+      const fasting = (glucoseLog || []).filter(r => r.readingType === "Fasting");
+      const sorted = [...fasting].sort((a, b) => (b.date + (b.time||"")).localeCompare(a.date + (a.time||"")));
+      return sorted.length > 1 ? sorted[1] : null;
+    })();
     // Get latest CGM summary for hero card
     const latestCgmSummary = (() => {
       const sorted = [...(cgmSummaryLog || [])].sort((a, b) => b.date.localeCompare(a.date));
       return sorted.length ? sorted[0] : null;
+    })();
+    const prevCgmSummary = (() => {
+      const sorted = [...(cgmSummaryLog || [])].sort((a, b) => b.date.localeCompare(a.date));
+      return sorted.length > 1 ? sorted[1] : null;
     })();
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", {
@@ -6271,7 +6280,8 @@ function Dashboard({
         latestCgmSummary && latestCgmSummary.avgGlucose != null && /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Glucose") },
           /*#__PURE__*/React.createElement(SectionTitle, null, "CGM · AVG GLUCOSE"),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
-            Math.round(latestCgmSummary.avgGlucose), " ", /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 400, color: C.faint } }, "mg/dL")
+            Math.round(latestCgmSummary.avgGlucose), " ", /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 400, color: C.faint } }, "mg/dL"),
+            /*#__PURE__*/React.createElement(Arrow, { curr: latestCgmSummary.avgGlucose, prev: prevCgmSummary ? prevCgmSummary.avgGlucose : null })
           ),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6, textAlign: "center" } }, fmtDate(latestCgmSummary.date)),
           goals && goals.avgCgmGlucose && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center" } },
@@ -6285,7 +6295,8 @@ function Dashboard({
         latestGlucose && /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setTab("Glucose") },
           /*#__PURE__*/React.createElement(SectionTitle, null, "FASTING GLUCOSE"),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
-            latestGlucose.value, " ", /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 400, color: C.faint } }, "mg/dL")
+            latestGlucose.value, " ", /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, fontWeight: 400, color: C.faint } }, "mg/dL"),
+            /*#__PURE__*/React.createElement(Arrow, { curr: latestGlucose.value, prev: prevGlucose ? prevGlucose.value : null })
           ),
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6, textAlign: "center" } }, fmtDate(latestGlucose.date)),
           goals && goals.fastingGlucose && /*#__PURE__*/React.createElement("div", { style: { textAlign: "center" } },
