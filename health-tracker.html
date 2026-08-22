@@ -2529,6 +2529,11 @@ function GlucoseTab({
     const avg = inWindow.reduce((s, r) => s + r.value, 0) / inWindow.length;
     return { avg: Math.round(avg), n: inWindow.length };
   })();
+  // v95: two-line trend data for the combined Manual Readings hero card —
+  // Fasting Glucose (per-reading) + Avg CGM Glucose (per-day summary), each
+  // filtered to TREND_CHART_START to match the app's other trend charts.
+  const fastingTrendPts = fastingSorted.filter(r => r.date >= TREND_CHART_START).map(r => ({ date: r.date, value: r.value }));
+  const avgCgmTrendPts = (cgmSummaryLog || []).filter(r => r.avgGlucose != null && r.date >= TREND_CHART_START).map(r => ({ date: r.date, value: r.avgGlucose }));
 
   return /*#__PURE__*/React.createElement("div", null,
     // Sub-view toggle
@@ -2545,45 +2550,83 @@ function GlucoseTab({
       }, "CGM Summary")
     ),
     view === "meter" && /*#__PURE__*/React.createElement(React.Fragment, null,
-    // Latest card (chart embedded, matching BP/Weight tabs) — Fasting readings only
-    latestFasting && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
-      /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST FASTING · ", fmtDate(latestFasting.date)),
-      /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 24, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 8 } },
+    // v95: combined LATEST card — Fasting Glucose + Avg CGM Glucose side by
+    // side (value, trend arrow, goal badge each), plus a two-line trend chart
+    // (TrendChart multi-series mode, same component HT-23 uses in Export).
+    (latestFasting || (latestCgm && latestCgm.avgGlucose != null)) && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST GLUCOSE"),
+      /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 10 } },
         /*#__PURE__*/React.createElement("div", null,
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: 34, fontWeight: 800, color: C.text, letterSpacing: -1 } }, latestFasting.value),
-          /*#__PURE__*/React.createElement("span", { style: { fontSize: 14, color: C.faint, marginLeft: 4 } }, "mg/dL"),
-          prevFasting && /*#__PURE__*/React.createElement("span", {
-            style: { fontSize: 13, fontWeight: 700, color: latestFasting.value < prevFasting.value ? "#22c55e" : "#ef4444", marginLeft: 8 }
-          }, latestFasting.value < prevFasting.value ? "↓" : "↑")
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 0.3, marginBottom: 4 } }, "FASTING GLUCOSE"),
+          latestFasting ? /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", null,
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: -1 } }, latestFasting.value),
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, color: C.faint, marginLeft: 4 } }, "mg/dL"),
+              prevFasting && /*#__PURE__*/React.createElement("span", {
+                style: { fontSize: 13, fontWeight: 700, color: latestFasting.value < prevFasting.value ? "#22c55e" : "#ef4444", marginLeft: 6 }
+              }, latestFasting.value < prevFasting.value ? "↓" : "↑")
+            ),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 4 } }, fmtDate(latestFasting.date), latestFasting.time ? " · " + latestFasting.time : ""),
+            goal && /*#__PURE__*/React.createElement(Badge, {
+              label: latestFasting.value <= goal ? "At Goal" : "Above Goal",
+              color: latestFasting.value <= goal ? "#22c55e" : "#f97316",
+              small: true
+            }),
+            rolling7Fasting && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 6 } },
+              "7-day avg: ", rolling7Fasting.avg, " mg/dL (", rolling7Fasting.n, ")"
+            ),
+            (() => {
+              const elapsed = elapsedMins(latestFasting.time, latestFasting.lastMealTime);
+              const mealNote = latestFasting.mealNote || latestFasting.note;
+              if (!elapsed && !mealNote) return null;
+              return /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.muted, marginTop: 4, fontStyle: "italic" } },
+                elapsed ? fmtElapsed(elapsed) : null,
+                elapsed && mealNote ? " · " : null,
+                mealNote ? "📝 " + mealNote : null
+              );
+            })()
+          ) : /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "No fasting readings yet.")
         ),
-        /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" } },
-          /*#__PURE__*/React.createElement(Badge, { label: latestFasting.value <= 99 ? "Normal" : latestFasting.value <= goal ? "Elevated" : "High", color: glucoseColor(latestFasting.value), small: true }),
-          latestFasting.readingType && /*#__PURE__*/React.createElement(Badge, { label: latestFasting.readingType, color: readingTypeBadgeColor(latestFasting.readingType), small: true }),
-          latestFasting.time && /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: C.faint } }, latestFasting.time)
+        /*#__PURE__*/React.createElement("div", null,
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 0.3, marginBottom: 4 } }, "AVG CGM GLUCOSE"),
+          (latestCgm && latestCgm.avgGlucose != null) ? /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", null,
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: -1 } }, Math.round(latestCgm.avgGlucose)),
+              /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, color: C.faint, marginLeft: 4 } }, "mg/dL"),
+              (prevCgm && prevCgm.avgGlucose != null) && /*#__PURE__*/React.createElement("span", {
+                style: { fontSize: 13, fontWeight: 700, color: latestCgm.avgGlucose < prevCgm.avgGlucose ? "#22c55e" : "#ef4444", marginLeft: 6 }
+              }, latestCgm.avgGlucose < prevCgm.avgGlucose ? "↓" : "↑")
+            ),
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 4 } }, fmtDate(latestCgm.date)),
+            avgCgmGoal && /*#__PURE__*/React.createElement(Badge, {
+              label: latestCgm.avgGlucose <= avgCgmGoal ? "At Goal" : "Above Goal",
+              color: latestCgm.avgGlucose <= avgCgmGoal ? "#22c55e" : "#f97316",
+              small: true
+            })
+          ) : /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "No CGM summary yet.")
         )
       ),
-      prevFasting && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } },
-        "prev ", prevFasting.value, " mg/dL", prevFasting.readingType ? " · " + prevFasting.readingType : "", prevFasting.time ? " · " + prevFasting.time : ""
-      ),
-      rolling7Fasting && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint, marginTop: 4 } },
-        "7-day avg: ", rolling7Fasting.avg, " mg/dL (", rolling7Fasting.n, " reading", rolling7Fasting.n === 1 ? "" : "s", ")"
-      ),
-      (() => {
-        const elapsed = elapsedMins(latestFasting.time, latestFasting.lastMealTime);
-        const mealNote = latestFasting.mealNote || latestFasting.note;
-        if (!elapsed && !mealNote) return null;
-        return /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.muted, marginTop: 4, fontStyle: "italic" } },
-          elapsed ? fmtElapsed(elapsed) : null,
-          elapsed && mealNote ? " · " : null,
-          mealNote ? "📝 " + mealNote : null
-        );
-      })(),
-      chartPtsFasting.length > 1 && /*#__PURE__*/React.createElement(MiniChart, { points: chartPtsFasting, color: "#3b82f6", goal: goal, bad: "high" })
+      (fastingTrendPts.length >= 2 || avgCgmTrendPts.length >= 2) && /*#__PURE__*/React.createElement("div", { style: { marginTop: 4 } },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6 } },
+          "Trend (since ", fmtDate(TREND_CHART_START), ")"
+        ),
+        /*#__PURE__*/React.createElement(TrendChart, {
+          series: [
+            { points: fastingTrendPts, color: "#3b82f6", label: "Fasting Glucose" },
+            { points: avgCgmTrendPts, color: "#f97316", label: "Avg CGM Glucose" }
+          ],
+          width: 440
+        })
+      )
     ),
-    // Goal card
+    // Goal cards — Fasting Glucose and Avg CGM Glucose
     latestFasting && goal && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
-      /*#__PURE__*/React.createElement(SectionTitle, null, "GOAL"),
+      /*#__PURE__*/React.createElement(SectionTitle, null, "GOAL · FASTING"),
       /*#__PURE__*/React.createElement(GoalBar, { label: "Fasting Glucose", current: latestFasting.value, goal: goal, unit: "mg/dL", streak: streak })
+    ),
+    latestCgm && latestCgm.avgGlucose != null && avgCgmGoal && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      /*#__PURE__*/React.createElement(SectionTitle, null, "GOAL · AVG CGM"),
+      /*#__PURE__*/React.createElement(GoalBar, { label: "Avg CGM Glucose", current: latestCgm.avgGlucose, goal: avgCgmGoal, unit: "mg/dL", streak: avgCgmStreak })
     ),
     // Log/Cancel toggle button
     /*#__PURE__*/React.createElement(AddBtn, {
@@ -2686,35 +2729,36 @@ function GlucoseTab({
     }, "No glucose readings yet.")
     ),
     view === "cgm" && /*#__PURE__*/React.createElement(React.Fragment, null,
-      // HT-35: combined LATEST card — Fasting Glucose + Avg CGM Glucose side by
-      // side, each with its own trend arrow, date, and goal badge. Replaces the
-      // old TIR-primary card (TIR/GMI/TAR/TBR/SD detail and trend chart dropped
-      // per Bob's direction; full CGM Summary stats are still visible in each
-      // entry below in ALL READINGS / the entries list).
-      (latestFasting || (latestCgm && latestCgm.avgGlucose != null)) && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+      // v95: combined LATEST card — TIR + Avg CGM Glucose side by side, each
+      // with its own trend arrow, date, and goal comparison. GMI/TAR/TBR/SD
+      // detail and the single-line trend chart remain dropped from this card;
+      // full CGM Summary stats are still visible on each entry in the list
+      // below. (Fasting Glucose + Avg CGM Glucose combined card now lives on
+      // the Manual Readings sub-view instead, alongside the two-line trend chart.)
+      (latestCgm && (latestCgm.tir != null || latestCgm.avgGlucose != null)) && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
         /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST GLUCOSE"),
         /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 } },
           /*#__PURE__*/React.createElement("div", null,
-            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 0.3, marginBottom: 4 } }, "FASTING GLUCOSE"),
-            latestFasting ? /*#__PURE__*/React.createElement(React.Fragment, null,
+            /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 0.3, marginBottom: 4 } }, "TIME IN RANGE"),
+            latestCgm.tir != null ? /*#__PURE__*/React.createElement(React.Fragment, null,
               /*#__PURE__*/React.createElement("div", null,
-                /*#__PURE__*/React.createElement("span", { style: { fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: -1 } }, latestFasting.value),
-                /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, color: C.faint, marginLeft: 4 } }, "mg/dL"),
-                prevFasting && /*#__PURE__*/React.createElement("span", {
-                  style: { fontSize: 13, fontWeight: 700, color: latestFasting.value < prevFasting.value ? "#22c55e" : "#ef4444", marginLeft: 6 }
-                }, latestFasting.value < prevFasting.value ? "↓" : "↑")
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: -1 } }, latestCgm.tir),
+                /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, color: C.faint, marginLeft: 4 } }, "% TIR"),
+                prevCgm && prevCgm.tir != null && /*#__PURE__*/React.createElement("span", {
+                  style: { fontSize: 13, fontWeight: 700, color: latestCgm.tir > prevCgm.tir ? "#22c55e" : "#ef4444", marginLeft: 6 }
+                }, latestCgm.tir > prevCgm.tir ? "↑" : "↓")
               ),
-              /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6 } }, fmtDate(latestFasting.date)),
-              goal && /*#__PURE__*/React.createElement(Badge, {
-                label: latestFasting.value <= goal ? "At Goal" : "Above Goal",
-                color: latestFasting.value <= goal ? "#22c55e" : "#f97316",
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6 } }, fmtDate(latestCgm.date)),
+              /*#__PURE__*/React.createElement(Badge, {
+                label: latestCgm.tir >= 70 ? "On Target" : latestCgm.tir >= 50 ? "Below Target" : "Well Below Target",
+                color: tirColor(latestCgm.tir),
                 small: true
               })
-            ) : /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "No fasting readings yet.")
+            ) : /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "No TIR logged yet.")
           ),
           /*#__PURE__*/React.createElement("div", null,
             /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 0.3, marginBottom: 4 } }, "AVG CGM GLUCOSE"),
-            (latestCgm && latestCgm.avgGlucose != null) ? /*#__PURE__*/React.createElement(React.Fragment, null,
+            (latestCgm.avgGlucose != null) ? /*#__PURE__*/React.createElement(React.Fragment, null,
               /*#__PURE__*/React.createElement("div", null,
                 /*#__PURE__*/React.createElement("span", { style: { fontSize: 28, fontWeight: 800, color: C.text, letterSpacing: -1 } }, Math.round(latestCgm.avgGlucose)),
                 /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, color: C.faint, marginLeft: 4 } }, "mg/dL"),
