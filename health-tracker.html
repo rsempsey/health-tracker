@@ -1802,6 +1802,16 @@ function WeightTab({
   const first = sorted[sorted.length - 1];
   const nudeEq = e => (e.condition === "clinical" || e.condition === "clothed" || e.condition === "light") ? +(e.weight + CLOTHING_OFFSET).toFixed(1) : e.weight;
   const change = latest && first && latest.id !== first.id ? (nudeEq(latest) - nudeEq(first)).toFixed(1) : null;
+  // 7-day rolling average, nude-equivalent — averages every weight entry
+  // (not just one per day) within the last 7 calendar days including today,
+  // matching the BP tab's rolling7 pattern.
+  const rolling7 = (() => {
+    const window7 = last7Dates();
+    const inWindow = entries.filter(e => window7.includes(e.date));
+    if (!inWindow.length) return null;
+    const avg = inWindow.reduce((s, e) => s + nudeEq(e), 0) / inWindow.length;
+    return { avg: +avg.toFixed(1), n: inWindow.length };
+  })();
   function save() {
     if (!f.weight || !f.date) return;
     const entry = {
@@ -1889,7 +1899,13 @@ function WeightTab({
         marginTop: 2,
         fontWeight: 600
       }
-    }, +change > 0 ? "+" : "", change, " lb since ", fmtDate(first.date))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    }, +change > 0 ? "+" : "", change, " lb since ", fmtDate(first.date)), rolling7 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: C.faint,
+        marginTop: 4
+      }
+    }, "7-day avg (nude-equiv): ", rolling7.avg, " lb (", rolling7.n, " reading", rolling7.n === 1 ? "" : "s", ")")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 26,
         fontWeight: 700,
@@ -2395,6 +2411,16 @@ function GlucoseTab({
     .map(r => ({ date: r.date, y: r.value }));
   const fastingGlucoseReadings = fastingSorted.map(r => ({ date: r.date, value: r.value }));
   const streak = calcStreak(fastingGlucoseReadings, goal, "high");
+  // 7-day rolling average, Fasting-type readings only — averages every Fasting
+  // reading (not just one per day) within the last 7 calendar days including
+  // today, matching the BP tab's rolling7 pattern.
+  const rolling7Fasting = (() => {
+    const window7 = last7Dates();
+    const inWindow = fastingSorted.filter(r => window7.includes(r.date));
+    if (!inWindow.length) return null;
+    const avg = inWindow.reduce((s, r) => s + r.value, 0) / inWindow.length;
+    return { avg: Math.round(avg), n: inWindow.length };
+  })();
 
   return /*#__PURE__*/React.createElement("div", null,
     // Sub-view toggle
@@ -2430,6 +2456,9 @@ function GlucoseTab({
       ),
       prevFasting && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } },
         "prev ", prevFasting.value, " mg/dL", prevFasting.readingType ? " · " + prevFasting.readingType : "", prevFasting.time ? " · " + prevFasting.time : ""
+      ),
+      rolling7Fasting && /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint, marginTop: 4 } },
+        "7-day avg: ", rolling7Fasting.avg, " mg/dL (", rolling7Fasting.n, " reading", rolling7Fasting.n === 1 ? "" : "s", ")"
       ),
       (() => {
         const elapsed = elapsedMins(latestFasting.time, latestFasting.lastMealTime);
