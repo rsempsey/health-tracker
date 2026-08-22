@@ -439,6 +439,7 @@ const SEED_GOALS = {
   LDL: 80,
   fastingGlucose: 110,
   avgCgmGlucose: 120,
+  postMealPeakGoal: 140,
   // Nutrition targets
   caloriesWeekday: 1785,
   caloriesWeekend: 2053,
@@ -2370,6 +2371,7 @@ function GlucoseTab({
   cgmSummaryLog,
   setCgmSummaryLog,
   cgmSummaryDraft,
+  postMealPeakLog,
   goals
 }) {
   const [view, setView] = useState("meter");
@@ -2546,6 +2548,19 @@ function GlucoseTab({
   const fastingTrendPts = fastingSorted.filter(r => r.date >= TREND_CHART_START).map(r => ({ date: r.date, value: r.value }));
   const avgCgmTrendPts = (cgmSummaryLog || []).filter(r => r.avgGlucose != null && r.date >= TREND_CHART_START).map(r => ({ date: r.date, value: r.avgGlucose }));
 
+  // HT-36: Post-Meal Peaks (window-based approximation, native-app-written).
+  // pmpGoal is a single shared target applied to all three meal categories.
+  // Streak requires ALL THREE peaks present and at-or-below goal that day;
+  // a day missing any of the three is treated as absent (not a miss),
+  // matching how other streaks in this app handle missing data.
+  const pmpSorted = [...(postMealPeakLog || [])].sort((a, b) => b.date.localeCompare(a.date));
+  const latestPmp = pmpSorted[0];
+  const pmpGoal = goals?.postMealPeakGoal || SEED_GOALS.postMealPeakGoal;
+  const pmpCompleteDays = (postMealPeakLog || [])
+    .filter(e => e.breakfastPeak != null && e.lunchPeak != null && e.dinnerPeak != null)
+    .map(e => ({ date: e.date, value: Math.max(e.breakfastPeak, e.lunchPeak, e.dinnerPeak) }));
+  const pmpStreak = calcStreak(pmpCompleteDays, pmpGoal, "high");
+
   return /*#__PURE__*/React.createElement("div", null,
     // Sub-view toggle
     /*#__PURE__*/React.createElement("div", {
@@ -2558,7 +2573,11 @@ function GlucoseTab({
       /*#__PURE__*/React.createElement("button", {
         onClick: () => setView("cgm"),
         style: { flex: 1, padding: "7px 10px", borderRadius: 7, border: "none", background: view === "cgm" ? "#fff" : "transparent", color: view === "cgm" ? C.text : C.muted, fontSize: 12, fontWeight: view === "cgm" ? 700 : 500, cursor: "pointer", boxShadow: view === "cgm" ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }
-      }, "CGM Summary")
+      }, "CGM Summary"),
+      /*#__PURE__*/React.createElement("button", {
+        onClick: () => setView("peaks"),
+        style: { flex: 1, padding: "7px 10px", borderRadius: 7, border: "none", background: view === "peaks" ? "#fff" : "transparent", color: view === "peaks" ? C.text : C.muted, fontSize: 12, fontWeight: view === "peaks" ? 700 : 500, cursor: "pointer", boxShadow: view === "peaks" ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }
+      }, "Post-Meal Peaks")
     ),
     view === "meter" && /*#__PURE__*/React.createElement(React.Fragment, null,
     // v95: combined LATEST card — Fasting Glucose + Avg CGM Glucose side by
@@ -2898,6 +2917,73 @@ function GlucoseTab({
       (!cgmSummaryLog || cgmSummaryLog.length === 0) && !cgmOpen && /*#__PURE__*/React.createElement("div", {
         style: { textAlign: "center", color: C.faint, fontSize: 14, padding: "40px 0" }
       }, "No CGM summaries yet.")
+    ),
+    // HT-36: Post-Meal Peak Glucose — window-based approximation using
+    // assumed meal-time windows against CGM data; computed natively
+    // (HealthTrackerBridge) and written to post-meal-peak-log, auto-write,
+    // no confirm step. Labeled "(approx., window-based)" wherever shown, per
+    // the known-limitation callout in the HealthKit Bridge doc — this is
+    // never presented as true single-meal precision.
+    view === "peaks" && /*#__PURE__*/React.createElement(React.Fragment, null,
+      latestPmp && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+        /*#__PURE__*/React.createElement(SectionTitle, null, "LATEST · ", fmtDate(latestPmp.date), " (approx., window-based)"),
+        /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 } },
+          ["breakfast", "lunch", "dinner"].map(meal => {
+            const peak = latestPmp[meal + "Peak"];
+            const time = latestPmp[meal + "PeakTime"];
+            const label = meal.charAt(0).toUpperCase() + meal.slice(1);
+            return /*#__PURE__*/React.createElement("div", { key: meal },
+              /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 0.3, marginBottom: 4 } }, label.toUpperCase()),
+              peak != null ? /*#__PURE__*/React.createElement(React.Fragment, null,
+                /*#__PURE__*/React.createElement("div", null,
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: 22, fontWeight: 800, color: C.text, letterSpacing: -0.5 } }, Math.round(peak)),
+                  /*#__PURE__*/React.createElement("span", { style: { fontSize: 11, color: C.faint, marginLeft: 3 } }, "mg/dL")
+                ),
+                time && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.faint, marginBottom: 4 } }, "at ", time),
+                /*#__PURE__*/React.createElement(Badge, {
+                  label: peak <= pmpGoal ? "At Goal" : "Above Goal",
+                  color: peak <= pmpGoal ? "#22c55e" : "#f97316",
+                  small: true
+                })
+              ) : /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint } }, "No data")
+            );
+          })
+        )
+      ),
+      // Goal card — single shared streak requiring all 3 meals present and
+      // at goal that day; a day missing any meal is treated as absent, not
+      // a miss (matches how other streaks in this app handle missing data).
+      latestPmp && pmpGoal && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+        /*#__PURE__*/React.createElement(SectionTitle, null, "GOAL"),
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.muted, marginBottom: 6 } },
+          "Post-Meal Peak Glucose: target ≤", pmpGoal, " mg/dL (approx., window-based)"
+        ),
+        pmpStreak
+          ? /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: "#22c55e", fontWeight: 600 } }, fmtStreak(pmpStreak))
+          : /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "No active streak — needs all three meals logged and at goal.")
+      ),
+      pmpSorted.length > 0 && /*#__PURE__*/React.createElement("div", null,
+        /*#__PURE__*/React.createElement(SectionTitle, null, "ALL PEAKS (approx., window-based)"),
+        pmpSorted.map(e => /*#__PURE__*/React.createElement("div", {
+          key: e.date,
+          style: { background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "12px 14px", marginBottom: 8 }
+        },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 6 } }, fmtDate(e.date)),
+          /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: C.text } },
+            ["breakfast", "lunch", "dinner"].map(meal => {
+              const peak = e[meal + "Peak"];
+              const time = e[meal + "PeakTime"];
+              const label = meal.charAt(0).toUpperCase() + meal.slice(1);
+              return /*#__PURE__*/React.createElement("span", { key: meal },
+                label, ": ", peak != null ? `${Math.round(peak)} mg/dL${time ? ' (' + time + ')' : ''}` : "—"
+              );
+            })
+          )
+        ))
+      ),
+      (!postMealPeakLog || postMealPeakLog.length === 0) && /*#__PURE__*/React.createElement("div", {
+        style: { textAlign: "center", color: C.faint, fontSize: 14, padding: "40px 0" }
+      }, "No post-meal peak data yet.")
     )
   );
 }
@@ -3539,6 +3625,11 @@ function GoalsTab({
   }, {
     key: "avgCgmGlucose",
     label: "Avg CGM Glucose",
+    unit: "mg/dL",
+    bad: "high"
+  }, {
+    key: "postMealPeakGoal",
+    label: "Post-Meal Peak Glucose",
     unit: "mg/dL",
     bad: "high"
   }];
@@ -6185,7 +6276,8 @@ function ExportTab({
   meds,
   medLogs,
   healthkitDailyLog,
-  bmLog
+  bmLog,
+  postMealPeakLog
 }) {
   const [view, setView] = useState(null);
   const [sections, setSections] = useState(EMPTY_SECTIONS);
@@ -6308,6 +6400,22 @@ function ExportTab({
       [...(bmLog || [])].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).forEach(r => {
         rows.push([r.date, r.time || '', r.bristol, bristolStatusLabel(r.bristol), r.notes || '']);
       });
+      return makeCSV(rows);
+    }
+  }, {
+    label: 'Post-Meal Peak Glucose (approx., window-based)',
+    count: (postMealPeakLog || []).length,
+    build: () => {
+      const rows = [['Date', 'Breakfast Peak (mg/dL)', 'Breakfast Peak Time', 'Lunch Peak (mg/dL)', 'Lunch Peak Time', 'Dinner Peak (mg/dL)', 'Dinner Peak Time']];
+      [...(postMealPeakLog || [])].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => rows.push([
+        e.date,
+        e.breakfastPeak != null ? Math.round(e.breakfastPeak) : '',
+        e.breakfastPeakTime || '',
+        e.lunchPeak != null ? Math.round(e.lunchPeak) : '',
+        e.lunchPeakTime || '',
+        e.dinnerPeak != null ? Math.round(e.dinnerPeak) : '',
+        e.dinnerPeakTime || ''
+      ]));
       return makeCSV(rows);
     }
   }];
@@ -7060,7 +7168,10 @@ function App() {
   const [cgmSummaryDraft, setCgmSummaryDraft, cgmDraftLoaded] = usePersistedState("cgm-summary-draft", []);
   const [bmLog, setBmLog, bmLoaded] = usePersistedState("bowel-log", []);
   const [weightProjectionConfig, setWeightProjectionConfig, wpcLoaded] = usePersistedState("weight-projection-config", SEED_WEIGHT_PROJECTION_CONFIG);
-  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded && cgmLoaded && hkdlLoaded && cgmDraftLoaded && bmLoaded && wpcLoaded;
+  // HT-36: read-only from the web app's perspective — written by
+  // HealthTrackerBridge (native), auto-write, no confirm step.
+  const [postMealPeakLog, setPostMealPeakLog, pmpLoaded] = usePersistedState("post-meal-peak-log", []);
+  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded && cgmLoaded && hkdlLoaded && cgmDraftLoaded && bmLoaded && wpcLoaded && pmpLoaded;
   const shared = {
     bp,
     setBp,
@@ -7087,7 +7198,9 @@ function App() {
     bmLog,
     setBmLog,
     weightProjectionConfig,
-    setWeightProjectionConfig
+    setWeightProjectionConfig,
+    postMealPeakLog,
+    setPostMealPeakLog
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "app-root",
