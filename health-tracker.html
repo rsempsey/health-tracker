@@ -1015,6 +1015,74 @@ function SaveBtn({
     }
   }, label);
 }
+// ── DATE RANGE FILTER (HT-34) ───────────────────────────────────────────────
+// Shared toggle + from/to date picker used by each logging tab's full list
+// (Vitals ALL READINGS, Glucose ALL READINGS, Weight ALL ENTRIES, Meds
+// RECENT DOSES) so old entries can be found and edited beyond the default
+// recent-entries view. Uses the same single-button toggle pattern as AddBtn.
+function DateRangeFilter({
+  open,
+  setOpen,
+  from,
+  setFrom,
+  to,
+  setTo
+}) {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setOpen(!open),
+    style: {
+      width: "100%",
+      padding: "9px",
+      background: open ? C.border : "none",
+      color: open ? C.text : C.accent,
+      border: `1px solid ${open ? C.border : C.accent}`,
+      borderRadius: 8,
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: "pointer",
+      marginBottom: open ? 10 : 14
+    }
+  }, open ? "Cancel" : "📅 Filter by Date Range"), open && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: 10,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: labelSt
+  }, "From"), /*#__PURE__*/React.createElement("input", {
+    style: inputSt,
+    type: "date",
+    value: from,
+    onChange: e => setFrom(e.target.value)
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: labelSt
+  }, "To"), /*#__PURE__*/React.createElement("input", {
+    style: inputSt,
+    type: "date",
+    value: to,
+    onChange: e => setTo(e.target.value)
+  })), (from || to) && /*#__PURE__*/React.createElement("div", {
+    style: {
+      gridColumn: "1 / -1"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setFrom("");
+      setTo("");
+    },
+    style: {
+      fontSize: 12,
+      color: C.muted,
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      textDecoration: "underline",
+      padding: 0
+    }
+  }, "Clear dates"))));
+}
 function Spinner() {
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1388,9 +1456,16 @@ function VitalsTab({
     cuffType: "wrist-home"
   });
   const [editId, setEditId] = useState(null);
+  const [dateFilterOpen, setDateFilterOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const sorted = [...readings].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const latest = sorted[0];
   const prev = sorted[1];
+  // HT-34: filters the ALL READINGS list only; does not affect latest/rolling7/chart.
+  const allReadingsFiltered = (dateFrom || dateTo)
+    ? sorted.filter(r => (!dateFrom || r.date >= dateFrom) && (!dateTo || r.date <= dateTo))
+    : sorted;
   // 7-day rolling average, arm-equivalent — normalizes wrist readings the
   // same way the LATEST card and charts do, then averages every reading
   // (not just one per day) within the last 7 calendar days including today.
@@ -1686,7 +1761,16 @@ function VitalsTab({
   }, "Wrist — Office"))), /*#__PURE__*/React.createElement(SaveBtn, {
     onClick: save,
     label: editId ? "Update Reading" : "Save"
-  })), /*#__PURE__*/React.createElement(SectionTitle, null, "ALL READINGS"), sorted.map(r => {
+  })), /*#__PURE__*/React.createElement(DateRangeFilter, {
+    open: dateFilterOpen,
+    setOpen: setDateFilterOpen,
+    from: dateFrom,
+    setFrom: setDateFrom,
+    to: dateTo,
+    setTo: setDateTo
+  }), /*#__PURE__*/React.createElement(SectionTitle, null, "ALL READINGS", (dateFrom || dateTo) ? ` (${allReadingsFiltered.length})` : ""), allReadingsFiltered.length === 0 && (dateFrom || dateTo) && /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, color: C.faint, padding: "12px 0" }
+  }, "No readings in this date range."), allReadingsFiltered.map(r => {
     const bp = bpCat(r.systolic, r.diastolic);
     return /*#__PURE__*/React.createElement(Card, {
       key: r.id,
@@ -1797,11 +1881,18 @@ function WeightTab({
     condition: "nude",
     notes: ""
   });
+  const [dateFilterOpen, setDateFilterOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const sorted = [...entries].sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
   const latest = sorted[0];
   const first = sorted[sorted.length - 1];
   const nudeEq = e => (e.condition === "clinical" || e.condition === "clothed" || e.condition === "light") ? +(e.weight + CLOTHING_OFFSET).toFixed(1) : e.weight;
   const change = latest && first && latest.id !== first.id ? (nudeEq(latest) - nudeEq(first)).toFixed(1) : null;
+  // HT-34: filters the ALL ENTRIES list only; does not affect latest/rolling7/chart/targets.
+  const allEntriesFiltered = (dateFrom || dateTo)
+    ? sorted.filter(e => (!dateFrom || e.date >= dateFrom) && (!dateTo || e.date <= dateTo))
+    : sorted;
   // 7-day rolling average, nude-equivalent — averages every weight entry
   // (not just one per day) within the last 7 calendar days including today,
   // matching the BP tab's rolling7 pattern.
@@ -2170,7 +2261,16 @@ function WeightTab({
   })), /*#__PURE__*/React.createElement(SaveBtn, {
     onClick: save,
     label: editId ? "Update Entry" : "Save"
-  })), /*#__PURE__*/React.createElement(SectionTitle, null, "ALL ENTRIES"), sorted.map(e => {
+  })), /*#__PURE__*/React.createElement(DateRangeFilter, {
+    open: dateFilterOpen,
+    setOpen: setDateFilterOpen,
+    from: dateFrom,
+    setFrom: setDateFrom,
+    to: dateTo,
+    setTo: setDateTo
+  }), /*#__PURE__*/React.createElement(SectionTitle, null, "ALL ENTRIES", (dateFrom || dateTo) ? ` (${allEntriesFiltered.length})` : ""), allEntriesFiltered.length === 0 && (dateFrom || dateTo) && /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, color: C.faint, padding: "12px 0" }
+  }, "No entries in this date range."), allEntriesFiltered.map(e => {
     const b = parseFloat(bmi(e.weight));
     const cat = bmiCat(b);
     return /*#__PURE__*/React.createElement(Card, {
@@ -2341,6 +2441,9 @@ function GlucoseTab({
     .filter(r => r.avgGlucose != null)
     .map(r => ({ date: r.date, value: r.avgGlucose }));
   const avgCgmStreak = calcStreak(avgCgmReadings, avgCgmGoal, "high");
+  const [dateFilterOpen, setDateFilterOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const sorted = [...glucoseLog].sort((a, b) => (b.date + (b.time||"")).localeCompare(a.date + (a.time||"")));
   const goal = goals?.fastingGlucose || SEED_GOALS.fastingGlucose;
 
@@ -2411,6 +2514,11 @@ function GlucoseTab({
     .map(r => ({ date: r.date, y: r.value }));
   const fastingGlucoseReadings = fastingSorted.map(r => ({ date: r.date, value: r.value }));
   const streak = calcStreak(fastingGlucoseReadings, goal, "high");
+  // HT-34: filters the ALL READINGS list only (all reading types); does not
+  // affect the Fasting-only LATEST card or its rolling average above.
+  const allReadingsFiltered = (dateFrom || dateTo)
+    ? sorted.filter(r => (!dateFrom || r.date >= dateFrom) && (!dateTo || r.date <= dateTo))
+    : sorted;
   // 7-day rolling average, Fasting-type readings only — averages every Fasting
   // reading (not just one per day) within the last 7 calendar days including
   // today, matching the BP tab's rolling7 pattern.
@@ -2530,8 +2638,16 @@ function GlucoseTab({
     ),
     // Readings list
     sorted.length > 0 && /*#__PURE__*/React.createElement("div", null,
-      /*#__PURE__*/React.createElement(SectionTitle, null, "ALL READINGS"),
-      sorted.map(r => {
+      /*#__PURE__*/React.createElement(DateRangeFilter, {
+        open: dateFilterOpen, setOpen: setDateFilterOpen,
+        from: dateFrom, setFrom: setDateFrom,
+        to: dateTo, setTo: setDateTo
+      }),
+      /*#__PURE__*/React.createElement(SectionTitle, null, "ALL READINGS", (dateFrom || dateTo) ? ` (${allReadingsFiltered.length})` : ""),
+      allReadingsFiltered.length === 0 && (dateFrom || dateTo) && /*#__PURE__*/React.createElement("div", {
+        style: { fontSize: 13, color: C.faint, padding: "12px 0" }
+      }, "No readings in this date range."),
+      allReadingsFiltered.map(r => {
         const elapsed = elapsedMins(r.time, r.lastMealTime);
         const mealNote = r.mealNote || r.note;
         return /*#__PURE__*/React.createElement("div", {
@@ -3963,6 +4079,9 @@ function MedsTab({
   const [open, setOpen] = useState(false);
   const [editMedId, setEditMedId] = useState(null);
   const [logOpen, setLogOpen] = useState(false);
+  const [dateFilterOpen, setDateFilterOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [f, setF] = useState({
     name: "",
     dose: "",
@@ -4113,6 +4232,12 @@ function MedsTab({
   // group logs by date, most recent first
   const logsByDate = [...medLogs].sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
   const recentLogs = logsByDate.slice(0, 20);
+  // HT-34: when a date filter is active, show every matching dose regardless
+  // of the 20-item recent cap above; otherwise fall back to recentLogs.
+  const dateFiltered = (dateFrom || dateTo)
+    ? logsByDate.filter(l => (!dateFrom || l.date >= dateFrom) && (!dateTo || l.date <= dateTo))
+    : null;
+  const displayedLogs = dateFiltered !== null ? dateFiltered : recentLogs;
   function MedCard({
     m
   }) {
@@ -4451,7 +4576,16 @@ function MedsTab({
     style: {
       marginBottom: 14
     }
-  }, /*#__PURE__*/React.createElement(SectionTitle, null, "RECENT DOSES"), recentLogs.map(l => /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(DateRangeFilter, {
+    open: dateFilterOpen,
+    setOpen: setDateFilterOpen,
+    from: dateFrom,
+    setFrom: setDateFrom,
+    to: dateTo,
+    setTo: setDateTo
+  }), /*#__PURE__*/React.createElement(SectionTitle, null, dateFiltered !== null ? `DOSE LOG (${displayedLogs.length})` : "RECENT DOSES"), dateFiltered !== null && dateFiltered.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 13, color: C.faint, padding: "12px 0" }
+  }, "No doses logged in this date range."), displayedLogs.map(l => /*#__PURE__*/React.createElement("div", {
     key: l.id,
     style: {
       display: "flex",
