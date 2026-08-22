@@ -1578,7 +1578,7 @@ function VitalsTab({
       borderRadius: 4,
       padding: "2px 7px"
     }
-  }, latest.cuffType === "wrist-home" ? "🏠 Wrist" : latest.cuffType === "arm-home" ? "🏠 Arm" : latest.cuffType === "arm-office" ? "🏥 Arm" : "🏥 Wrist")), (latest.cuffType === "wrist-home" || latest.cuffType === "wrist-office") && /*#__PURE__*/React.createElement("div", {
+  }, latest.cuffType === "wrist-home" ? "🏠 Wrist" : latest.cuffType === "arm-home" ? "🏠 Arm" : latest.cuffType === "arm-office" ? "🏥 Arm" : latest.cuffType === "arm-equivalent-estimated" ? "⌚ Est. Arm" : "🏥 Wrist")), (latest.cuffType === "wrist-home" || latest.cuffType === "wrist-office") && /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 12,
       color: "#6366f1",
@@ -1759,7 +1759,9 @@ function VitalsTab({
     value: "arm-office"
   }, "Arm — Office"), /*#__PURE__*/React.createElement("option", {
     value: "wrist-office"
-  }, "Wrist — Office"))), /*#__PURE__*/React.createElement(SaveBtn, {
+  }, "Wrist — Office"), /*#__PURE__*/React.createElement("option", {
+    value: "arm-equivalent-estimated"
+  }, "Estimated Arm Equivalent"))), /*#__PURE__*/React.createElement(SaveBtn, {
     onClick: save,
     label: editId ? "Update Reading" : "Save"
   })), /*#__PURE__*/React.createElement(DateRangeFilter, {
@@ -1821,7 +1823,7 @@ function VitalsTab({
         borderRadius: 4,
         padding: "1px 6px"
       }
-    }, r.cuffType === "wrist-home" ? "🏠 Wrist" : r.cuffType === "arm-home" ? "🏠 Arm" : r.cuffType === "arm-office" ? "🏥 Arm" : r.cuffType === "wrist-office" ? "🏥 Wrist" : "")), /*#__PURE__*/React.createElement("div", {
+    }, r.cuffType === "wrist-home" ? "🏠 Wrist" : r.cuffType === "arm-home" ? "🏠 Arm" : r.cuffType === "arm-office" ? "🏥 Arm" : r.cuffType === "wrist-office" ? "🏥 Wrist" : r.cuffType === "arm-equivalent-estimated" ? "⌚ Est. Arm" : "")), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 15,
         color: C.muted,
@@ -5519,7 +5521,7 @@ function PDFSummary({
         );
       }
       const n = normBP(r);
-      const cuffLabel = r.cuffType === 'wrist-home' ? 'Wrist/Home' : r.cuffType === 'arm-home' ? 'Arm/Home' : r.cuffType === 'arm-office' ? 'Arm/Office' : 'Wrist/Office';
+      const cuffLabel = r.cuffType === 'wrist-home' ? 'Wrist/Home' : r.cuffType === 'arm-home' ? 'Arm/Home' : r.cuffType === 'arm-office' ? 'Arm/Office' : r.cuffType === 'arm-equivalent-estimated' ? 'Estimated Arm Equivalent' : 'Wrist/Office';
       return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
         /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(r.date)),
         /*#__PURE__*/React.createElement("td", { style: S.td }, r.time || '—'),
