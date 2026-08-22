@@ -2529,6 +2529,17 @@ function GlucoseTab({
     const avg = inWindow.reduce((s, r) => s + r.value, 0) / inWindow.length;
     return { avg: Math.round(avg), n: inWindow.length };
   })();
+  // HT-37: 7-day rolling average, Avg CGM Glucose (cgm-summary-log entries) —
+  // averages every CGM Summary entry (one per day, since entries are already
+  // daily summaries) within the last 7 calendar days including today, mirroring
+  // rolling7Fasting above.
+  const rolling7AvgCgm = (() => {
+    const window7 = last7Dates();
+    const inWindow = (cgmSummaryLog || []).filter(r => r.avgGlucose != null && window7.includes(r.date));
+    if (!inWindow.length) return null;
+    const avg = inWindow.reduce((s, r) => s + r.avgGlucose, 0) / inWindow.length;
+    return { avg: Math.round(avg), n: inWindow.length };
+  })();
   // v95: two-line trend data for the combined Manual Readings hero card —
   // Fasting Glucose (per-reading) + Avg CGM Glucose (per-day summary), each
   // filtered to TREND_CHART_START to match the app's other trend charts.
@@ -2602,7 +2613,10 @@ function GlucoseTab({
               label: latestCgm.avgGlucose <= avgCgmGoal ? "At Goal" : "Above Goal",
               color: latestCgm.avgGlucose <= avgCgmGoal ? "#22c55e" : "#f97316",
               small: true
-            })
+            }),
+            rolling7AvgCgm && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 6 } },
+              "7-day avg: ", rolling7AvgCgm.avg, " mg/dL (", rolling7AvgCgm.n, ")"
+            )
           ) : /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "No CGM summary yet.")
         )
       ),
