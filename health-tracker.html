@@ -6363,7 +6363,7 @@ function ExportTab({
       return s.includes(',') || s.includes('\n') || s.includes('"') ? '"' + s.replace(/"/g, '""') + '"' : s;
     }).join(',')).join('\n');
   }
-  const csvSets = [{
+  const coreCsvSets = [{
     label: 'Blood Pressure & Heart Rate',
     count: bp.length,
     build: () => {
@@ -6477,6 +6477,88 @@ function ExportTab({
       ]));
       return makeCSV(rows);
     }
+  }, {
+    label: 'Avg CGM Glucose',
+    count: (cgmSummaryLog || []).length,
+    build: () => {
+      const rows = [['Date', 'Avg CGM Glucose (mg/dL)', 'Time in Range (%)']];
+      [...(cgmSummaryLog || [])].sort((a, b) => a.date.localeCompare(b.date)).forEach(r => rows.push([
+        r.date,
+        r.avgGlucose != null ? r.avgGlucose : '',
+        r.tir != null ? r.tir : ''
+      ]));
+      return makeCSV(rows);
+    }
+  }, {
+    label: 'Medication Adherence',
+    count: meds.filter(m => m.frequency !== 'As needed').length,
+    build: () => {
+      function adherenceFor(m) {
+        if (!medLogs || !medLogs.length) return { total: 0, expected: null, pct: null };
+        const start = m.startDate;
+        const todayISO = today();
+        const logs = medLogs.filter(l => l.medId === m.id && l.date >= start && l.date <= todayISO);
+        const startD = new Date(start + 'T00:00:00');
+        const todayD = new Date(todayISO + 'T00:00:00');
+        const daysElapsed = Math.round((todayD - startD) / 86400000) + 1;
+        if (m.frequency === 'Weekly' || m.frequency === 'weekly') {
+          const weeks = Math.max(1, Math.ceil(daysElapsed / 7));
+          return { total: logs.length, expected: weeks, pct: Math.round(logs.length / weeks * 100) };
+        }
+        const days = Math.max(1, daysElapsed);
+        return { total: logs.length, expected: days, pct: Math.round(logs.length / days * 100) };
+      }
+      const rows = [['Medication', 'Doses Logged', 'Expected', 'Adherence (%)', 'Last Taken']];
+      [...meds].filter(m => m.frequency !== 'As needed').sort((a, b) => a.name.localeCompare(b.name)).forEach(m => {
+        const a = adherenceFor(m);
+        const lastLog = [...(medLogs || [])].filter(l => l.medId === m.id).sort((x, y) => y.date.localeCompare(x.date))[0];
+        rows.push([
+          m.name + (m.dose ? ' ' + m.dose : ''),
+          a.total,
+          a.expected != null ? a.expected : '',
+          a.pct != null ? a.pct : '',
+          lastLog ? lastLog.date + (lastLog.time ? ' ' + lastLog.time : '') : ''
+        ]);
+      });
+      return makeCSV(rows);
+    }
+  }, {
+    label: 'Nutrition Summary',
+    count: journal.length,
+    build: () => {
+      const sorted = [...journal].sort((a, b) => a.date.localeCompare(b.date));
+      const count = sorted.length;
+      if (!count) return makeCSV([['Macro', 'Daily Average', 'Daily Target', 'vs Target'], ['No nutrition data logged', '', '', '']]);
+      const avg = key => +(sorted.reduce((s, e) => s + (e[key] || 0), 0) / count).toFixed(1);
+      const macros = [
+        { key: 'calories', label: 'Calories', unit: 'kcal', target: null },
+        { key: 'protein', label: 'Protein', unit: 'g', target: goals.protein || 166, bad: 'low' },
+        { key: 'sugar', label: 'Added Sugar', unit: 'g', target: goals.sugar || 25, bad: 'high' },
+        { key: 'carbs', label: 'Carbs', unit: 'g', target: goals.carbs || 163, bad: 'high' },
+        { key: 'saturatedFat', label: 'Saturated Fat', unit: 'g', target: goals.saturatedFat || 13, bad: 'high' },
+        { key: 'fiber', label: 'Fiber', unit: 'g', target: goals.fiber || 37, bad: 'low' },
+        { key: 'sodium', label: 'Sodium', unit: 'mg', target: goals.sodium || 1500, bad: 'high' },
+        { key: 'water', label: 'Water', unit: 'oz', target: goals.water || 120, bad: 'low' }
+      ];
+      const rows = [['Macro', 'Daily Average', 'Daily Target', 'vs Target']];
+      macros.forEach(m => {
+        const val = avg(m.key);
+        const diff = m.target ? +(val - m.target).toFixed(1) : null;
+        const onTrack = m.target ? (m.bad === 'high' ? val <= m.target : val >= m.target) : null;
+        rows.push([
+          m.label,
+          val + ' ' + m.unit,
+          m.target ? m.target + ' ' + m.unit : '',
+          diff == null ? '' : (onTrack ? 'On track' : 'Off by ' + Math.abs(diff) + ' ' + m.unit)
+        ]);
+      });
+      return makeCSV(rows);
+    }
+  }];
+  const csvSets = [...coreCsvSets, {
+    label: 'Full Export (All Sections)',
+    count: coreCsvSets.length,
+    build: () => coreCsvSets.map(s => '## ' + s.label + '\n' + s.build()).join('\n\n')
   }];
 
   // ── Copied state for text ──────────────────────────────────────────────────
