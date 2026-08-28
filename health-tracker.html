@@ -3990,7 +3990,8 @@ const MACRO_DEFS = [{
   key: "protein",
   label: "Protein",
   unit: "g",
-  goalKey: "protein"
+  goalKey: "protein",
+  bad: "low"
 }, {
   key: "sugar",
   label: "Added Sugar",
@@ -4110,6 +4111,42 @@ function NutritionTab({
     if (bad === "high") return val <= target ? "#22c55e" : val <= target * 1.1 ? "#eab308" : "#ef4444";
     return val >= target ? "#22c55e" : val >= target * 0.9 ? "#eab308" : "#ef4444";
   }
+  // HT-43: goal-status label to pair with macroColor's color, matching the
+  // "At Goal"/"Above Goal" Badge pattern used on the Glucose tab's LATEST card.
+  function macroGoalLabel(key, val, dateStr) {
+    const target = macroTarget(key, dateStr);
+    if (!target || val == null) return null;
+    const def = MACRO_DEFS.find(m => m.key === key);
+    const bad = def?.bad || "high";
+    if (bad === "high") return val <= target ? "At Goal" : "Above Goal";
+    return val >= target ? "At Goal" : "Below Goal";
+  }
+  // HT-43: hero cards for Calories/Protein/Sugar/Fiber — latest entry (most
+  // recent date, not necessarily today), each with a 7-day rolling average,
+  // matching the rolling7 pattern used on the BP/Weight/Glucose tabs.
+  const latestEntry = sorted[0];
+  const heroKeys = ["calories", "protein", "sugar", "fiber"];
+  const window7 = last7Dates();
+  function rolling7For(key) {
+    const inWindow = entries.filter(e => window7.includes(e.date) && e[key] != null);
+    if (!inWindow.length) return null;
+    const avg = inWindow.reduce((s, e) => s + (e[key] || 0), 0) / inWindow.length;
+    return { avg: +avg.toFixed(1), n: inWindow.length };
+  }
+  // HT-43: trend graph data for the same 4 hero macros, filtered to
+  // TREND_CHART_START onward to match every other trend chart in the app.
+  const heroTrendSeries = [
+    { key: "calories", color: "#3b82f6", label: "Calories" },
+    { key: "protein", color: "#22c55e", label: "Protein" },
+    { key: "sugar", color: "#f97316", label: "Sugar" },
+    { key: "fiber", color: "#a855f7", label: "Fiber" }
+  ].map(s => ({
+    ...s,
+    points: [...entries]
+      .filter(e => e.date >= TREND_CHART_START && e[s.key] != null)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(e => ({ date: e.date, value: e[s.key] }))
+  }));
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(AddBtn, {
     onClick: () => {
       if (open) {
@@ -4174,7 +4211,41 @@ function NutritionTab({
   })), /*#__PURE__*/React.createElement(SaveBtn, {
     onClick: save,
     label: editId ? "Update Entry" : "Save"
-  })), /*#__PURE__*/React.createElement(SectionTitle, null, "ALL ENTRIES"), sorted.length === 0 && !open && /*#__PURE__*/React.createElement("div", {
+  })), latestEntry && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
+    /*#__PURE__*/React.createElement(SectionTitle, null, "NUTRITION"),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 10 } }, fmtDate(latestEntry.date), isWeekend(latestEntry.date) ? " · Weekend" : ""),
+    /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 10 } },
+      ...heroKeys.map(key => {
+        const def = MACRO_DEFS.find(m => m.key === key);
+        const val = latestEntry[key];
+        const goalLabel = macroGoalLabel(key, val, latestEntry.date);
+        const color = macroColor(key, val, latestEntry.date);
+        const r7 = rolling7For(key);
+        return /*#__PURE__*/React.createElement("div", { key },
+          /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 0.3, marginBottom: 4 } }, def.label.toUpperCase()),
+          /*#__PURE__*/React.createElement("div", null,
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 24, fontWeight: 800, color: C.text, letterSpacing: -1 } }, val != null ? val.toFixed(1) : "—"),
+            /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: C.faint, marginLeft: 4 } }, def.unit)
+          ),
+          goalLabel && /*#__PURE__*/React.createElement("div", { style: { marginTop: 3, marginBottom: 4 } },
+            /*#__PURE__*/React.createElement(Badge, { label: goalLabel, color, small: true })
+          ),
+          r7 && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 4 } },
+            "7-day avg: ", r7.avg, " ", def.unit, " (", r7.n, ")"
+          )
+        );
+      })
+    ),
+    heroTrendSeries.some(s => s.points.length >= 2) && /*#__PURE__*/React.createElement("div", { style: { marginTop: 4 } },
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 6 } },
+        "Trend (since ", fmtDate(TREND_CHART_START), ")"
+      ),
+      /*#__PURE__*/React.createElement(TrendChart, {
+        series: heroTrendSeries.map(({ points, color, label }) => ({ points, color, label })),
+        width: 440
+      })
+    )
+  ), /*#__PURE__*/React.createElement(SectionTitle, null, "ALL ENTRIES"), sorted.length === 0 && !open && /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
       color: C.faint,
