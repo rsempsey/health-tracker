@@ -788,47 +788,6 @@ function last7Dates() {
   return days;
 }
 
-// ── TREND SUMMARY TIME WINDOWS (Export tab's Trend Summary section) ──────────
-// Independent of TREND_CHART_START (which only governs the fixed BP/Glucose/
-// Weight/CGM full-history trend charts) — this is a separate, user-selectable
-// window used solely for the Trend Summary's first-vs-latest comparisons.
-const TREND_WINDOWS = ["ALL", "7 DAYS", "14 DAYS", "30 DAYS", "60 DAYS", "90 DAYS", "12 MONTHS", "MTD", "YTD", "CUSTOM"];
-function trendWindowRange(key, customStart) {
-  const end = today();
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  // HT-41: lets Bob pick an arbitrary "date since" instead of only the fixed
-  // preset lengths below. Falls back to TREND_CHART_START if no date is set
-  // yet (e.g. CUSTOM just selected, date picker not touched).
-  if (key === "CUSTOM") return { start: customStart || TREND_CHART_START, end };
-  if (key === "ALL") return { start: TREND_CHART_START, end };
-  if (key === "MTD") {
-    const first = new Date(d.getFullYear(), d.getMonth(), 1);
-    return { start: localDateStr(first), end };
-  }
-  if (key === "YTD") {
-    const first = new Date(d.getFullYear(), 0, 1);
-    return { start: localDateStr(first), end };
-  }
-  if (key === "12 MONTHS") {
-    const past = new Date(d);
-    past.setMonth(past.getMonth() - 12);
-    return { start: localDateStr(past), end };
-  }
-  const daysMap = { "7 DAYS": 7, "14 DAYS": 14, "30 DAYS": 30, "60 DAYS": 60, "90 DAYS": 90 };
-  const n = daysMap[key] || 7;
-  const past = new Date(d);
-  past.setDate(past.getDate() - (n - 1));
-  return { start: localDateStr(past), end };
-}
-function trendWindowLabel(key, customStart) {
-  if (key === "CUSTOM") return `since ${fmtDate(customStart || TREND_CHART_START)}`;
-  if (key === "ALL") return `all data (since ${fmtDate(TREND_CHART_START)})`;
-  if (key === "MTD") return "month to date";
-  if (key === "YTD") return "year to date";
-  if (key === "12 MONTHS") return "the last 12 months";
-  return "the last " + key.toLowerCase();
-}
 // Basic first-vs-latest comparison used throughout the Trend Summary.
 // readingsAsc: ascending-by-date [{date, value}], already window-filtered.
 function trendStats(readingsAsc, goal, bad) {
@@ -4916,8 +4875,7 @@ function PDFSummary({
   bmLog,
   postMealPeakLog,
   sections,
-  trendWindow,
-  customTrendStart
+  trendAnalysisText
 }) {
   const bpSorted = [...bp].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const wSorted = [...weight].sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
@@ -5243,304 +5201,10 @@ function PDFSummary({
     style: S.metaLabel
   }, "Report Generated"), /*#__PURE__*/React.createElement("span", {
     style: S.metaVal
-  }, todayStr)))), sections.trend && (() => {
-    const { start: winStart, end: winEnd } = trendWindowRange(trendWindow, customTrendStart);
-    const windowLabel = trendWindowLabel(trendWindow, customTrendStart);
-    const windowDays = Math.round((new Date(winEnd + 'T00:00:00') - new Date(winStart + 'T00:00:00')) / 86400000) + 1;
-    const priorRange = (() => {
-      const startMs = new Date(winStart + 'T00:00:00').getTime();
-      const endMs = new Date(winEnd + 'T00:00:00').getTime();
-      const days = Math.round((endMs - startMs) / 86400000) + 1;
-      const priorEndMs = startMs - 86400000;
-      const priorStartMs = priorEndMs - (days - 1) * 86400000;
-      return { start: localDateStr(new Date(priorStartMs)), end: localDateStr(new Date(priorEndMs)) };
-    })();
-    const rows = [];
-
-    // direction: does this delta represent an improvement, given which way is "bad"?
-    function direction(delta, bad) {
-      if (delta == null || Math.abs(delta) < 1e-9) return 'flat';
-      if (bad === 'low') return delta > 0 ? 'improving' : 'worsening';
-      return delta < 0 ? 'improving' : 'worsening';
-    }
-    function metGoal(latest, goal, bad) {
-      if (latest == null || goal == null) return null;
-      return bad === 'low' ? latest >= goal : latest <= goal;
-    }
-    // Compares this window's delta to the immediately preceding window of
-    // equal length — "accelerating"/"slowing" (same direction, different
-    // magnitude), "reversing course" (direction flipped), or null if there
-    // isn't enough prior data to say anything meaningful.
-    function paceNote(delta, priorDelta, bad) {
-      if (delta == null || priorDelta == null) return null;
-      const dCur = direction(delta, bad), dPrior = direction(priorDelta, bad);
-      if (dCur === 'flat' || dPrior === 'flat') return null;
-      if (dCur !== dPrior) return 'reversing course from the prior period';
-      const ratio = Math.abs(delta) / Math.abs(priorDelta || 1e-9);
-      if (ratio >= 1.25) return 'accelerating vs. the prior period';
-      if (ratio <= 0.75) return 'slowing vs. the prior period';
-      return 'holding a steady pace vs. the prior period';
-    }
-    // A metric already at its defined maximum (e.g. 100% Time in Range) has
-    // nowhere left to improve — "slowing" reads as a concern there when it's
-    // really just ceiling-bounded, so pace comparisons are suppressed for it.
-    function atCeiling(r) {
-      return r.ceiling != null && r.latest === r.ceiling;
-    }
-
-    if (sections.bp) {
-      const buildBP = (s, e) => [...bp].filter(r => r.date >= s && r.date <= e)
-        .map(r => { const n = normBP(r); return { date: r.date, time: r.time || '', value: n.sys }; })
-        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-      const st = trendStats(buildBP(winStart, winEnd), goals?.systolic, "high");
-      const priorSt = trendStats(buildBP(priorRange.start, priorRange.end), goals?.systolic, "high");
-      if (st) rows.push({ group: "Vitals", metric: "Systolic BP", unit: "mmHg", bad: "high", goal: goals?.systolic, priorDelta: (priorSt && priorSt.n >= 2) ? priorSt.delta : null, ...st });
-    }
-
-    if (sections.glucose && glucoseLog && glucoseLog.length > 0) {
-      const buildFasting = (s, e) => glucoseLog.filter(r => r.readingType === "Fasting" && r.date >= s && r.date <= e)
-        .map(r => ({ date: r.date, time: r.time || '', value: r.value }))
-        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-      const fastingGoal = goals?.fastingGlucose || SEED_GOALS.fastingGlucose;
-      const fastingSt = trendStats(buildFasting(winStart, winEnd), fastingGoal, "high");
-      const fastingPriorSt = trendStats(buildFasting(priorRange.start, priorRange.end), fastingGoal, "high");
-      if (fastingSt) rows.push({ group: "Vitals", metric: "Fasting Glucose", unit: "mg/dL", bad: "high", goal: fastingGoal, priorDelta: (fastingPriorSt && fastingPriorSt.n >= 2) ? fastingPriorSt.delta : null, ...fastingSt });
-
-      const buildAvgCgm = (s, e) => (cgmSummaryLog || []).filter(r => r.avgGlucose != null && r.date >= s && r.date <= e)
-        .map(r => ({ date: r.date, value: r.avgGlucose }))
-        .sort((a, b) => a.date.localeCompare(b.date));
-      const avgCgmGoal = goals?.avgCgmGlucose || SEED_GOALS.avgCgmGlucose;
-      const avgSt = trendStats(buildAvgCgm(winStart, winEnd), avgCgmGoal, "high");
-      const avgPriorSt = trendStats(buildAvgCgm(priorRange.start, priorRange.end), avgCgmGoal, "high");
-      if (avgSt) rows.push({ group: "Vitals", metric: "Avg CGM Glucose", unit: "mg/dL", bad: "high", goal: avgCgmGoal, priorDelta: (avgPriorSt && avgPriorSt.n >= 2) ? avgPriorSt.delta : null, ...avgSt });
-
-      const buildTir = (s, e) => (cgmSummaryLog || []).filter(r => r.tir != null && r.date >= s && r.date <= e)
-        .map(r => ({ date: r.date, value: r.tir }))
-        .sort((a, b) => a.date.localeCompare(b.date));
-      const tirSt = trendStats(buildTir(winStart, winEnd), null, null);
-      const tirPriorSt = trendStats(buildTir(priorRange.start, priorRange.end), null, null);
-      if (tirSt) rows.push({ group: "Vitals", metric: "CGM Time in Range", unit: "%", bad: "low", goal: 70, ceiling: 100, priorDelta: (tirPriorSt && tirPriorSt.n >= 2) ? tirPriorSt.delta : null, ...tirSt });
-    }
-
-    if (sections.weight) {
-      const buildW = (s, e) => [...weight].filter(e2 => e2.date >= s && e2.date <= e)
-        .map(e2 => { const n = normW(e2); return { date: e2.date, time: e2.time || '', value: n.w }; })
-        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-      const st = trendStats(buildW(winStart, winEnd), goals?.weight, "high");
-      const priorSt = trendStats(buildW(priorRange.start, priorRange.end), goals?.weight, "high");
-      if (st) rows.push({ group: "Vitals", metric: "Weight", unit: "lb", bad: "high", goal: goals?.weight, priorDelta: (priorSt && priorSt.n >= 2) ? priorSt.delta : null, ...st });
-    }
-
-    if (sections.labs) {
-      ["HbA1c", "HDL", "LDL"].forEach(marker => {
-        const panels = [...labs].filter(l => l.values && l.values[marker] != null).sort((a, b) => a.date.localeCompare(b.date));
-        if (!panels.length) return;
-        const latestPanel = panels[panels.length - 1];
-        if (latestPanel.date < winStart || latestPanel.date > winEnd) return;
-        const latestVal = firstNum(latestPanel.values[marker]);
-        const prevPanel = panels.length >= 2 ? panels[panels.length - 2] : null;
-        const firstVal = prevPanel ? firstNum(prevPanel.values[marker]) : latestVal;
-        const delta = +(latestVal - firstVal).toFixed(1);
-        const pct = firstVal ? +((delta / Math.abs(firstVal)) * 100).toFixed(1) : null;
-        const goal = goals?.[marker];
-        const bad = marker === "HDL" ? "low" : "high";
-        const streak = goal != null ? calcStreak(panels.map(l => ({ date: l.date, value: firstNum(l.values[marker]) })), goal, bad) : null;
-        rows.push({ group: "Labs", metric: marker, unit: marker === "HbA1c" ? "%" : "mg/dL", bad, goal, priorDelta: null, first: firstVal, latest: latestVal, delta, pct, streak, n: prevPanel ? 2 : 1, note: prevPanel ? null : "only 1 panel on record" });
-      });
-    }
-
-    if (sections.meds || (sections.adherence && medLogs && medLogs.length > 0)) {
-      function adherenceFor(s, e) {
-        const eligible = meds.filter(m => m.frequency !== "As needed" && m.startDate <= e);
-        let totalLogs = 0, totalExpected = 0;
-        eligible.forEach(m => {
-          const effStart = m.startDate > s ? m.startDate : s;
-          if (effStart > e) return;
-          const logsN = (medLogs || []).filter(l => l.medId === m.id && l.date >= effStart && l.date <= e).length;
-          const startD = new Date(effStart + 'T00:00:00');
-          const endD = new Date(e + 'T00:00:00');
-          const daysElapsed = Math.round((endD - startD) / 86400000) + 1;
-          const expected = m.frequency === 'Weekly' ? Math.max(1, Math.ceil(daysElapsed / 7)) : Math.max(1, daysElapsed);
-          totalLogs += logsN;
-          totalExpected += expected;
-        });
-        return { pct: totalExpected > 0 ? Math.round(totalLogs / totalExpected * 100) : null, n: eligible.length };
-      }
-      const cur = adherenceFor(winStart, winEnd);
-      const prior = adherenceFor(priorRange.start, priorRange.end);
-      if (cur.pct != null) {
-        rows.push({ group: "Medications", metric: "Adherence", unit: "%", first: null, latest: cur.pct, delta: null, pct: null, streak: null, n: cur.n, isRate: true, priorPct: prior.pct });
-      }
-    }
-
-    if (sections.activity && healthkitDailyLog && healthkitDailyLog.length > 0) {
-      const buildDaily = (s, e) => healthkitDailyLog.filter(d => d.date >= s && d.date <= e).sort((a, b) => a.date.localeCompare(b.date));
-      // healthkitDailyLog's entry for "today" is a running total that hasn't
-      // finished accumulating (synced mid-day via the Push-to-Web-App
-      // Shortcut) — comparing it against a completed prior day understates
-      // steps/active energy/sleep that just haven't happened yet today, and
-      // skews the delta. Clip the window's end to yesterday for Activity
-      // specifically; BP/Glucose/Weight are manually-logged point-in-time
-      // readings and don't have this partial-day problem.
-      const activityWinEnd = winEnd < yesterday() ? winEnd : yesterday();
-
-      const sleepGoal = goals?.sleepHours;
-      const sleepSt = trendStats(buildDaily(winStart, activityWinEnd).filter(d => d.sleepMinutes != null).map(d => ({ date: d.date, value: +(d.sleepMinutes / 60).toFixed(1) })), sleepGoal, "low");
-      const sleepPriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.sleepMinutes != null).map(d => ({ date: d.date, value: +(d.sleepMinutes / 60).toFixed(1) })), sleepGoal, "low");
-      if (sleepSt) rows.push({ group: "Activity", metric: "Sleep", unit: "hr", bad: "low", goal: sleepGoal, priorDelta: (sleepPriorSt && sleepPriorSt.n >= 2) ? sleepPriorSt.delta : null, ...sleepSt });
-
-      const stepsGoal = goals?.steps;
-      const stepsSt = boundaryAvgStats(buildDaily(winStart, activityWinEnd).filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps })), stepsGoal, "low", windowDays);
-      const stepsPriorSt = boundaryAvgStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.steps != null).map(d => ({ date: d.date, value: d.steps })), stepsGoal, "low", windowDays);
-      if (stepsSt) rows.push({ group: "Activity", metric: "Steps", unit: "", bad: "low", goal: stepsGoal, priorDelta: (stepsPriorSt && stepsPriorSt.n >= 2) ? stepsPriorSt.delta : null, ...stepsSt });
-
-      const aeGoal = goals?.activeEnergy;
-      const aeSt = boundaryAvgStats(buildDaily(winStart, activityWinEnd).filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) })), aeGoal, "low", windowDays);
-      const aePriorSt = boundaryAvgStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.activeEnergyKcal != null).map(d => ({ date: d.date, value: Math.round(d.activeEnergyKcal) })), aeGoal, "low", windowDays);
-      if (aeSt) rows.push({ group: "Activity", metric: "Active Energy", unit: "kcal", bad: "low", goal: aeGoal, priorDelta: (aePriorSt && aePriorSt.n >= 2) ? aePriorSt.delta : null, ...aeSt });
-
-      const rhrGoal = goals?.restingHeartRate;
-      const rhrSt = trendStats(buildDaily(winStart, activityWinEnd).filter(d => d.restingHeartRate != null).map(d => ({ date: d.date, value: Math.round(d.restingHeartRate) })), rhrGoal, "high");
-      const rhrPriorSt = trendStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.restingHeartRate != null).map(d => ({ date: d.date, value: Math.round(d.restingHeartRate) })), rhrGoal, "high");
-      if (rhrSt) rows.push({ group: "Activity", metric: "Resting Heart Rate", unit: "bpm", bad: "high", goal: rhrGoal, priorDelta: (rhrPriorSt && rhrPriorSt.n >= 2) ? rhrPriorSt.delta : null, ...rhrSt });
-
-      const waterGoal = goals?.water;
-      const waterSt = boundaryAvgStats(buildDaily(winStart, activityWinEnd).filter(d => d.waterOz != null).map(d => ({ date: d.date, value: Math.round(d.waterOz) })), waterGoal, "low", windowDays);
-      const waterPriorSt = boundaryAvgStats(buildDaily(priorRange.start, priorRange.end).filter(d => d.waterOz != null).map(d => ({ date: d.date, value: Math.round(d.waterOz) })), waterGoal, "low", windowDays);
-      if (waterSt) rows.push({ group: "Activity", metric: "Water", unit: "oz", bad: "low", goal: waterGoal, priorDelta: (waterPriorSt && waterPriorSt.n >= 2) ? waterPriorSt.delta : null, ...waterSt });
-    }
-
-    if (sections.bm && bmLog && bmLog.length > 0) {
-      const windowed = bmLog.filter(r => r.date >= winStart && r.date <= winEnd);
-      if (windowed.length) {
-        const avgBristol = +(windowed.reduce((s, r) => s + r.bristol, 0) / windowed.length).toFixed(1);
-        const allSorted = [...bmLog].sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
-        const last5 = allSorted.slice(0, 5);
-        const trendingConstipated = last5.length === 5 && (last5.reduce((s, r) => s + r.bristol, 0) / 5) <= 2.5;
-        const daysSinceLast = allSorted.length ? Math.round((new Date(today() + 'T00:00:00') - new Date(allSorted[0].date + 'T00:00:00')) / 86400000) : null;
-        rows.push({ group: "Digestive", metric: "Bowel Movements", unit: "", first: null, latest: avgBristol, delta: null, pct: null, streak: null, n: windowed.length, isBM: true, trendingConstipated, daysSinceLast });
-      }
-    }
-
-    function fmtVal(v, unit) {
-      if (v == null) return '—';
-      return v + (unit ? ' ' + unit : '');
-    }
-    // Lowercase the first letter for mid-sentence use, except when the
-    // metric name is (or starts with) an all-caps acronym — e.g. "CGM Time
-    // in Range" should stay "CGM Time in Range", not "cGM Time in Range".
-    // HbA1c is explicitly listed since it mixes case and digits, so the
-    // all-caps regex below wouldn't catch it on its own.
-    function lcName(name) {
-      if (["HbA1c"].includes(name)) return name;
-      const firstWord = name.split(' ')[0];
-      if (/^[A-Z]{2,}$/.test(firstWord)) return name;
-      return name.charAt(0).toLowerCase() + name.slice(1);
-    }
-    // Short clause for a numeric (first-vs-latest) row, used inside the
-    // flowing per-group paragraphs.
-    function clauseFor(r) {
-      if (r.isRate) {
-        let c = `medication adherence was ${r.latest}%`;
-        if (r.priorPct != null && r.priorPct !== r.latest) c += ` (${r.priorPct}% the prior period)`;
-        return c;
-      }
-      if (r.isBM) {
-        let c = `bowel movements averaged Bristol type ${r.latest} (${r.n} entr${r.n === 1 ? 'y' : 'ies'})`;
-        if (r.trendingConstipated) c += ', trending constipated';
-        return c;
-      }
-      if (r.n === 1) return `${lcName(r.metric)} was ${fmtVal(r.latest, r.unit)} (only one reading this window)`;
-      // Verb reflects what the raw number actually did (rose/fell), not
-      // whether that's good or bad — "declined" next to a rising number
-      // reads as a contradiction. Goodness is conveyed separately via the
-      // off-goal note below, not baked into the verb.
-      const verb = r.delta > 0 ? 'rose' : (r.delta < 0 ? 'fell' : 'held steady');
-      if (verb === 'held steady') return `${lcName(r.metric)} held steady at ${fmtVal(r.latest, r.unit)}`;
-      const pctStr = r.pct != null ? ` (${r.pct > 0 ? '+' : ''}${r.pct}%)` : '';
-      let clause = `${lcName(r.metric)} ${verb} to ${fmtVal(r.latest, r.unit)} from ${fmtVal(r.first, r.unit)}${pctStr}`;
-      const met = metGoal(r.latest, r.goal, r.bad);
-      if (met === false) clause += r.bad === 'low' ? ', below goal' : ', above goal';
-      return clause;
-    }
-
-    if (!rows.length) return /*#__PURE__*/React.createElement(React.Fragment, null,
-      /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Trend Summary"),
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint, fontStyle: 'italic', marginBottom: 14 } },
-        "No underlying sections selected (or no data in ", windowLabel, "). Select Blood Pressure, Glucose, Weight, Lab Results, Medications/Adherence, Activity & Vitals, or Bowel Movements above to see trends here."
-      )
-    );
-
-    const groups = [];
-    rows.forEach(r => { if (!groups.includes(r.group)) groups.push(r.group); });
-
-    // ── Opening "at a glance" paragraph: biggest improvement + biggest concern ──
-    const ranked = rows.filter(r => r.pct != null && Math.abs(r.pct) >= 3)
-      .map(r => ({ ...r, signedImprovement: direction(r.delta, r.bad) === 'improving' ? Math.abs(r.pct) : -Math.abs(r.pct) }))
-      .sort((a, b) => b.signedImprovement - a.signedImprovement);
-    const mostImproved = ranked.length && ranked[0].signedImprovement > 0 ? ranked[0] : null;
-    const mostConcerning = ranked.length && ranked[ranked.length - 1].signedImprovement < 0 ? ranked[ranked.length - 1] : null;
-    let openingText = `Over ${windowLabel}, `;
-    if (mostImproved && mostConcerning && mostImproved.metric !== mostConcerning.metric) {
-      openingText += `${lcName(mostImproved.metric)} showed the most improvement (${mostImproved.pct > 0 ? '+' : ''}${mostImproved.pct}%), while ${lcName(mostConcerning.metric)} moved in the wrong direction (${mostConcerning.pct > 0 ? '+' : ''}${mostConcerning.pct}%).`;
-    } else if (mostImproved) {
-      openingText += `${lcName(mostImproved.metric)} showed the most improvement (${mostImproved.pct > 0 ? '+' : ''}${mostImproved.pct}%).`;
-    } else if (mostConcerning) {
-      openingText += `${lcName(mostConcerning.metric)} moved in the wrong direction (${mostConcerning.pct > 0 ? '+' : ''}${mostConcerning.pct}%); nothing else changed by more than a few percent.`;
-    } else {
-      openingText += `nothing changed by more than a few percent — a stable period across the board.`;
-    }
-
-    // ── Consistency paragraph: active streaks + pace notes worth flagging ──
-    const streakRows = rows.filter(r => r.streak && r.streak.days >= 2);
-    const paceRows = rows.filter(r => !r.isRate && !r.isBM && !atCeiling(r) && paceNote(r.delta, r.priorDelta, r.bad));
-    let consistencyParts = [];
-    if (streakRows.length) {
-      consistencyParts.push(streakRows.map(r => `${lcName(r.metric)} (${r.streak.days}d)`).join(', ') + (streakRows.length === 1 ? ' is' : ' are') + ' currently on a streak at goal');
-    }
-    if (paceRows.length) {
-      paceRows.forEach(r => consistencyParts.push(`${lcName(r.metric)} is ${paceNote(r.delta, r.priorDelta, r.bad)}`));
-    }
-    const consistencyText = consistencyParts.length ? consistencyParts.join('; ') + '.' : null;
-
-    return /*#__PURE__*/React.createElement(React.Fragment, null,
-      /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Trend Summary"),
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 10 } }, "Window: ", windowLabel),
-      /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.text, marginBottom: 8, lineHeight: 1.5 } }, openingText),
-      consistencyText && /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.text, marginBottom: 14, lineHeight: 1.5, fontStyle: 'italic' } }, consistencyText),
-      ...groups.map(g => /*#__PURE__*/React.createElement(React.Fragment, { key: g },
-        /*#__PURE__*/React.createElement("div", { style: S.h3 }, g),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.text, marginBottom: g === "Activity" ? 4 : 10, lineHeight: 1.5 } },
-          (() => {
-            const clauses = rows.filter(r => r.group === g).map(clauseFor);
-            if (clauses.length === 1) return clauses[0].charAt(0).toUpperCase() + clauses[0].slice(1) + '.';
-            return clauses.slice(0, -1).join(', ') + ', and ' + clauses[clauses.length - 1] + '.';
-          })().replace(/^./, c => c.toUpperCase())
-        ),
-        g === "Activity" && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.faint, fontStyle: 'italic', marginBottom: 10 } }, "Excludes today — today's totals are still accumulating and would otherwise skew the comparison.")
-      )),
-      /*#__PURE__*/React.createElement("table", { style: { ...S.table, marginTop: 10 } },
-        /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
-          /*#__PURE__*/React.createElement("th", { style: S.th }, "Metric"),
-          /*#__PURE__*/React.createElement("th", { style: S.th }, "Start"),
-          /*#__PURE__*/React.createElement("th", { style: S.th }, "Latest"),
-          /*#__PURE__*/React.createElement("th", { style: S.th }, "Δ"),
-          /*#__PURE__*/React.createElement("th", { style: S.th }, "% Change"),
-          /*#__PURE__*/React.createElement("th", { style: S.th }, "vs. Prior Period"),
-          /*#__PURE__*/React.createElement("th", { style: S.th }, "Streak")
-        )),
-        /*#__PURE__*/React.createElement("tbody", null, rows.map((r, i) => /*#__PURE__*/React.createElement("tr", { key: i, style: { background: i % 2 === 0 ? '#fff' : '#fafafa' } },
-          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600 } }, r.metric),
-          /*#__PURE__*/React.createElement("td", { style: S.td }, r.isRate || r.isBM ? '—' : fmtVal(r.first, r.unit)),
-          /*#__PURE__*/React.createElement("td", { style: S.td }, r.isRate ? r.latest + '%' : fmtVal(r.latest, r.unit)),
-          /*#__PURE__*/React.createElement("td", { style: S.td }, (r.isRate || r.isBM || r.delta == null) ? '—' : (r.delta > 0 ? '+' : '') + r.delta),
-          /*#__PURE__*/React.createElement("td", { style: S.td }, (r.isRate || r.isBM || r.pct == null) ? '—' : (r.pct > 0 ? '+' : '') + r.pct + '%'),
-          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, atCeiling(r) ? 'at ceiling' : (paceNote(r.delta, r.priorDelta, r.bad) || '—')),
-          /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, r.streak ? `${r.streak.days}d` : '—')
-        )))
-      )
-    );
-  })(), sections.hero && /*#__PURE__*/React.createElement("div", {
+  }, todayStr)))), sections.trendAnalysis && trendAnalysisText && trendAnalysisText.trim() && /*#__PURE__*/React.createElement(React.Fragment, null,
+    /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Trend Analysis"),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.text, lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: 14 } }, trendAnalysisText)
+  ), sections.hero && /*#__PURE__*/React.createElement("div", {
     style: S.hero
   }, latestNormBP && /*#__PURE__*/React.createElement(StatBox, {
     label: "Blood Pressure" + (latestNormBP.isEst ? " (est.)" : ""),
@@ -6276,9 +5940,9 @@ function PDFSummary({
 
 // ── EXPORT TAB ────────────────────────────────────────────────────────────────
 const SECTION_DEFS = [{
-  key: 'trend',
-  label: 'Trend Summary',
-  desc: 'Narrative + stats deltas/streaks for every other selected section, over a configurable time window. Always renders first.'
+  key: 'trendAnalysis',
+  label: 'Trend Analysis',
+  desc: 'Paste in your own analysis (e.g. from an external CSV-based tool). Always renders first.'
 }, {
   key: 'hero',
   label: 'Summary Stats',
@@ -6330,7 +5994,7 @@ const SECTION_DEFS = [{
 }];
 const PRESETS = {
   'Doctor Visit': {
-    trend: false,
+    trendAnalysis: false,
     hero: true,
     bp: true,
     glucose: true,
@@ -6345,7 +6009,7 @@ const PRESETS = {
     postMealPeak: false
   },
   'Full Export': {
-    trend: false,
+    trendAnalysis: false,
     hero: true,
     bp: true,
     glucose: true,
@@ -6360,7 +6024,7 @@ const PRESETS = {
     postMealPeak: false
   },
   'Labs Only': {
-    trend: false,
+    trendAnalysis: false,
     hero: true,
     bp: false,
     glucose: false,
@@ -6375,7 +6039,7 @@ const PRESETS = {
     postMealPeak: false
   },
   'Goal Progress': {
-    trend: false,
+    trendAnalysis: false,
     hero: false,
     bp: false,
     glucose: false,
@@ -6390,7 +6054,7 @@ const PRESETS = {
     postMealPeak: false
   },
   'Vitals': {
-    trend: false,
+    trendAnalysis: false,
     hero: false,
     bp: true,
     glucose: true,
@@ -6405,7 +6069,7 @@ const PRESETS = {
     postMealPeak: false
   },
   'Current Snapshot': {
-    trend: false,
+    trendAnalysis: false,
     hero: true,
     bp: true,
     glucose: true,
@@ -6421,7 +6085,7 @@ const PRESETS = {
   }
 };
 const EMPTY_SECTIONS = {
-  trend: false,
+  trendAnalysis: false,
   hero: false,
   bp: false,
   glucose: false,
@@ -6452,11 +6116,9 @@ function ExportTab({
   const [view, setView] = useState(null);
   const [sections, setSections] = useState(EMPTY_SECTIONS);
   const [activePreset, setActivePreset] = useState(null);
-  const [trendWindow, setTrendWindow] = useState("7 DAYS");
-  // HT-41: custom "date since" window, mutually exclusive with the preset
-  // dropdown values above — switching to a preset clears this, switching to
-  // CUSTOM defaults it to today so the date picker is never blank.
-  const [customTrendStart, setCustomTrendStart] = useState("");
+  // HT-45: pasted-in Trend Analysis text, ephemeral (not persisted) — cleared
+  // on page reload, pasted fresh before each export.
+  const [trendAnalysisText, setTrendAnalysisText] = useState("");
   function toggleSection(key) {
     setSections(s => ({
       ...s,
@@ -6832,8 +6494,7 @@ function ExportTab({
     bmLog: bmLog,
     postMealPeakLog: postMealPeakLog,
     sections: sections,
-    trendWindow: trendWindow,
-    customTrendStart: customTrendStart
+    trendAnalysisText: trendAnalysisText
   }));
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(Card, {
     style: {
@@ -6915,32 +6576,18 @@ function ExportTab({
       fontSize: 10,
       color: C.faint
     }
-  }, s.desc))))), sections.trend && /*#__PURE__*/React.createElement("div", {
+  }, s.desc))))), sections.trendAnalysis && /*#__PURE__*/React.createElement("div", {
     style: { marginBottom: 14, padding: '10px 12px', background: '#fafafa', border: '1px solid ' + C.border, borderRadius: 8 }
   },
-    /*#__PURE__*/React.createElement("label", { style: { fontSize: 12, color: C.muted, fontWeight: 600, display: 'block', marginBottom: 6 } }, "Trend Summary Time Window"),
-    /*#__PURE__*/React.createElement("select", {
-      value: trendWindow,
-      onChange: e => {
-        const v = e.target.value;
-        setTrendWindow(v);
-        if (v === "CUSTOM") {
-          if (!customTrendStart) setCustomTrendStart(today());
-        } else {
-          setCustomTrendStart("");
-        }
-      },
-      style: { ...inputSt, padding: '6px 8px', fontSize: 13 }
-    }, TREND_WINDOWS.map(w => /*#__PURE__*/React.createElement("option", { key: w, value: w }, w === "CUSTOM" ? "Custom…" : w))),
-    trendWindow === "CUSTOM" && /*#__PURE__*/React.createElement("div", { style: { marginTop: 8 } },
-      /*#__PURE__*/React.createElement("label", { style: { fontSize: 11, color: C.faint, display: 'block', marginBottom: 3 } }, "Date since"),
-      /*#__PURE__*/React.createElement("input", {
-        style: { ...inputSt, padding: '6px 8px', fontSize: 13 },
-        type: "date",
-        value: customTrendStart,
-        onChange: e => setCustomTrendStart(e.target.value)
-      })
-    )
+    /*#__PURE__*/React.createElement("label", { style: { fontSize: 12, color: C.muted, fontWeight: 600, display: 'block', marginBottom: 6 } }, "Trend Analysis"),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 8 } }, "Paste in your analysis below. Not saved — pasted fresh each time you generate a PDF."),
+    /*#__PURE__*/React.createElement("textarea", {
+      value: trendAnalysisText,
+      onChange: e => setTrendAnalysisText(e.target.value),
+      placeholder: "Paste your trend analysis here…",
+      rows: 8,
+      style: { ...inputSt, padding: '8px', fontSize: 13, fontFamily: 'inherit', resize: 'vertical', width: '100%', boxSizing: 'border-box' }
+    })
   ), /*#__PURE__*/React.createElement("button", {
     onClick: () => setView({
       type: 'pdf'
