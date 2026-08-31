@@ -6119,6 +6119,9 @@ function ExportTab({
   // HT-45: pasted-in Trend Analysis text, ephemeral (not persisted) — cleared
   // on page reload, pasted fresh before each export.
   const [trendAnalysisText, setTrendAnalysisText] = useState("");
+  // HT-46: optional "since" date filter for CSV exports, independent of Trend Analysis.
+  const [csvSinceDate, setCsvSinceDate] = useState("");
+  const [csvCopied, setCsvCopied] = useState(false);
   function toggleSection(key) {
     setSections(s => ({
       ...s,
@@ -6140,12 +6143,25 @@ function ExportTab({
       return s.includes(',') || s.includes('\n') || s.includes('"') ? '"' + s.replace(/"/g, '""') + '"' : s;
     }).join(',')).join('\n');
   }
+  // HT-46: date-per-entry datasets are filtered to csvSinceDate (inclusive) when set;
+  // Medications is a roster (not date-events) and stays unfiltered.
+  const sinceOk = d => !csvSinceDate || d >= csvSinceDate;
+  const bpF = bp.filter(r => sinceOk(r.date));
+  const glucoseLogF = (glucoseLog || []).filter(r => sinceOk(r.date));
+  const weightF = weight.filter(r => sinceOk(r.date));
+  const labsF = labs.filter(r => sinceOk(r.date));
+  const journalF = journal.filter(r => sinceOk(r.date));
+  const medLogsF = (medLogs || []).filter(r => sinceOk(r.date));
+  const healthkitDailyLogF = (healthkitDailyLog || []).filter(r => sinceOk(r.date));
+  const bmLogF = (bmLog || []).filter(r => sinceOk(r.date));
+  const postMealPeakLogF = (postMealPeakLog || []).filter(r => sinceOk(r.date));
+  const cgmSummaryLogF = (cgmSummaryLog || []).filter(r => sinceOk(r.date));
   const coreCsvSets = [{
     label: 'Blood Pressure & Heart Rate',
-    count: bp.length,
+    count: bpF.length,
     build: () => {
       const rows = [['Date', 'Time', 'Systolic', 'Diastolic', 'Heart Rate', 'Cuff Type', 'Category']];
-      [...bp].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).forEach(r => {
+      [...bpF].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).forEach(r => {
         const n = r.cuffType === 'wrist-home' || r.cuffType === 'wrist-office';
         rows.push([r.date, r.time || '', r.systolic, r.diastolic, r.heartRate, r.cuffType || '', bpCat(n ? r.systolic + WRIST_OFFSET.systolic : r.systolic, n ? r.diastolic + WRIST_OFFSET.diastolic : r.diastolic).label]);
       });
@@ -6153,10 +6169,10 @@ function ExportTab({
     }
   }, {
     label: 'Glucose Readings',
-    count: (glucoseLog || []).length,
+    count: glucoseLogF.length,
     build: () => {
       const rows = [['Date', 'Time', 'Value (mg/dL)', 'Reading Type', 'Last Meal Time', 'Elapsed (min)', 'Meal Note']];
-      [...(glucoseLog || [])].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).forEach(r => {
+      [...glucoseLogF].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).forEach(r => {
         let elapsed = '';
         if (r.time && r.lastMealTime) {
           const [rh, rm] = r.time.split(':').map(Number);
@@ -6170,10 +6186,10 @@ function ExportTab({
     }
   }, {
     label: 'Weight',
-    count: weight.length,
+    count: weightF.length,
     build: () => {
       const rows = [['Date', 'Time', 'Weight (lb)', 'Condition', 'Est. Nude (lb)', 'BMI', 'Notes']];
-      [...weight].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).forEach(e => {
+      [...weightF].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).forEach(e => {
         const isCl = e.condition === 'clinical' || e.condition === 'clothed' || e.condition === 'light';
         const nude = isCl ? +(e.weight + CLOTHING_OFFSET).toFixed(1) : e.weight;
         rows.push([e.date, e.time || '', e.weight, e.condition || 'nude', nude, bmi(nude), e.notes || '']);
@@ -6182,19 +6198,19 @@ function ExportTab({
     }
   }, {
     label: 'Lab Results',
-    count: labs.length,
+    count: labsF.length,
     build: () => {
-      const markers = [...new Set(labs.flatMap(l => Object.keys(l.values)))].sort();
+      const markers = [...new Set(labsF.flatMap(l => Object.keys(l.values)))].sort();
       const rows = [['Date', 'Lab', ...markers]];
-      [...labs].sort((a, b) => a.date.localeCompare(b.date)).forEach(l => rows.push([l.date, l.lab, ...markers.map(m => l.values[m] != null ? String(l.values[m]) : '')]));
+      [...labsF].sort((a, b) => a.date.localeCompare(b.date)).forEach(l => rows.push([l.date, l.lab, ...markers.map(m => l.values[m] != null ? String(l.values[m]) : '')]));
       return makeCSV(rows);
     }
   }, {
     label: 'Nutrition Log',
-    count: journal.length,
+    count: journalF.length,
     build: () => {
       const rows = [['Date', 'Calories', 'Protein (g)', 'Sugar (g)', 'Carbs (g)', 'Sat Fat (g)', 'Fiber (g)', 'Sodium (mg)', 'Water (oz)']];
-      [...journal].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => rows.push([e.date, e.calories || 0, e.protein || 0, e.sugar || 0, e.carbs || 0, e.saturatedFat || 0, e.fiber || 0, e.sodium || 0, e.water || 0]));
+      [...journalF].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => rows.push([e.date, e.calories || 0, e.protein || 0, e.sugar || 0, e.carbs || 0, e.saturatedFat || 0, e.fiber || 0, e.sodium || 0, e.water || 0]));
       return makeCSV(rows);
     }
   }, {
@@ -6207,18 +6223,18 @@ function ExportTab({
     }
   }, {
     label: 'Medication Logs',
-    count: (medLogs || []).length,
+    count: medLogsF.length,
     build: () => {
       const rows = [['Date', 'Time', 'Medication', 'Dose', 'Notes']];
-      [...(medLogs || [])].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)).forEach(l => rows.push([l.date, l.time || '', l.medName, l.dose || '', l.notes || '']));
+      [...medLogsF].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)).forEach(l => rows.push([l.date, l.time || '', l.medName, l.dose || '', l.notes || '']));
       return makeCSV(rows);
     }
   }, {
     label: 'Activity & Vitals (HealthKit)',
-    count: (healthkitDailyLog || []).length,
+    count: healthkitDailyLogF.length,
     build: () => {
       const rows = [['Date', 'Sleep (hr)', 'Steps', 'Active Energy (kcal)', 'Water (oz)', 'Resting HR (bpm)']];
-      [...(healthkitDailyLog || [])].sort((a, b) => a.date.localeCompare(b.date)).forEach(d => rows.push([
+      [...healthkitDailyLogF].sort((a, b) => a.date.localeCompare(b.date)).forEach(d => rows.push([
         d.date,
         d.sleepMinutes != null ? +(d.sleepMinutes / 60).toFixed(1) : '',
         d.steps != null ? d.steps : '',
@@ -6230,20 +6246,20 @@ function ExportTab({
     }
   }, {
     label: 'Bowel Movements',
-    count: (bmLog || []).length,
+    count: bmLogF.length,
     build: () => {
       const rows = [['Date', 'Time', 'Bristol Type', 'Status', 'Notes']];
-      [...(bmLog || [])].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).forEach(r => {
+      [...bmLogF].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).forEach(r => {
         rows.push([r.date, r.time || '', r.bristol, bristolStatusLabel(r.bristol), r.notes || '']);
       });
       return makeCSV(rows);
     }
   }, {
     label: 'Post-Meal Peak Glucose (approx., window-based)',
-    count: (postMealPeakLog || []).length,
+    count: postMealPeakLogF.length,
     build: () => {
       const rows = [['Date', 'Breakfast Peak (mg/dL)', 'Breakfast Peak Time', 'Lunch Peak (mg/dL)', 'Lunch Peak Time', 'Dinner Peak (mg/dL)', 'Dinner Peak Time']];
-      [...(postMealPeakLog || [])].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => rows.push([
+      [...postMealPeakLogF].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => rows.push([
         e.date,
         e.breakfastPeak != null ? Math.round(e.breakfastPeak) : '',
         e.breakfastPeakTime || '',
@@ -6256,10 +6272,10 @@ function ExportTab({
     }
   }, {
     label: 'Avg CGM Glucose',
-    count: (cgmSummaryLog || []).length,
+    count: cgmSummaryLogF.length,
     build: () => {
       const rows = [['Date', 'Avg CGM Glucose (mg/dL)', 'Time in Range (%)']];
-      [...(cgmSummaryLog || [])].sort((a, b) => a.date.localeCompare(b.date)).forEach(r => rows.push([
+      [...cgmSummaryLogF].sort((a, b) => a.date.localeCompare(b.date)).forEach(r => rows.push([
         r.date,
         r.avgGlucose != null ? r.avgGlucose : '',
         r.tir != null ? r.tir : ''
@@ -6270,9 +6286,12 @@ function ExportTab({
     label: 'Medication Adherence',
     count: meds.filter(m => m.frequency !== 'As needed').length,
     build: () => {
+      // HT-46: when a since-date is set, the adherence window's start shifts forward
+      // to that date (never before the med's own start), so "Expected"/pct reflect
+      // just the filtered period rather than the medication's full lifetime.
       function adherenceFor(m) {
         if (!medLogs || !medLogs.length) return { total: 0, expected: null, pct: null };
-        const start = m.startDate;
+        const start = csvSinceDate && csvSinceDate > m.startDate ? csvSinceDate : m.startDate;
         const todayISO = today();
         const logs = medLogs.filter(l => l.medId === m.id && l.date >= start && l.date <= todayISO);
         const startD = new Date(start + 'T00:00:00');
@@ -6288,6 +6307,7 @@ function ExportTab({
       const rows = [['Medication', 'Doses Logged', 'Expected', 'Adherence (%)', 'Last Taken']];
       [...meds].filter(m => m.frequency !== 'As needed').sort((a, b) => a.name.localeCompare(b.name)).forEach(m => {
         const a = adherenceFor(m);
+        // Last Taken stays unfiltered (a factual "when" independent of the analysis window).
         const lastLog = [...(medLogs || [])].filter(l => l.medId === m.id).sort((x, y) => y.date.localeCompare(x.date))[0];
         rows.push([
           m.name + (m.dose ? ' ' + m.dose : ''),
@@ -6301,14 +6321,14 @@ function ExportTab({
     }
   }, {
     label: 'Nutrition Summary',
-    count: journal.length,
+    count: journalF.length,
     build: () => {
-      const sorted = [...journal].sort((a, b) => a.date.localeCompare(b.date));
+      const sorted = [...journalF].sort((a, b) => a.date.localeCompare(b.date));
       const count = sorted.length;
       if (!count) return makeCSV([['Macro', 'Daily Average', 'Daily Target', 'vs Target'], ['No nutrition data logged', '', '', '']]);
       // HT-44: same Water-from-healthkit-daily-log fix as PDFSummary/NutritionTab.
       const hkByDate = {};
-      (healthkitDailyLog || []).forEach(d => { hkByDate[d.date] = d; });
+      healthkitDailyLogF.forEach(d => { hkByDate[d.date] = d; });
       const avg = key => {
         if (key === 'water') {
           const vals = sorted.map(e => hkByDate[e.date]?.waterOz).filter(v => v != null);
@@ -6404,7 +6424,33 @@ function ExportTab({
       marginBottom: 10,
       lineHeight: 1.5
     }
-  }, "Tap the text box, select all, and copy — then paste into Notes or email to yourself."), /*#__PURE__*/React.createElement("textarea", {
+  }, "Tap Copy for one-tap clipboard copy, or tap the text box to select all manually."), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      // HT-47: reuses the app's existing execCommand('copy') pattern (see copyText
+      // above) rather than the newer Clipboard API, for consistency and reliability
+      // across mobile browsers/webviews.
+      const ta = document.createElement('textarea');
+      ta.value = view.content;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCsvCopied(true);
+      setTimeout(() => setCsvCopied(false), 2500);
+    },
+    style: {
+      width: '100%',
+      padding: '11px',
+      marginBottom: 10,
+      borderRadius: 9,
+      border: 'none',
+      background: C.accent,
+      color: '#fff',
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: 'pointer'
+    }
+  }, csvCopied ? '✓ Copied' : 'Copy to Clipboard'), /*#__PURE__*/React.createElement("textarea", {
     readOnly: true,
     value: view.content,
     style: {
@@ -6612,7 +6658,36 @@ function ExportTab({
       color: C.muted,
       marginBottom: 12
     }
-  }, "Tap a dataset to view and copy the raw data."), csvSets.map(({
+  }, "Tap a dataset to view and copy the raw data."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 12,
+      padding: '8px 10px',
+      background: '#fafafa',
+      border: '1px solid ' + C.border,
+      borderRadius: 8
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: { fontSize: 12, color: C.muted, fontWeight: 600, whiteSpace: 'nowrap' }
+  }, "Since (optional)"), /*#__PURE__*/React.createElement("input", {
+    type: 'date',
+    value: csvSinceDate,
+    onChange: e => setCsvSinceDate(e.target.value),
+    style: { ...inputSt, padding: '6px 8px', fontSize: 13, flex: 1 }
+  }), csvSinceDate && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setCsvSinceDate(''),
+    style: {
+      background: 'none',
+      border: 'none',
+      color: C.accent,
+      fontSize: 13,
+      fontWeight: 600,
+      cursor: 'pointer',
+      padding: '4px 2px'
+    }
+  }, "Clear")), csvSets.map(({
     label,
     count,
     build
