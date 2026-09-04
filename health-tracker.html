@@ -4874,6 +4874,7 @@ function PDFSummary({
   healthkitDailyLog,
   bmLog,
   postMealPeakLog,
+  weightProjectionConfig,
   sections,
   trendAnalysisText,
   pdfSinceDate
@@ -5420,7 +5421,67 @@ function PDFSummary({
         /*#__PURE__*/React.createElement("td", { style: S.td }, e.notes || '')
       );
     });
-  })()))), sections.labs && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  })()))), sections.weightTarget && weightProjectionConfig && weight && weight.length > 0 && (() => {
+    // HT-49: Actual (nude-equiv) vs. Original Target (pure phase-based projection,
+    // never recalibrated — computed by feeding buildWeeklyMilestones an empty
+    // weigh-in list) vs. Interpolated Target (the live self-correcting model
+    // already used on the Weight tab). Reuses HT-31/HT-32's existing model
+    // functions rather than duplicating the projection math.
+    const cfg = weightProjectionConfig;
+    const origMilestones = buildWeeklyMilestones(cfg, []);
+    const interpMilestones = buildWeeklyMilestones(cfg, weight);
+    const actualPts = [...weight].sort((a, b) => a.date.localeCompare(b.date))
+      .filter(e => e.date >= chartStart)
+      .map(e => ({ date: e.date, value: weightNudeEquivalent(e) }));
+    const origPts = origMilestones.filter(m => m.date >= chartStart && m.date <= today()).map(m => ({ date: m.date, value: m.target }));
+    const interpPts = interpMilestones.filter(m => m.date >= chartStart && m.date <= today()).map(m => ({ date: m.date, value: m.target }));
+    const actualByDate = {};
+    weight.forEach(e => {
+      if (!actualByDate[e.date] || (e.time || '') > (actualByDate[e.date].time || '')) actualByDate[e.date] = e;
+    });
+    function targetCell(dateStr, useEmptyEntries) {
+      const r = weightTargetForDate(cfg, useEmptyEntries ? [] : weight, dateStr);
+      if (!r || r.outOfRange) return /*#__PURE__*/React.createElement("td", { style: { ...S.td, color: '#9ca3af', fontStyle: 'italic' } }, "—");
+      return /*#__PURE__*/React.createElement("td", { style: S.td }, r.target, " lb");
+    }
+    return /*#__PURE__*/React.createElement(React.Fragment, null,
+      /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Weight Target Comparison"),
+      (actualPts.filter(p => p.value != null).length >= 2 || origPts.length >= 2 || interpPts.length >= 2) && /*#__PURE__*/React.createElement("div", {
+        style: { marginTop: 10, marginBottom: 14, pageBreakInside: "avoid", breakInside: "avoid" }
+      },
+        /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Trend (nude-equivalent, since ", fmtDate(chartStart), ")"),
+        /*#__PURE__*/React.createElement(TrendChart, {
+          series: [
+            { points: actualPts, color: "#1d4ed8", label: "Actual" },
+            { points: origPts, color: "#9ca3af", label: "Original Target" },
+            { points: interpPts, color: "#16a34a", label: "Interpolated Target" }
+          ],
+          width: 620
+        })
+      ),
+      /*#__PURE__*/React.createElement("div", { style: S.h3 }, "Last 7 Days"),
+      /*#__PURE__*/React.createElement("table", { style: S.table },
+        /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null,
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Date"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Actual (nude-equiv.)"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Original Target"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Interpolated Target")
+        )),
+        /*#__PURE__*/React.createElement("tbody", null, last7Dates().map((d, i) => {
+          const e = actualByDate[d];
+          const rowStyle = { background: i % 2 === 0 ? '#fff' : '#fafafa' };
+          return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
+            /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(d)),
+            e ? /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600 } }, weightNudeEquivalent(e), " lb")
+              : /*#__PURE__*/React.createElement("td", { style: { ...S.td, color: '#9ca3af', fontStyle: 'italic' } }, "No reading logged"),
+            targetCell(d, true),
+            targetCell(d, false)
+          );
+        }))
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, fontStyle: 'italic', marginTop: 6 } }, "Original Target assumes no recalibration ever occurred; Interpolated Target is the live, self-correcting model also shown on the Weight tab.")
+    );
+  })(), sections.labs && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: S.h2
   }, "Lab Results — Key Markers"), [...labs].sort((a, b) => b.date.localeCompare(a.date)).map(lab => /*#__PURE__*/React.createElement("div", {
     key: lab.id
@@ -5964,6 +6025,10 @@ const SECTION_DEFS = [{
   label: 'Weight',
   desc: 'Rolling 7-day detail table + full-history trend chart (nude-equiv.)'
 }, {
+  key: 'weightTarget',
+  label: 'Weight Target Comparison',
+  desc: 'Actual (nude-equiv.) vs. Original Target (never recalibrated) vs. Interpolated Target'
+}, {
   key: 'labs',
   label: 'Lab Results',
   desc: 'Key markers across all panels'
@@ -6003,6 +6068,7 @@ const PRESETS = {
     bp: true,
     glucose: true,
     weight: true,
+    weightTarget: false,
     labs: false,
     meds: true,
     adherence: true,
@@ -6018,6 +6084,7 @@ const PRESETS = {
     bp: true,
     glucose: true,
     weight: true,
+    weightTarget: false,
     labs: true,
     meds: true,
     adherence: true,
@@ -6033,6 +6100,7 @@ const PRESETS = {
     bp: false,
     glucose: false,
     weight: false,
+    weightTarget: false,
     labs: true,
     meds: false,
     adherence: false,
@@ -6048,6 +6116,7 @@ const PRESETS = {
     bp: false,
     glucose: false,
     weight: false,
+    weightTarget: false,
     labs: false,
     meds: false,
     adherence: false,
@@ -6063,6 +6132,7 @@ const PRESETS = {
     bp: true,
     glucose: true,
     weight: true,
+    weightTarget: false,
     labs: false,
     meds: false,
     adherence: false,
@@ -6078,6 +6148,7 @@ const PRESETS = {
     bp: true,
     glucose: true,
     weight: true,
+    weightTarget: true,
     labs: false,
     meds: true,
     adherence: true,
@@ -6094,6 +6165,7 @@ const EMPTY_SECTIONS = {
   bp: false,
   glucose: false,
   weight: false,
+  weightTarget: false,
   labs: false,
   meds: false,
   adherence: false,
@@ -6115,7 +6187,8 @@ function ExportTab({
   medLogs,
   healthkitDailyLog,
   bmLog,
-  postMealPeakLog
+  postMealPeakLog,
+  weightProjectionConfig
 }) {
   const [view, setView] = useState(null);
   const [sections, setSections] = useState(EMPTY_SECTIONS);
@@ -6275,6 +6348,33 @@ function ExportTab({
         e.dinnerPeak != null ? Math.round(e.dinnerPeak) : '',
         e.dinnerPeakTime || ''
       ]));
+      return makeCSV(rows);
+    }
+  }, {
+    // HT-49: uses the full (unfiltered) weight array for model computation so
+    // recalibration near the csvSinceDate boundary stays accurate; only the
+    // displayed rows are filtered to sinceOk.
+    label: 'Weight Target Comparison',
+    count: weightF.length,
+    build: () => {
+      const rows = [['Date', 'Actual (nude-equiv, lb)', 'Original Target (lb)', 'Interpolated Target (lb)']];
+      const byDate = {};
+      weightF.forEach(e => {
+        if (!byDate[e.date] || (e.time || '') > (byDate[e.date].time || '')) byDate[e.date] = e;
+      });
+      Object.keys(byDate).sort().forEach(d => {
+        const e = byDate[d];
+        const isCl = e.condition === 'clinical' || e.condition === 'clothed' || e.condition === 'light';
+        const nude = isCl ? +(e.weight + CLOTHING_OFFSET).toFixed(1) : e.weight;
+        const orig = weightTargetForDate(weightProjectionConfig, [], d);
+        const interp = weightTargetForDate(weightProjectionConfig, weight, d);
+        rows.push([
+          d,
+          nude,
+          orig && !orig.outOfRange ? orig.target : '',
+          interp && !interp.outOfRange ? interp.target : ''
+        ]);
+      });
       return makeCSV(rows);
     }
   }, {
@@ -6546,6 +6646,7 @@ function ExportTab({
     healthkitDailyLog: healthkitDailyLog,
     bmLog: bmLog,
     postMealPeakLog: postMealPeakLog,
+    weightProjectionConfig: weightProjectionConfig,
     sections: sections,
     trendAnalysisText: trendAnalysisText,
     pdfSinceDate: pdfSinceDate
