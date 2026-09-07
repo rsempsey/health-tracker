@@ -5617,7 +5617,7 @@ function PDFSummary({
     style: S.th
   }, "Adherence"), /*#__PURE__*/React.createElement("th", {
     style: S.th
-  }, "Last Taken"))), /*#__PURE__*/React.createElement("tbody", null, allMeds.filter(m => m.frequency !== 'As needed').map((m, i) => {
+  }, "Last Taken"))), /*#__PURE__*/React.createElement("tbody", null, allMeds.filter(m => m.frequency !== 'As needed' && m.active).map((m, i) => {
     const a = medAdherence(m);
     const lastLog = [...medLogs].filter(l => l.medId === m.id).sort((a, b) => b.date.localeCompare(a.date))[0];
     return /*#__PURE__*/React.createElement("tr", {
@@ -6439,7 +6439,7 @@ function ExportTab({
     }
   }, {
     label: 'Medication Adherence',
-    count: meds.filter(m => m.frequency !== 'As needed').length,
+    count: meds.filter(m => m.frequency !== 'As needed' && m.active).length,
     build: () => {
       // HT-46: when a since-date is set, the adherence window's start shifts forward
       // to that date (never before the med's own start), so "Expected"/pct reflect
@@ -6460,7 +6460,7 @@ function ExportTab({
         return { total: logs.length, expected: days, pct: Math.round(logs.length / days * 100) };
       }
       const rows = [['Medication', 'Doses Logged', 'Expected', 'Adherence (%)', 'Last Taken']];
-      [...meds].filter(m => m.frequency !== 'As needed').sort((a, b) => a.name.localeCompare(b.name)).forEach(m => {
+      [...meds].filter(m => m.frequency !== 'As needed' && m.active).sort((a, b) => a.name.localeCompare(b.name)).forEach(m => {
         const a = adherenceFor(m);
         // Last Taken stays unfiltered (a factual "when" independent of the analysis window).
         const lastLog = [...(medLogs || [])].filter(l => l.medId === m.id).sort((x, y) => y.date.localeCompare(x.date))[0];
