@@ -2921,7 +2921,10 @@ function GlucoseTab({
                   label: peak <= pmpGoal ? "At Goal" : "Above Goal",
                   color: peak <= pmpGoal ? "#22c55e" : "#f97316",
                   small: true
-                })
+                }),
+                latestPmp[meal + "Trough"] != null && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.faint, marginTop: 4 } },
+                  "Trough: ", Math.round(latestPmp[meal + "Trough"]), " mg/dL (Δ", Math.round(latestPmp[meal + "Delta"]), ", +", latestPmp[meal + "TimeToTroughMinutes"], "min)"
+                )
               ) : /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint } }, "No data")
             );
           })
@@ -2950,9 +2953,13 @@ function GlucoseTab({
             ["breakfast", "lunch", "dinner"].map(meal => {
               const peak = e[meal + "Peak"];
               const time = e[meal + "PeakTime"];
+              const trough = e[meal + "Trough"];
+              const delta = e[meal + "Delta"];
+              const timeToTrough = e[meal + "TimeToTroughMinutes"];
               const label = meal.charAt(0).toUpperCase() + meal.slice(1);
+              const troughText = trough != null ? ` → Trough: ${Math.round(trough)} mg/dL (Δ${Math.round(delta)}, +${timeToTrough}min)` : "";
               return /*#__PURE__*/React.createElement("span", { key: meal },
-                label, ": ", peak != null ? `${Math.round(peak)} mg/dL${time ? ' (' + time + ')' : ''}` : "—"
+                label, ": ", peak != null ? `${Math.round(peak)} mg/dL${time ? ' (' + time + ')' : ''}${troughText}` : "—"
               );
             })
           )
@@ -5976,10 +5983,15 @@ function PDFSummary({
     const dChartPts = postMealPeakLog.filter(e => e.dinnerPeak != null && e.date >= chartStart).map(e => ({ date: e.date, value: e.dinnerPeak }));
     const byDate = {};
     postMealPeakLog.forEach(e => { byDate[e.date] = e; });
-    function cell(peak, time) {
+    function cell(peak, time, trough, delta, timeToTrough) {
       if (peak == null) return /*#__PURE__*/React.createElement("td", { style: { ...S.td, color: '#9ca3af', fontStyle: 'italic' } }, "No data");
       const color = peak <= pmpGoal ? '#16a34a' : '#dc2626';
-      return /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600, color } }, Math.round(peak), " mg/dL", time ? " (" + time + ")" : "");
+      return /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600, color } },
+        Math.round(peak), " mg/dL", time ? " (" + time + ")" : "",
+        trough != null && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, fontWeight: 400, color: '#9ca3af', marginTop: 2 } },
+          "Trough ", Math.round(trough), " (Δ", Math.round(delta), ", +", timeToTrough, "min)"
+        )
+      );
     }
     return /*#__PURE__*/React.createElement(React.Fragment, null,
       /*#__PURE__*/React.createElement("div", { style: S.h2 }, "Post-Meal Peak Glucose (approx., window-based)"),
@@ -6007,9 +6019,9 @@ function PDFSummary({
           const rowStyle = { background: i % 2 === 0 ? '#fff' : '#fafafa' };
           return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
             /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(d)),
-            cell(e && e.breakfastPeak, e && e.breakfastPeakTime),
-            cell(e && e.lunchPeak, e && e.lunchPeakTime),
-            cell(e && e.dinnerPeak, e && e.dinnerPeakTime)
+            cell(e && e.breakfastPeak, e && e.breakfastPeakTime, e && e.breakfastTrough, e && e.breakfastDelta, e && e.breakfastTimeToTroughMinutes),
+            cell(e && e.lunchPeak, e && e.lunchPeakTime, e && e.lunchTrough, e && e.lunchDelta, e && e.lunchTimeToTroughMinutes),
+            cell(e && e.dinnerPeak, e && e.dinnerPeakTime, e && e.dinnerTrough, e && e.dinnerDelta, e && e.dinnerTimeToTroughMinutes)
           );
         }))
       )
@@ -6354,15 +6366,31 @@ function ExportTab({
     label: 'Post-Meal Peak Glucose (approx., window-based)',
     count: postMealPeakLogF.length,
     build: () => {
-      const rows = [['Date', 'Breakfast Peak (mg/dL)', 'Breakfast Peak Time', 'Lunch Peak (mg/dL)', 'Lunch Peak Time', 'Dinner Peak (mg/dL)', 'Dinner Peak Time']];
+      const rows = [['Date',
+        'Breakfast Peak (mg/dL)', 'Breakfast Peak Time', 'Breakfast Trough (mg/dL)', 'Breakfast Trough Time', 'Breakfast Delta (mg/dL)', 'Breakfast Time to Trough (min)',
+        'Lunch Peak (mg/dL)', 'Lunch Peak Time', 'Lunch Trough (mg/dL)', 'Lunch Trough Time', 'Lunch Delta (mg/dL)', 'Lunch Time to Trough (min)',
+        'Dinner Peak (mg/dL)', 'Dinner Peak Time', 'Dinner Trough (mg/dL)', 'Dinner Trough Time', 'Dinner Delta (mg/dL)', 'Dinner Time to Trough (min)'
+      ]];
       [...postMealPeakLogF].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => rows.push([
         e.date,
         e.breakfastPeak != null ? Math.round(e.breakfastPeak) : '',
         e.breakfastPeakTime || '',
+        e.breakfastTrough != null ? Math.round(e.breakfastTrough) : '',
+        e.breakfastTroughTime || '',
+        e.breakfastDelta != null ? Math.round(e.breakfastDelta) : '',
+        e.breakfastTimeToTroughMinutes != null ? e.breakfastTimeToTroughMinutes : '',
         e.lunchPeak != null ? Math.round(e.lunchPeak) : '',
         e.lunchPeakTime || '',
+        e.lunchTrough != null ? Math.round(e.lunchTrough) : '',
+        e.lunchTroughTime || '',
+        e.lunchDelta != null ? Math.round(e.lunchDelta) : '',
+        e.lunchTimeToTroughMinutes != null ? e.lunchTimeToTroughMinutes : '',
         e.dinnerPeak != null ? Math.round(e.dinnerPeak) : '',
-        e.dinnerPeakTime || ''
+        e.dinnerPeakTime || '',
+        e.dinnerTrough != null ? Math.round(e.dinnerTrough) : '',
+        e.dinnerTroughTime || '',
+        e.dinnerDelta != null ? Math.round(e.dinnerDelta) : '',
+        e.dinnerTimeToTroughMinutes != null ? e.dinnerTimeToTroughMinutes : ''
       ]));
       return makeCSV(rows);
     }
