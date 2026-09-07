@@ -441,8 +441,8 @@ const SEED_GOALS = {
   avgCgmGlucose: 120,
   postMealPeakGoal: 140,
   // Nutrition targets
-  caloriesWeekday: 1785,
-  caloriesWeekend: 2053,
+  caloriesLow: 2318,
+  caloriesHigh: 2453,
   protein: 166,
   sugar: 25,
   carbs: 163,
@@ -3618,12 +3618,12 @@ function GoalsTab({
     bad: "high"
   }];
   const nutritionDefs = [{
-    key: "caloriesWeekday",
-    label: "Calories (M–Th)",
+    key: "caloriesLow",
+    label: "Calories (Tue–Fri)",
     unit: "kcal"
   }, {
-    key: "caloriesWeekend",
-    label: "Calories (F–Su)",
+    key: "caloriesHigh",
+    label: "Calories (Sat–Mon)",
     unit: "kcal"
   }, {
     key: "protein",
@@ -4005,9 +4005,12 @@ const MACRO_DEFS = [{
   goalKey: "water",
   bad: "low"
 }];
-function isWeekend(dateStr) {
+function isHighCalDay(dateStr) {
+  // HT-53: higher-calorie days are Sat/Sun/Mon (getDay: 6/0/1); Tue-Fri
+  // (2/3/4/5) are the lower-calorie days. Supersedes the old M-Th/F-Su split.
   const d = new Date(dateStr + 'T12:00:00');
-  return d.getDay() === 0 || d.getDay() === 6;
+  const day = d.getDay();
+  return day === 6 || day === 0 || day === 1;
 }
 function NutritionTab({
   journal: entries,
@@ -4086,7 +4089,7 @@ function NutritionTab({
   }
   function macroTarget(key, dateStr) {
     if (!goals) return null;
-    if (key === "calories") return isWeekend(dateStr) ? goals.caloriesWeekend : goals.caloriesWeekday;
+    if (key === "calories") return isHighCalDay(dateStr) ? goals.caloriesHigh : goals.caloriesLow;
     return goals[key] || null;
   }
   function macroColor(key, val, dateStr) {
@@ -4203,7 +4206,7 @@ function NutritionTab({
     label: editId ? "Update Entry" : "Save"
   })), latestEntry && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
     /*#__PURE__*/React.createElement(SectionTitle, null, "NUTRITION"),
-    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 10 } }, fmtDate(latestEntry.date), isWeekend(latestEntry.date) ? " · Weekend" : ""),
+    /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 10 } }, fmtDate(latestEntry.date), isHighCalDay(latestEntry.date) ? " · Higher-Cal Day" : ""),
     /*#__PURE__*/React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 10 } },
       ...heroKeys.map(key => {
         const def = MACRO_DEFS.find(m => m.key === key);
@@ -4268,7 +4271,7 @@ function NutritionTab({
       fontSize: 12,
       color: C.faint
     }
-  }, fmtDate(e.date), isWeekend(e.date) ? " · Weekend" : ""), /*#__PURE__*/React.createElement("div", {
+  }, fmtDate(e.date), isHighCalDay(e.date) ? " · Higher-Cal Day" : ""), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4
