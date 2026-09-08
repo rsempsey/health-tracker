@@ -2510,6 +2510,17 @@ function GlucoseTab({
     const avg = inWindow.reduce((s, r) => s + r.avgGlucose, 0) / inWindow.length;
     return { avg: Math.round(avg), n: inWindow.length };
   })();
+  // HT-55: 7-day rolling average, Time in Range (cgm-summary-log entries) —
+  // same pattern as rolling7AvgCgm above, just on the tir field. Added so the
+  // CGM Summary sub-view's own LATEST GLUCOSE card can show a 7-day avg for
+  // both its stats, matching the Manual Readings sub-view's card.
+  const rolling7Tir = (() => {
+    const window7 = last7Dates();
+    const inWindow = (cgmSummaryLog || []).filter(r => r.tir != null && window7.includes(r.date));
+    if (!inWindow.length) return null;
+    const avg = inWindow.reduce((s, r) => s + r.tir, 0) / inWindow.length;
+    return { avg: Math.round(avg), n: inWindow.length };
+  })();
   // v95: two-line trend data for the combined Manual Readings hero card —
   // Fasting Glucose (per-reading) + Avg CGM Glucose (per-day summary), each
   // filtered to TREND_CHART_START to match the app's other trend charts.
@@ -2528,6 +2539,16 @@ function GlucoseTab({
     .filter(e => e.breakfastPeak != null && e.lunchPeak != null && e.dinnerPeak != null)
     .map(e => ({ date: e.date, value: Math.max(e.breakfastPeak, e.lunchPeak, e.dinnerPeak) }));
   const pmpStreak = calcStreak(pmpCompleteDays, pmpGoal, "high");
+  // HT-55: 7-day rolling average helper for Post-Meal Peaks — one function
+  // covering all six fields (breakfast/lunch/dinner x peak/trough), mirroring
+  // the Nutrition tab's rolling7For(key) pattern.
+  function rolling7Pmp(field) {
+    const window7 = last7Dates();
+    const inWindow = pmpSorted.filter(r => r[field] != null && window7.includes(r.date));
+    if (!inWindow.length) return null;
+    const avg = inWindow.reduce((s, r) => s + r[field], 0) / inWindow.length;
+    return { avg: Math.round(avg), n: inWindow.length };
+  }
 
   return /*#__PURE__*/React.createElement("div", null,
     // Sub-view toggle
@@ -2754,7 +2775,10 @@ function GlucoseTab({
                 label: latestCgm.tir >= 70 ? "On Target" : latestCgm.tir >= 50 ? "Below Target" : "Well Below Target",
                 color: tirColor(latestCgm.tir),
                 small: true
-              })
+              }),
+              rolling7Tir && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 6 } },
+                "7-day avg: ", rolling7Tir.avg, "% (", rolling7Tir.n, ")"
+              )
             ) : /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "No TIR logged yet.")
           ),
           /*#__PURE__*/React.createElement("div", null,
@@ -2775,6 +2799,9 @@ function GlucoseTab({
               }),
               latestCgm.medianGlucose != null && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 6 } },
                 "Median: ", Math.round(latestCgm.medianGlucose), " mg/dL"
+              ),
+              rolling7AvgCgm && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 6 } },
+                "7-day avg: ", rolling7AvgCgm.avg, " mg/dL (", rolling7AvgCgm.n, ")"
               )
             ) : /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "No CGM summary yet.")
           )
@@ -2909,6 +2936,8 @@ function GlucoseTab({
             const peak = latestPmp[meal + "Peak"];
             const time = latestPmp[meal + "PeakTime"];
             const label = meal.charAt(0).toUpperCase() + meal.slice(1);
+            const r7Peak = rolling7Pmp(meal + "Peak");
+            const r7Trough = rolling7Pmp(meal + "Trough");
             return /*#__PURE__*/React.createElement("div", { key: meal },
               /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: C.muted, letterSpacing: 0.3, marginBottom: 4 } }, label.toUpperCase()),
               peak != null ? /*#__PURE__*/React.createElement(React.Fragment, null,
@@ -2924,6 +2953,12 @@ function GlucoseTab({
                 }),
                 latestPmp[meal + "Trough"] != null && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.faint, marginTop: 4 } },
                   "Trough: ", Math.round(latestPmp[meal + "Trough"]), " mg/dL (Δ", Math.round(latestPmp[meal + "Delta"]), ", +", latestPmp[meal + "TimeToTroughMinutes"], "min)"
+                ),
+                r7Peak && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.faint, marginTop: 4 } },
+                  "7-day avg peak: ", r7Peak.avg, " mg/dL"
+                ),
+                r7Trough && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.faint, marginTop: 2 } },
+                  "7-day avg trough: ", r7Trough.avg, " mg/dL"
                 )
               ) : /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint } }, "No data")
             );
@@ -7214,6 +7249,18 @@ function ActivityTab({ healthkitDailyLog, goals }) {
   const latest = sorted[0];
   const recent = sorted.slice(0, 14);
   const sleepHoursLatest = latest && latest.sleepMinutes != null ? +(latest.sleepMinutes / 60).toFixed(1) : null;
+  // HT-55: 7-day rolling average helper, mirroring the Nutrition tab's
+  // rolling7For(key) pattern, for Sleep/Steps/Active Kcal hero cards.
+  function rolling7Activity(field) {
+    const window7 = last7Dates();
+    const inWindow = (healthkitDailyLog || []).filter(d => d[field] != null && window7.includes(d.date));
+    if (!inWindow.length) return null;
+    const avg = inWindow.reduce((s, d) => s + d[field], 0) / inWindow.length;
+    return { avg, n: inWindow.length };
+  }
+  const r7Sleep = rolling7Activity("sleepMinutes");
+  const r7Steps = rolling7Activity("steps");
+  const r7ActiveEnergy = rolling7Activity("activeEnergyKcal");
   return /*#__PURE__*/React.createElement("div", null,
     !latest && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.faint } },
@@ -7227,21 +7274,30 @@ function ActivityTab({ healthkitDailyLog, goals }) {
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
           latest.sleepMinutes != null ? `${Math.floor(latest.sleepMinutes / 60)}h ${latest.sleepMinutes % 60}m` : "—"
         ),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, textAlign: "center" } }, fmtDate(latest.date))
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, textAlign: "center" } }, fmtDate(latest.date)),
+        r7Sleep && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.faint, textAlign: "center", marginTop: 4 } },
+          "7-day avg: ", Math.floor(r7Sleep.avg / 60), "h ", Math.round(r7Sleep.avg % 60), "m"
+        )
       ),
       /*#__PURE__*/React.createElement(Card, null,
         /*#__PURE__*/React.createElement(SectionTitle, null, "STEPS"),
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
           latest.steps != null ? latest.steps.toLocaleString() : "—"
         ),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, textAlign: "center" } }, fmtDate(latest.date))
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, textAlign: "center" } }, fmtDate(latest.date)),
+        r7Steps && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.faint, textAlign: "center", marginTop: 4 } },
+          "7-day avg: ", Math.round(r7Steps.avg).toLocaleString()
+        )
       ),
       /*#__PURE__*/React.createElement(Card, null,
         /*#__PURE__*/React.createElement(SectionTitle, null, "ACTIVE KCAL"),
         /*#__PURE__*/React.createElement("div", { style: { fontSize: 20, fontWeight: 800, color: C.text, textAlign: "center" } },
           latest.activeEnergyKcal != null ? Math.round(latest.activeEnergyKcal) : "—"
         ),
-        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, textAlign: "center" } }, fmtDate(latest.date))
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, textAlign: "center" } }, fmtDate(latest.date)),
+        r7ActiveEnergy && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.faint, textAlign: "center", marginTop: 4 } },
+          "7-day avg: ", Math.round(r7ActiveEnergy.avg)
+        )
       )
     ),
     latest && goals && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
@@ -7285,6 +7341,14 @@ function WaterTab({ healthkitDailyLog, goals }) {
     .filter(d => d.waterOz != null)
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(d => ({ date: d.date, y: d.waterOz }));
+  // HT-55: 7-day rolling average, Water — same pattern used across the app.
+  const rolling7Water = (() => {
+    const window7 = last7Dates();
+    const inWindow = (healthkitDailyLog || []).filter(d => d.waterOz != null && window7.includes(d.date));
+    if (!inWindow.length) return null;
+    const avg = inWindow.reduce((s, d) => s + d.waterOz, 0) / inWindow.length;
+    return { avg: Math.round(avg), n: inWindow.length };
+  })();
   return /*#__PURE__*/React.createElement("div", null,
     !latest && /*#__PURE__*/React.createElement(Card, { style: { marginBottom: 14 } },
       /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, color: C.faint } },
@@ -7297,6 +7361,9 @@ function WaterTab({ healthkitDailyLog, goals }) {
           latest.waterOz != null ? Math.round(latest.waterOz) : "—"),
         /*#__PURE__*/React.createElement("span", { style: { fontSize: 13, color: C.faint } }, "oz"),
         goal && /*#__PURE__*/React.createElement("span", { style: { fontSize: 12, color: C.faint } }, "of ", goal, " oz goal")
+      ),
+      rolling7Water && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginBottom: 10 } },
+        "7-day avg: ", rolling7Water.avg, " oz (", rolling7Water.n, ")"
       ),
       chartPts.length >= 2 && /*#__PURE__*/React.createElement(MiniChart, { points: chartPts, color: "#06b6d4", goal: goal, unit: "oz" })
     ),
