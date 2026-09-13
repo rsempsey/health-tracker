@@ -478,6 +478,23 @@ function weightNudeEquivalent(e) {
     ? +(e.weight + CLOTHING_OFFSET).toFixed(1)
     : e.weight;
 }
+// HT-56: Average weekly weight change from July 1, 2026 (TREND_CHART_START)
+// to the most recent logged entry, nude-equivalent. Uses the first and
+// latest entries within the window rather than a full regression, matching
+// the existing "X lb since [date]" change pattern already shown on the
+// Weight tab hero card. Negative perWeek = losing; positive = gaining.
+function avgWeeklyWeightChange(entries) {
+  const inRange = [...(entries || [])]
+    .filter(e => e.date >= TREND_CHART_START)
+    .sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
+  if (inRange.length < 2) return null;
+  const startE = inRange[0], endE = inRange[inRange.length - 1];
+  const daysElapsed = Math.round((new Date(endE.date + "T00:00:00").getTime() - new Date(startE.date + "T00:00:00").getTime()) / 86400000);
+  if (daysElapsed < 7) return null; // need at least a week of spread for a meaningful weekly rate
+  const startW = weightNudeEquivalent(startE), endW = weightNudeEquivalent(endE);
+  const perWeek = +((endW - startW) / (daysElapsed / 7)).toFixed(2);
+  return { perWeek, startDate: startE.date, endDate: endE.date, weeks: +(daysElapsed / 7).toFixed(1) };
+}
 function phaseRateForWeek(cfg, weekNum) {
   if (weekNum <= cfg.phase1EndWeek) return cfg.phase1Rate;
   if (weekNum <= cfg.phase2EndWeek) return cfg.phase2Rate;
@@ -1189,8 +1206,9 @@ function TrendChart({
         ))
       ),
       /*#__PURE__*/React.createElement("svg", {
-        width, height,
-        style: { display: "block", overflow: "visible" }
+        viewBox: `0 0 ${width} ${height}`,
+        preserveAspectRatio: "xMidYMid meet",
+        style: { display: "block", overflow: "visible", width: "100%", height: "auto", maxWidth: width }
       },
         ...activeSeries.flatMap((s, si) => {
           const sorted = [...s.points].sort((a, b) => a.date.localeCompare(b.date));
@@ -1239,9 +1257,9 @@ function TrendChart({
   // than simply omitted.
   const goalY = (goal != null && goal >= mn && goal <= mx) ? yFor(goal) : null;
   return /*#__PURE__*/React.createElement("svg", {
-    width,
-    height,
-    style: { display: "block", overflow: "visible" }
+    viewBox: `0 0 ${width} ${height}`,
+    preserveAspectRatio: "xMidYMid meet",
+    style: { display: "block", overflow: "visible", width: "100%", height: "auto", maxWidth: width }
   },
     goalY != null && /*#__PURE__*/React.createElement("line", {
       x1: pad, y1: goalY, x2: width - pad, y2: goalY,
@@ -1870,6 +1888,8 @@ function WeightTab({
     const avg = inWindow.reduce((s, e) => s + nudeEq(e), 0) / inWindow.length;
     return { avg: +avg.toFixed(1), n: inWindow.length };
   })();
+  // HT-56: average weekly weight change since July 1, 2026 (nude-equivalent).
+  const avgWeekly = avgWeeklyWeightChange(entries);
   function save() {
     if (!f.weight || !f.date) return;
     const entry = {
@@ -1963,7 +1983,14 @@ function WeightTab({
         color: C.faint,
         marginTop: 4
       }
-    }, "7-day avg (nude-equiv): ", rolling7.avg, " lb (", rolling7.n, " reading", rolling7.n === 1 ? "" : "s", ")")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    }, "7-day avg (nude-equiv): ", rolling7.avg, " lb (", rolling7.n, " reading", rolling7.n === 1 ? "" : "s", ")"), avgWeekly && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: avgWeekly.perWeek <= 0 ? "#22c55e" : "#ef4444",
+        marginTop: 4,
+        fontWeight: 600
+      }
+    }, "Avg ", avgWeekly.perWeek <= 0 ? "loss" : "gain", ": ", Math.abs(avgWeekly.perWeek), " lb/wk (since ", fmtDate(TREND_CHART_START), ")")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 26,
         fontWeight: 700,
@@ -6933,6 +6960,7 @@ function Dashboard({
   weightProjectionConfig
 }) {
   const dashDailyTarget = interpolatedWeightTarget(weightProjectionConfig, wData);
+  const dashAvgWeekly = avgWeeklyWeightChange(wData);
   const bpSorted = [...(bpData || [])].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
   const latestBP = bpSorted[0];
   const prevBP = bpSorted[1];
@@ -7059,6 +7087,9 @@ function Dashboard({
               dashDailyTarget.actual != null && (dashDailyTarget.status === "ahead"
                 ? ` · Ahead by ${Math.abs(dashDailyTarget.diff)} lb`
                 : ` · Behind by ${dashDailyTarget.diff} lb`)
+            ),
+            dashAvgWeekly && /*#__PURE__*/React.createElement("div", { style: { fontSize: 10, color: C.faint, marginTop: 4, textAlign: "center" } },
+              "Avg ", dashAvgWeekly.perWeek <= 0 ? "loss" : "gain", ": ", Math.abs(dashAvgWeekly.perWeek), " lb/wk"
             )
           );
         })()
