@@ -6388,10 +6388,13 @@ function ExportTab({
     }
   }, {
     label: 'Medications',
-    count: meds.length,
+    // HT-57: exclude Stopped/inactive medications from this roster export,
+    // same active-status filter HT-54 already applies to Medication
+    // Adherence. Active and Pending medications remain included.
+    count: meds.filter(m => m.active).length,
     build: () => {
       const rows = [['Name', 'Dose', 'Frequency', 'Start Date', 'Status', 'Notes']];
-      meds.forEach(m => rows.push([m.name, m.dose || '', m.frequency, m.startDate, m.active ? (m.startDate > today() ? 'Pending' : 'Active') : 'Inactive', m.notes || '']));
+      meds.filter(m => m.active).forEach(m => rows.push([m.name, m.dose || '', m.frequency, m.startDate, m.startDate > today() ? 'Pending' : 'Active', m.notes || '']));
       return makeCSV(rows);
     }
   }, {
