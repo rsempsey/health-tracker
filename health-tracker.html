@@ -5636,11 +5636,10 @@ function PDFSummary({
     style: S.th
   }, "Status"), /*#__PURE__*/React.createElement("th", {
     style: S.th
-  }, "Notes"))), /*#__PURE__*/React.createElement("tbody", null, allMeds.map((m, i) => /*#__PURE__*/React.createElement("tr", {
+  }, "Notes"))), /*#__PURE__*/React.createElement("tbody", null, allMeds.filter(m => m.active).map((m, i) => /*#__PURE__*/React.createElement("tr", {
     key: m.id,
     style: {
-      background: i % 2 === 0 ? '#fff' : '#fafafa',
-      opacity: m.active ? 1 : 0.7
+      background: i % 2 === 0 ? '#fff' : '#fafafa'
     }
   }, /*#__PURE__*/React.createElement("td", {
     style: {
@@ -5656,10 +5655,10 @@ function PDFSummary({
   }, fmtDate(m.startDate)), /*#__PURE__*/React.createElement("td", {
     style: {
       ...S.td,
-      color: m.active ? (m.startDate > today() ? '#f97316' : '#22c55e') : '#9ca3af',
+      color: m.startDate > today() ? '#f97316' : '#22c55e',
       fontWeight: 600
     }
-  }, m.active ? (m.startDate > today() ? 'Pending' : 'Active') : 'Inactive'), /*#__PURE__*/React.createElement("td", {
+  }, m.startDate > today() ? 'Pending' : 'Active'), /*#__PURE__*/React.createElement("td", {
     style: {
       ...S.td,
       fontSize: 10,
