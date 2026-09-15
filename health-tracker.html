@@ -6947,6 +6947,91 @@ function ExportTab({
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
+// HT-58: Dashboard card for mySugr HealthKit readings that
+// HealthTrackerBridge couldn't confidently auto-classify as Fasting (outside
+// the 4-9am morning window). Full-width, hidden entirely when the flagged
+// queue is empty — same conditional-render pattern as the Water hero card.
+// Tapping the summary line expands an inline list; each entry gets a
+// reading-type dropdown (defaulting to Random, matching the 3-day
+// auto-default's own choice) and a Confirm button that writes it into
+// glucose-log and removes it from the flagged queue. Left unreviewed, the
+// App-level 3-day auto-default effect handles it instead — this card and
+// that effect are two paths to the same resolution, not overlapping duties.
+function FlaggedGlucoseCard({
+  flaggedGlucoseLog,
+  setFlaggedGlucoseLog,
+  glucoseLog,
+  setGlucoseLog
+}) {
+  const [open, setOpen] = useState(false);
+  const [choices, setChoices] = useState({});
+
+  const entries = flaggedGlucoseLog || [];
+  const count = entries.length;
+  if (!count) return null;
+
+  const sorted = [...entries].sort((a, b) => (b.date + (b.time || "")).localeCompare(a.date + (a.time || "")));
+
+  function resolve(entry) {
+    const readingType = choices[entry.id] || "Random";
+    const newEntry = {
+      id: Date.now(),
+      date: entry.date,
+      time: entry.time || "",
+      value: entry.value,
+      readingType,
+      mealNote: "Reviewed from flagged HealthKit reading (mySugr)",
+      lastMealTime: ""
+    };
+    setGlucoseLog([...(glucoseLog || []), newEntry]);
+    setFlaggedGlucoseLog(entries.filter(e => e.id !== entry.id));
+  }
+
+  return /*#__PURE__*/React.createElement("div", { style: { marginBottom: 10, textAlign: "center" } },
+    /*#__PURE__*/React.createElement(Card, { style: { cursor: "pointer" }, onClick: () => setOpen(!open) },
+      /*#__PURE__*/React.createElement(SectionTitle, null, "GLUCOSE — NEEDS REVIEW"),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 18, fontWeight: 800, color: "#f97316", letterSpacing: -0.3, textAlign: "center" } },
+        count, " reading", count > 1 ? "s" : "", " to classify"
+      ),
+      /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 4, textAlign: "center" } },
+        open ? "Tap to collapse" : "Tap to review"
+      )
+    ),
+    open && /*#__PURE__*/React.createElement(Card, { style: { marginTop: 8, textAlign: "left" } },
+      sorted.map((entry, i) => /*#__PURE__*/React.createElement("div", {
+        key: entry.id,
+        style: {
+          paddingBottom: 10,
+          marginBottom: i < sorted.length - 1 ? 10 : 0,
+          borderBottom: i < sorted.length - 1 ? `1px solid ${C.border}` : "none"
+        }
+      },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.text } },
+          Math.round(entry.value), " mg/dL — ", fmtDate(entry.date), entry.time ? ` at ${entry.time}` : ""
+        ),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8, alignItems: "center" } },
+          /*#__PURE__*/React.createElement("select", {
+            style: { ...inputSt, flex: 1 },
+            value: choices[entry.id] || "Random",
+            onChange: e => setChoices({ ...choices, [entry.id]: e.target.value })
+          },
+            /*#__PURE__*/React.createElement("option", { value: "Fasting" }, "Fasting"),
+            /*#__PURE__*/React.createElement("option", { value: "Post-meal" }, "Post-meal"),
+            /*#__PURE__*/React.createElement("option", { value: "Random" }, "Random")
+          ),
+          /*#__PURE__*/React.createElement("button", {
+            onClick: () => resolve(entry),
+            style: {
+              fontSize: 13, color: "#fff", background: C.accent, border: "none",
+              borderRadius: 6, cursor: "pointer", padding: "8px 14px", fontWeight: 600, whiteSpace: "nowrap"
+            }
+          }, "Confirm")
+        )
+      ))
+    )
+  );
+}
+
 function Dashboard({
   setTab,
   bp: bpData,
@@ -6957,9 +7042,12 @@ function Dashboard({
   meds,
   medLogs,
   glucoseLog,
+  setGlucoseLog,
   cgmSummaryLog,
   healthkitDailyLog,
-  weightProjectionConfig
+  weightProjectionConfig,
+  flaggedGlucoseLog,
+  setFlaggedGlucoseLog
 }) {
   const dashDailyTarget = interpolatedWeightTarget(weightProjectionConfig, wData);
   const dashAvgWeekly = avgWeeklyWeightChange(wData);
@@ -7050,6 +7138,12 @@ function Dashboard({
           /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 4, textAlign: "center" } }, medSub)
         )
       ),
+      /*#__PURE__*/React.createElement(FlaggedGlucoseCard, {
+        flaggedGlucoseLog,
+        setFlaggedGlucoseLog,
+        glucoseLog,
+        setGlucoseLog
+      }),
       /*#__PURE__*/React.createElement("div", {
         style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10, textAlign: "center" }
       },
@@ -7447,7 +7541,41 @@ function App() {
   // HT-36: read-only from the web app's perspective — written by
   // HealthTrackerBridge (native), auto-write, no confirm step.
   const [postMealPeakLog, setPostMealPeakLog, pmpLoaded] = usePersistedState("post-meal-peak-log", []);
-  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded && cgmLoaded && hkdlLoaded && cgmDraftLoaded && bmLoaded && wpcLoaded && pmpLoaded;
+  // HT-58: HealthTrackerBridge writes a mySugr-sourced glucose reading here
+  // instead of glucose-log when it falls outside the 4-9am morning window
+  // (native side can't confidently auto-classify it as Fasting). The
+  // Dashboard's "Glucose — Needs Review" card lets Bob pick the real
+  // reading type; the auto-default effect below handles anything left
+  // unreviewed for 3 days.
+  const [flaggedGlucoseLog, setFlaggedGlucoseLog, fgLoaded] = usePersistedState("flagged-glucose-log", []);
+  const allLoaded = bpLoaded && wLoaded && labLoaded && gLoaded && jLoaded && mLoaded && mlLoaded && glLoaded && cgmLoaded && hkdlLoaded && cgmDraftLoaded && bmLoaded && wpcLoaded && pmpLoaded && fgLoaded;
+
+  // HT-58: 3-day auto-default. Any flagged-glucose-log entry whose date is
+  // 3+ calendar days old (daysSinceDate, day-granularity, same helper used
+  // by the BM tab's "days since last logged" indicator) gets auto-logged
+  // into glucose-log as Random and cleared from the flagged queue — no
+  // manual confirmation required, per HT-58's scope decision. Runs whenever
+  // flaggedGlucoseLog changes (including right after load); idempotent,
+  // since a run that finds nothing overdue is a no-op and processed entries
+  // are removed from flaggedGlucoseLog so they can't be reprocessed.
+  useEffect(() => {
+    if (!allLoaded) return;
+    const overdue = (flaggedGlucoseLog || []).filter(e => daysSinceDate(e.date) >= 3);
+    if (!overdue.length) return;
+    const newEntries = overdue.map((e, i) => ({
+      id: Date.now() + i,
+      date: e.date,
+      time: e.time || "",
+      value: e.value,
+      readingType: "Random",
+      mealNote: "Auto-defaulted to Random after 3 days unreviewed (flagged HealthKit reading, mySugr)",
+      lastMealTime: ""
+    }));
+    setGlucoseLog([...(glucoseLog || []), ...newEntries]);
+    setFlaggedGlucoseLog((flaggedGlucoseLog || []).filter(e => daysSinceDate(e.date) < 3));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allLoaded, flaggedGlucoseLog]);
+
   const shared = {
     bp,
     setBp,
@@ -7476,7 +7604,9 @@ function App() {
     weightProjectionConfig,
     setWeightProjectionConfig,
     postMealPeakLog,
-    setPostMealPeakLog
+    setPostMealPeakLog,
+    flaggedGlucoseLog,
+    setFlaggedGlucoseLog
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "app-root",
