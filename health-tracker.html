@@ -1874,6 +1874,8 @@ function WeightTab({
   const first = sorted[sorted.length - 1];
   const nudeEq = e => (e.condition === "clinical" || e.condition === "clothed" || e.condition === "light") ? +(e.weight + CLOTHING_OFFSET).toFixed(1) : e.weight;
   const change = latest && first && latest.id !== first.id ? (nudeEq(latest) - nudeEq(first)).toFixed(1) : null;
+  // HT-60: percentage companion to the lb-since-first-entry change above, same basis (nude-equivalent).
+  const changePct = latest && first && latest.id !== first.id ? ((nudeEq(latest) - nudeEq(first)) / nudeEq(first) * 100).toFixed(1) : null;
   // HT-34: filters the ALL ENTRIES list only; does not affect latest/rolling7/chart/targets.
   const allEntriesFiltered = (dateFrom || dateTo)
     ? sorted.filter(e => (!dateFrom || e.date >= dateFrom) && (!dateTo || e.date <= dateTo))
@@ -1977,7 +1979,7 @@ function WeightTab({
         marginTop: 2,
         fontWeight: 600
       }
-    }, +change > 0 ? "+" : "", change, " lb since ", fmtDate(first.date)), rolling7 && /*#__PURE__*/React.createElement("div", {
+    }, +change > 0 ? "+" : "", change, " lb (", +changePct > 0 ? "+" : "", changePct, "%) since ", fmtDate(first.date)), rolling7 && /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 12,
         color: C.faint,
@@ -5579,6 +5581,8 @@ function PDFSummary({
     style: S.th
   }, "Nude Equiv."), /*#__PURE__*/React.createElement("th", {
     style: S.th
+  }, "Since Previous"), /*#__PURE__*/React.createElement("th", {
+    style: S.th
   }, "BMI"), /*#__PURE__*/React.createElement("th", {
     style: S.th
   }, "Condition"), /*#__PURE__*/React.createElement("th", {
@@ -5588,6 +5592,10 @@ function PDFSummary({
     weight.forEach(e => {
       if (!byDate[e.date] || (e.time || '') > (byDate[e.date].time || '')) byDate[e.date] = e;
     });
+    // HT-60: previous-logged-day lookup walks the full per-day history (not
+    // just the visible 7-day window), so a gap in the last 7 days still
+    // compares against the last day that actually had a reading.
+    const sortedByDateDates = Object.keys(byDate).sort();
     return last7Dates().map((d, i) => {
       const e = byDate[d];
       const rowStyle = { background: i % 2 === 0 ? '#fff' : '#fafafa' };
@@ -5599,16 +5607,28 @@ function PDFSummary({
           /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
           /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
           /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+          /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
           /*#__PURE__*/React.createElement("td", { style: S.td }, "—")
         );
       }
       const n = normW(e);
+      const dIdx = sortedByDateDates.indexOf(d);
+      const prevDate = dIdx > 0 ? sortedByDateDates[dIdx - 1] : null;
+      const prevEntry = prevDate ? byDate[prevDate] : null;
+      const prevN = prevEntry ? normW(prevEntry) : null;
+      let sincePrev = '—';
+      if (prevN) {
+        const deltaLb = +(n.w - prevN.w).toFixed(1);
+        const deltaPct = +((n.w - prevN.w) / prevN.w * 100).toFixed(1);
+        sincePrev = `${deltaLb > 0 ? '+' : ''}${deltaLb} lb (${deltaPct > 0 ? '+' : ''}${deltaPct}%)`;
+      }
       const condLabel = e.condition === 'nude' ? 'Nude' : e.condition === 'light' ? 'Light clothing' : e.condition === 'clothed' ? 'Fully clothed' : 'Clinical/Office';
       return /*#__PURE__*/React.createElement("tr", { key: d, style: rowStyle },
         /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(e.date)),
         /*#__PURE__*/React.createElement("td", { style: S.td }, e.time || '—'),
         /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600 } }, e.weight, " lb"),
         /*#__PURE__*/React.createElement("td", { style: { ...S.td, ...(n.isEst ? { color: '#7c3aed', fontStyle: 'italic' } : { fontWeight: 600 }) } }, n.isEst ? n.w + ' lb (est.)' : e.weight + ' lb'),
+        /*#__PURE__*/React.createElement("td", { style: S.td }, sincePrev),
         /*#__PURE__*/React.createElement("td", { style: S.td }, bmi(n.w)),
         /*#__PURE__*/React.createElement("td", { style: S.td }, condLabel),
         /*#__PURE__*/React.createElement("td", { style: S.td }, e.notes || '')
@@ -6476,11 +6496,25 @@ function ExportTab({
     label: 'Weight',
     count: weightF.length,
     build: () => {
-      const rows = [['Date', 'Time', 'Weight (lb)', 'Condition', 'Est. Nude (lb)', 'BMI', 'Notes']];
+      const rows = [['Date', 'Time', 'Weight (lb)', 'Condition', 'Est. Nude (lb)', 'BMI', 'Since Previous (nude-equiv.)', 'Notes']];
+      // HT-60: delta vs. the previous logged entry (full unfiltered history,
+      // entry granularity, not just entries within the CSV's Since window),
+      // nude-equivalent basis, mirroring the Weight tab's since-first-entry stat.
+      const allWSorted = [...weight].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
       [...weightF].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || ''))).forEach(e => {
         const isCl = e.condition === 'clinical' || e.condition === 'clothed' || e.condition === 'light';
         const nude = isCl ? +(e.weight + CLOTHING_OFFSET).toFixed(1) : e.weight;
-        rows.push([e.date, e.time || '', e.weight, e.condition || 'nude', nude, bmi(nude), e.notes || '']);
+        const idx = allWSorted.findIndex(x => x.id === e.id);
+        const prev = idx > 0 ? allWSorted[idx - 1] : null;
+        let sincePrev = '';
+        if (prev) {
+          const prevIsCl = prev.condition === 'clinical' || prev.condition === 'clothed' || prev.condition === 'light';
+          const prevNude = prevIsCl ? +(prev.weight + CLOTHING_OFFSET).toFixed(1) : prev.weight;
+          const deltaLb = +(nude - prevNude).toFixed(1);
+          const deltaPct = +((nude - prevNude) / prevNude * 100).toFixed(1);
+          sincePrev = `${deltaLb > 0 ? '+' : ''}${deltaLb} lb (${deltaPct > 0 ? '+' : ''}${deltaPct}%)`;
+        }
+        rows.push([e.date, e.time || '', e.weight, e.condition || 'nude', nude, bmi(nude), sincePrev, e.notes || '']);
       });
       return makeCSV(rows);
     }
