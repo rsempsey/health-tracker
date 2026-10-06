@@ -617,6 +617,120 @@ function dateForWeightTarget(cfg, weightEntries, targetWeight) {
   if (last.target === targetWeight) return { date: last.date, currentMilestone: last, nextMilestone: last };
   return { outOfRange: true, horizonDate: last.date, horizonWeight: last.target };
 }
+// HT-61: Trend-based projection for the Weight tab's Projection Lookup card.
+// Starts from the regression-line value at the latest weigh-in (not the raw
+// latest reading, which carries day-to-day noise) and applies the slope of
+// the last 42 days, scaled week by week by the model's phase rates (phase
+// rate for that week / phase rate for the latest weigh-in's week) so the
+// pace follows the model's glide path. The milestone-table functions above
+// are untouched (still used by Today's Target and the Weight Target
+// Comparison export); only the Projection Lookup card calls these.
+const TREND_WINDOW_DAYS = 42;
+const TREND_MIN_DAYS = 5;
+function trendDayNum(dateStr) {
+  return Math.round(new Date(dateStr + "T00:00:00").getTime() / 86400000);
+}
+function trendAddDays(dateStr, n) {
+  const b = new Date(dateStr + "T00:00:00");
+  return localDateStr(new Date(b.getFullYear(), b.getMonth(), b.getDate() + n));
+}
+// One nude-equivalent value per date (average if several entries that day,
+// e.g. repeated HealthKit syncs), last 42 days ending at the latest weigh-in,
+// ordinary least-squares line. level = fitted value at the latest date.
+function trendProjectionBasis(cfg, weightEntries) {
+  if (!cfg || !cfg.startDate) return null;
+  const byDate = {};
+  for (const e of (weightEntries || [])) {
+    if (!e || !e.date || e.weight == null || e.weight === "") continue;
+    const w = weightNudeEquivalent({ ...e, weight: +e.weight });
+    if (!isFinite(w)) continue;
+    (byDate[e.date] = byDate[e.date] || []).push(w);
+  }
+  const dates = Object.keys(byDate).sort();
+  if (!dates.length) return { insufficient: true, count: 0 };
+  const latestDate = dates[dates.length - 1];
+  const latestDay = trendDayNum(latestDate);
+  const pts = dates
+    .map(d => ({ x: trendDayNum(d) - latestDay, y: byDate[d].reduce((a, v) => a + v, 0) / byDate[d].length }))
+    .filter(p => p.x > -TREND_WINDOW_DAYS);
+  if (pts.length < TREND_MIN_DAYS) return { insufficient: true, count: pts.length, latestDate };
+  const n = pts.length;
+  const mx = pts.reduce((a, p) => a + p.x, 0) / n;
+  const my = pts.reduce((a, p) => a + p.y, 0) / n;
+  let sxx = 0, sxy = 0;
+  for (const p of pts) { sxx += (p.x - mx) * (p.x - mx); sxy += (p.x - mx) * (p.y - my); }
+  const slope = sxx > 0 ? sxy / sxx : 0;
+  const levelRaw = my + slope * (0 - mx);
+  const startDay = trendDayNum(cfg.startDate);
+  const wkLatest = Math.floor((latestDay - startDay) / 7) + 1;
+  let nextStepDate = null;
+  if (wkLatest <= cfg.phase1EndWeek) nextStepDate = trendAddDays(cfg.startDate, cfg.phase1EndWeek * 7);
+  else if (wkLatest <= cfg.phase2EndWeek) nextStepDate = trendAddDays(cfg.startDate, cfg.phase2EndWeek * 7);
+  return {
+    latestDate, latestDay, startDay, wkLatest, count: n, nextStepDate,
+    levelRaw, level: +levelRaw.toFixed(1),
+    slopePerDay: slope, slopePerWeek: +(slope * 7).toFixed(2)
+  };
+}
+// Multiplier on the fitted daily slope for a given future day: the model's
+// phase rate for that day's program week relative to the phase rate of the
+// week the latest weigh-in falls in (1.0 until the next phase boundary).
+function trendStepFactor(cfg, basis, dayNum) {
+  const wk = Math.floor((dayNum - basis.startDay) / 7) + 1;
+  const base = phaseRateForWeek(cfg, basis.wkLatest);
+  return base > 0 ? phaseRateForWeek(cfg, wk) / base : 1;
+}
+function trendProjectedWeight(cfg, basis, daysAhead) {
+  let w = basis.levelRaw;
+  for (let j = 1; j <= daysAhead; j++) w += basis.slopePerDay * trendStepFactor(cfg, basis, basis.latestDay + j);
+  return w;
+}
+// "What weight should I be on date X?" Returns { target, basis } or
+// { outOfRange: true, reason, ... } (insufficient | not-after-latest | beyond-horizon).
+function trendProjectionForDate(cfg, weightEntries, dateStr) {
+  if (!cfg || !cfg.startDate || !dateStr) return null;
+  const basis = trendProjectionBasis(cfg, weightEntries);
+  if (!basis) return null;
+  if (basis.insufficient) return { outOfRange: true, reason: "insufficient", count: basis.count };
+  const k = trendDayNum(dateStr) - basis.latestDay;
+  if (k <= 0) return { outOfRange: true, reason: "not-after-latest", latestDate: basis.latestDate };
+  const horizonDay = basis.startDay + (cfg.totalWeeks - 1) * 7;
+  if (basis.latestDay + k > horizonDay) {
+    return {
+      outOfRange: true, reason: "beyond-horizon",
+      horizonDate: trendAddDays(cfg.startDate, (cfg.totalWeeks - 1) * 7),
+      horizonWeight: +trendProjectedWeight(cfg, basis, Math.max(0, horizonDay - basis.latestDay)).toFixed(1),
+      basis
+    };
+  }
+  return { target: +trendProjectedWeight(cfg, basis, k).toFixed(1), basis };
+}
+// "When should I hit weight Y?" Walks forward day by day along the same
+// glide path until the line crosses targetWeight.
+function trendDateForWeight(cfg, weightEntries, targetWeight) {
+  if (!cfg || !cfg.startDate || targetWeight == null || isNaN(targetWeight)) return null;
+  const basis = trendProjectionBasis(cfg, weightEntries);
+  if (!basis) return null;
+  if (basis.insufficient) return { outOfRange: true, reason: "insufficient", count: basis.count };
+  if (targetWeight >= basis.levelRaw) return { outOfRange: true, reason: "already", level: basis.level, latestDate: basis.latestDate, basis };
+  if (basis.slopePerDay >= 0) return { outOfRange: true, reason: "not-trending-down", basis };
+  const horizonDay = basis.startDay + (cfg.totalWeeks - 1) * 7;
+  let w = basis.levelRaw;
+  for (let day = basis.latestDay + 1; day <= horizonDay; day++) {
+    w += basis.slopePerDay * trendStepFactor(cfg, basis, day);
+    if (w <= targetWeight) return { date: trendAddDays(basis.latestDate, day - basis.latestDay), basis };
+  }
+  return {
+    outOfRange: true, reason: "beyond-horizon",
+    horizonDate: trendAddDays(cfg.startDate, (cfg.totalWeeks - 1) * 7),
+    horizonWeight: +w.toFixed(1), basis
+  };
+}
+function trendProjectionNote(b) {
+  return `Based on your last ${TREND_WINDOW_DAYS} days (${b.slopePerWeek > 0 ? "+" : ""}${b.slopePerWeek} lb/wk) from a trend-line weight of ${b.level} lb as of ${fmtDate(b.latestDate)}.` +
+    (b.nextStepDate ? ` Pace slows after ${fmtDate(b.nextStepDate)} per the model's phase schedule.` : "") +
+    " Projection only; not a guarantee.";
+}
 const SEED_MEDS = [{
   id: 1,
   name: "Amlodipine Besylate",
@@ -1854,9 +1968,11 @@ function WeightTab({
   const [lookupMode, setLookupMode] = useState("dateToWeight"); // "dateToWeight" | "weightToDate"
   const [lookupDate, setLookupDate] = useState(today());
   const [lookupWeight, setLookupWeight] = useState("");
+  // HT-61: Projection Lookup now projects from the current trend (fitted level +
+  // 42-day slope, glide-path scaled) instead of reading off the milestone table.
   const lookupResult = lookupMode === "dateToWeight"
-    ? (lookupDate ? weightTargetForDate(weightProjectionConfig, entries, lookupDate) : null)
-    : (lookupWeight !== "" ? dateForWeightTarget(weightProjectionConfig, entries, +lookupWeight) : null);
+    ? (lookupDate ? trendProjectionForDate(weightProjectionConfig, entries, lookupDate) : null)
+    : (lookupWeight !== "" ? trendDateForWeight(weightProjectionConfig, entries, +lookupWeight) : null);
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState(null);
   const [f, setF] = useState({
@@ -2129,25 +2245,31 @@ function WeightTab({
     onChange: e => setLookupWeight(e.target.value)
   })), lookupResult && lookupResult.outOfRange ? /*#__PURE__*/React.createElement("div", {
     style: { fontSize: 12, color: C.faint }
-  }, lookupResult.reason === "before-start"
-    ? `The projection model starts ${fmtDate(lookupResult.horizonStart)} — pick a later date.`
-    : `That's beyond the model's projection horizon (through ${fmtDate(lookupResult.horizonDate)}, projected to ${lookupResult.horizonWeight} lb). Try a nearer date or a less ambitious weight.`
+  }, lookupResult.reason === "insufficient"
+    ? `Not enough recent weigh-ins to project a trend (need ${TREND_MIN_DAYS} different days in the last ${TREND_WINDOW_DAYS}; have ${lookupResult.count}).`
+    : lookupResult.reason === "not-after-latest"
+    ? `Pick a date after your latest weigh-in (${fmtDate(lookupResult.latestDate)}).`
+    : lookupResult.reason === "already"
+    ? `Your trend line is already at or below ${lookupWeight} lb (${lookupResult.level} lb as of ${fmtDate(lookupResult.latestDate)}).`
+    : lookupResult.reason === "not-trending-down"
+    ? `Your last ${TREND_WINDOW_DAYS} days aren't trending down (${lookupResult.basis.slopePerWeek} lb/wk), so there's no date to project for ${lookupWeight} lb.`
+    : `That's beyond the projection horizon (through ${fmtDate(lookupResult.horizonDate)}, projected to ${lookupResult.horizonWeight} lb). Try a nearer date or a less ambitious weight.`
   ) : lookupResult && lookupMode === "dateToWeight" ? /*#__PURE__*/React.createElement("div", null,
     /*#__PURE__*/React.createElement("span", {
       style: { fontSize: 26, fontWeight: 800, color: C.text, letterSpacing: -0.5 }
     }, lookupResult.target), /*#__PURE__*/React.createElement("span", {
       style: { fontSize: 13, color: C.faint, marginLeft: 5 }
-    }, "lb target"),
+    }, "lb projected"),
     /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 11, color: C.faint, marginTop: 6 }
-    }, "Projection only — recalibrates as you log actual weigh-ins; not a guarantee.")
+    }, trendProjectionNote(lookupResult.basis))
   ) : lookupResult && lookupMode === "weightToDate" ? /*#__PURE__*/React.createElement("div", null,
     /*#__PURE__*/React.createElement("span", {
       style: { fontSize: 18, fontWeight: 700, color: C.text }
     }, "On pace to hit ", lookupWeight, " lb by ~", fmtDate(lookupResult.date)),
     /*#__PURE__*/React.createElement("div", {
       style: { fontSize: 11, color: C.faint, marginTop: 6 }
-    }, "Projection only — recalibrates as you log actual weigh-ins; not a guarantee.")
+    }, trendProjectionNote(lookupResult.basis))
   ) : /*#__PURE__*/React.createElement("div", {
     style: { fontSize: 12, color: C.faint }
   }, lookupMode === "weightToDate" ? "Enter a target weight above." : "Pick a date above.")), /*#__PURE__*/React.createElement(AddBtn, {
