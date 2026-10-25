@@ -875,6 +875,11 @@ function bpCat(s, d) {
     color: "#ef4444"
   };
 }
+// HT-70: signed display for a cgmOffset value ("+5", "-10", "0").
+function fmtCgmOffset(v) {
+  const n = Math.round(Number(v));
+  return n > 0 ? "+" + n : String(n);
+}
 function fmtDate(d) {
   if (!d) return "—";
   const [y, m, day] = d.split("-");
@@ -2990,6 +2995,9 @@ function GlucoseTab({
               )
             ) : /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, color: C.faint } }, "No CGM summary yet.")
           )
+        ),
+        latestCgm.cgmOffset != null && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: "#7c3aed", marginTop: 8 } },
+          "Offset applied: ", fmtCgmOffset(latestCgm.cgmOffset), " mg/dL (stats recalculated from raw readings)"
         )
       ),
       // Goal card — Average CGM Glucose
@@ -3091,6 +3099,7 @@ function GlucoseTab({
                 r.medianGlucose != null ? " · Median " + r.medianGlucose + " mg/dL" : null,
                 r.gmi != null ? " · GMI " + r.gmi + "%" : null
               ),
+              r.cgmOffset != null && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: "#7c3aed" } }, "Offset " + fmtCgmOffset(r.cgmOffset) + " mg/dL applied"),
               r.note && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint, fontStyle: "italic" } }, r.note)
             ),
             /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" } },
@@ -3148,6 +3157,9 @@ function GlucoseTab({
               ) : /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, color: C.faint } }, "No data")
             );
           })
+        ),
+        latestPmp.cgmOffset != null && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: "#7c3aed", marginTop: 8 } },
+          "Offset applied: ", fmtCgmOffset(latestPmp.cgmOffset), " mg/dL (peaks and troughs recalculated from raw readings)"
         )
       ),
       // Goal card — single shared streak requiring all 3 meals present and
@@ -3182,7 +3194,8 @@ function GlucoseTab({
                 label, ": ", peak != null ? `${Math.round(peak)} mg/dL${time ? ' (' + time + ')' : ''}${troughText}` : "—"
               );
             })
-          )
+          ),
+          e.cgmOffset != null && /*#__PURE__*/React.createElement("div", { style: { fontSize: 11, fontWeight: 600, color: "#7c3aed", marginTop: 4 } }, "Offset " + fmtCgmOffset(e.cgmOffset) + " mg/dL applied")
         ))
       ),
       (!postMealPeakLog || postMealPeakLog.length === 0) && /*#__PURE__*/React.createElement("div", {
@@ -5714,7 +5727,8 @@ function PDFSummary({
         /*#__PURE__*/React.createElement("th", { style: S.th }, "Meal Note"),
         /*#__PURE__*/React.createElement("th", { style: S.th }, "Avg CGM Glucose"),
         /*#__PURE__*/React.createElement("th", { style: S.th }, "Median CGM Glucose"),
-        /*#__PURE__*/React.createElement("th", { style: S.th }, "TIR")
+        /*#__PURE__*/React.createElement("th", { style: S.th }, "TIR"),
+        /*#__PURE__*/React.createElement("th", { style: S.th }, "Offset")
       )),
       /*#__PURE__*/React.createElement("tbody", null, (() => {
         const fastingByDate = {};
@@ -5746,7 +5760,8 @@ function PDFSummary({
               : /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
             (c && c.tir != null)
               ? /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontWeight: 600, color: tirColor } }, c.tir, "%")
-              : /*#__PURE__*/React.createElement("td", { style: S.td }, "—")
+              : /*#__PURE__*/React.createElement("td", { style: S.td }, "—"),
+            /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, (c && c.cgmOffset != null) ? fmtCgmOffset(c.cgmOffset) + " mg/dL" : "")
           );
         });
       })())
@@ -6411,7 +6426,8 @@ function PDFSummary({
           /*#__PURE__*/React.createElement("th", { style: S.th }, "Date"),
           /*#__PURE__*/React.createElement("th", { style: S.th }, "Breakfast Peak"),
           /*#__PURE__*/React.createElement("th", { style: S.th }, "Lunch Peak"),
-          /*#__PURE__*/React.createElement("th", { style: S.th }, "Dinner Peak")
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Dinner Peak"),
+          /*#__PURE__*/React.createElement("th", { style: S.th }, "Offset")
         )),
         /*#__PURE__*/React.createElement("tbody", null, last7Dates().map((d, i) => {
           const e = byDate[d];
@@ -6420,7 +6436,8 @@ function PDFSummary({
             /*#__PURE__*/React.createElement("td", { style: S.td }, fmtDate(d)),
             cell(e && e.breakfastPeak, e && e.breakfastPeakTime, e && e.breakfastTrough, e && e.breakfastDelta, e && e.breakfastTimeToTroughMinutes),
             cell(e && e.lunchPeak, e && e.lunchPeakTime, e && e.lunchTrough, e && e.lunchDelta, e && e.lunchTimeToTroughMinutes),
-            cell(e && e.dinnerPeak, e && e.dinnerPeakTime, e && e.dinnerTrough, e && e.dinnerDelta, e && e.dinnerTimeToTroughMinutes)
+            cell(e && e.dinnerPeak, e && e.dinnerPeakTime, e && e.dinnerTrough, e && e.dinnerDelta, e && e.dinnerTimeToTroughMinutes),
+            /*#__PURE__*/React.createElement("td", { style: { ...S.td, fontSize: 10 } }, (e && e.cgmOffset != null) ? fmtCgmOffset(e.cgmOffset) + " mg/dL" : "")
           );
         }))
       )
@@ -6801,7 +6818,8 @@ function ExportTab({
       const rows = [['Date',
         'Breakfast Peak (mg/dL)', 'Breakfast Peak Time', 'Breakfast Trough (mg/dL)', 'Breakfast Trough Time', 'Breakfast Delta (mg/dL)', 'Breakfast Time to Trough (min)',
         'Lunch Peak (mg/dL)', 'Lunch Peak Time', 'Lunch Trough (mg/dL)', 'Lunch Trough Time', 'Lunch Delta (mg/dL)', 'Lunch Time to Trough (min)',
-        'Dinner Peak (mg/dL)', 'Dinner Peak Time', 'Dinner Trough (mg/dL)', 'Dinner Trough Time', 'Dinner Delta (mg/dL)', 'Dinner Time to Trough (min)'
+        'Dinner Peak (mg/dL)', 'Dinner Peak Time', 'Dinner Trough (mg/dL)', 'Dinner Trough Time', 'Dinner Delta (mg/dL)', 'Dinner Time to Trough (min)',
+        'CGM Offset (mg/dL)'
       ]];
       [...postMealPeakLogF].sort((a, b) => a.date.localeCompare(b.date)).forEach(e => rows.push([
         e.date,
@@ -6822,7 +6840,8 @@ function ExportTab({
         e.dinnerTrough != null ? Math.round(e.dinnerTrough) : '',
         e.dinnerTroughTime || '',
         e.dinnerDelta != null ? Math.round(e.dinnerDelta) : '',
-        e.dinnerTimeToTroughMinutes != null ? e.dinnerTimeToTroughMinutes : ''
+        e.dinnerTimeToTroughMinutes != null ? e.dinnerTimeToTroughMinutes : '',
+        e.cgmOffset != null ? e.cgmOffset : ''
       ]));
       return makeCSV(rows);
     }
@@ -6857,12 +6876,13 @@ function ExportTab({
     label: 'Avg CGM Glucose',
     count: cgmSummaryLogF.length,
     build: () => {
-      const rows = [['Date', 'Avg CGM Glucose (mg/dL)', 'Median CGM Glucose (mg/dL)', 'Time in Range (%)']];
+      const rows = [['Date', 'Avg CGM Glucose (mg/dL)', 'Median CGM Glucose (mg/dL)', 'Time in Range (%)', 'CGM Offset (mg/dL)']];
       [...cgmSummaryLogF].sort((a, b) => a.date.localeCompare(b.date)).forEach(r => rows.push([
         r.date,
         r.avgGlucose != null ? r.avgGlucose : '',
         r.medianGlucose != null ? r.medianGlucose : '',
-        r.tir != null ? r.tir : ''
+        r.tir != null ? r.tir : '',
+        r.cgmOffset != null ? r.cgmOffset : ''
       ]));
       return makeCSV(rows);
     }
